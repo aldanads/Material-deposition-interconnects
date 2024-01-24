@@ -52,8 +52,10 @@ def initialization(n_sim,save_data):
     b = 0.358 # (nm)
     c = 0.358 # (nm)
     lattice_constants = (a,b,c)
-    crystal_size = (3, 3,0.358)
+    crystal_size = (3, 3,1)
     bravais_latt = ['fcc']
+    orientation = ['001','111']
+    lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
     
 # =============================================================================
 #     Activation energies
@@ -61,11 +63,14 @@ def initialization(n_sim,save_data):
 # =============================================================================
     E_mig = 0.4 # (eV)
 
+    # Binding energy | Desorption energy: https://doi.org/10.1039/D1SC04708F
+    # Surface: [0]-TaN, [1]-Ru25, [2]-Ru50, [3]-Ru100, [4]-1 ML Ru passivation
+    desorption_energy = [3.49, 3.58, 3.59, 3.64, 4.12]
 
 # =============================================================================
 #     Initialize the crystal grid structure - nodes with empty spaces
 # =============================================================================
-    Co_latt = Crystal_Lattice(lattice_constants,crystal_size,bravais_latt[0],experimental_conditions,E_mig)
+    Co_latt = Crystal_Lattice(lattice_properties,experimental_conditions,E_mig)
     
     
 # =============================================================================
@@ -76,7 +81,7 @@ def initialization(n_sim,save_data):
     test = [0,1,2]
 
     # Deposition process of chemical species
-    Co_latt.deposition_specie(0.0001,rng,test[0])
+    Co_latt.deposition_specie(0.0001,rng,test[1])
 
 
     return Co_latt,rng    

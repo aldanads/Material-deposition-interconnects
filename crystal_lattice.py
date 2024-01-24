@@ -10,24 +10,23 @@ from Site import Site
 from scipy import constants
 import numpy as np
 
+# Rotation of a vector - Is copper growing in [111] direction?
+# The basis vector is in [001]
+# https://stackoverflow.com/questions/48265646/rotation-of-a-vector-python
+
 
 class Crystal_Lattice():
     
-    def __init__(self,lattice_constants,crystal_size,bravais_latt,experimental_conditions,E_mig):
-        
-        self.lattice_constants = lattice_constants
-        self.bravais_latt = bravais_latt
-        self.crystal_size = crystal_size
+    def __init__(self,lattice_properties,experimental_conditions,E_mig):
+        self.lattice_constants = lattice_properties[0]
+        self.crystal_size = lattice_properties[1]
+        self.bravais_latt = lattice_properties[2]
+        self.latt_orientation = lattice_properties[3]
         self.chemical_specie = experimental_conditions[4]
         self.activation_energies = E_mig
         self.time = 0
-
         
-        self.latt = self.lattice_model()
-        self.basis_vectors = self.latt.vectors # Basis vectors
-        self.positions_cartesian = self.latt.positions # Position in cartesian coordinates
-        self.positions_idx = self.latt.indices[:,:3] # Position in lattices coordinates (indexes)
-        
+        self.lattice_model()
         self.crystal_grid()
         
         self.sites_occupied = [] # Sites occupy be a chemical specie
@@ -52,33 +51,78 @@ class Crystal_Lattice():
             latt.add_connections(1)
             latt.analyze()
             latt.build((self.crystal_size[0], self.crystal_size[1],self.crystal_size[2]))
-            return latt
-        
+            self.latt = latt
+
+            if self.latt_orientation == '001':
+                self.basis_vectors = self.latt.vectors # Basis vectors
+                self.positions_cartesian = self.latt.positions # Position in cartesian coordinates
+                self.positions_idx = self.latt.indices[:,:3] # Position in lattices coordinates (indexes)
+                
+            elif self.latt_orientation == '111':
+                basis_vectors = self.latt.vectors # Basis vectors
+
+                # Rotate around z axis 45 degrees
+                rotation_1 = ['z',np.pi/4]
+                vectors_1 = [list(self.rotate_vector(vector,rotation_1[0],rotation_1[1])) for vector in basis_vectors]
+
+                # We can calculate the angle establishing the condition that z components are the same for the three vectors 
+                rotation_2 = ['x',np.arctan(vectors_1[2][2]/(vectors_1[0][1] - vectors_1[2][1]))]
+                vectors_2 = [list(self.rotate_vector(vector,rotation_2[0],rotation_2[1])) for vector in vectors_1]
+                self.basis_vectors = vectors_2
+
     # Initialize the crystal grid with no chemical species
     def crystal_grid(self):
         
-        # Dictionary with lattice coordinates (indexes) as keys and Site objects as values
-        # Site includes:
-        #  - Chemical specie - Empty
-        #  - Position in cartesian coordinates
-        self.grid_crystal = {
-            tuple(idx):Site("Empty",
-                tuple(pos),
-                self.activation_energies)
-            for idx, pos in zip(self.positions_idx, self.positions_cartesian)
-        }
+        if self.latt_orientation == '001':
+            # Dictionary with lattice coordinates (indexes) as keys and Site objects as values
+            # Site includes:
+            #  - Chemical specie - Empty
+            #  - Position in cartesian coordinates
+            self.grid_crystal = {
+                tuple(idx):Site("Empty",
+                    tuple(pos),
+                    self.activation_energies)
+                for idx, pos in zip(self.positions_idx, self.positions_cartesian)
+            }
+            
+            # Pruning the neighbors according to the lattice domain
+            # E.g.: (0,0,0) only has 3 neighbors within the domain
+            #  - Nearest neighbors indexes
+            #  - Nearest neighbors cartesian
+            for idx,site in self.grid_crystal.items():
+                site.neighbors_analysis(self.grid_crystal,self.latt.get_neighbors(idx)[:,:3],self.latt.get_neighbor_positions(idx))
         
-        # Pruning the neighbors according to the lattice domain
-        # E.g.: (0,0,0) only has 3 neighbors within the domain
-        #  - Nearest neighbors indexes
-        #  - Nearest neighbors cartesian
-        for idx,node in self.grid_crystal.items():
-            node.neighbors_analysis(self.grid_crystal,self.latt.get_neighbors(idx)[:,:3],self.latt.get_neighbor_positions(idx))
+        elif self.latt_orientation == '111':
+
+            start_idx_site = (0,0,0) # Starting site
+            self.grid_crystal = {start_idx_site:Site("Empty",
+                (0,0,0),
+                self.activation_energies)}
+            
+            # We employ a Depth-First Search algorithm to build the grid_crystal
+            # based on the nearest neighbors of each site
+            # -----------------------------------------------------------------------
+            # Recursive is only valid for small crystal structures --> recursion depth error
+            # visited = set()
+            # self.dfs_recursive(start_idx_site, visited))
+            # -----------------------------------------------------------------------
+            self.dfs_iterative(start_idx_site)
+            
+            self.positions_idx = list(self.grid_crystal.keys())
+            self.positions_cartesian = [site.position for site in self.grid_crystal.values()]
+                
+            for idx,site in self.grid_crystal.items():
+                # Neighbors for each idx in grid_crystal
+                neighbors_positions = [self.idx_to_cart(idx) for idx in self.latt.get_neighbors(idx)[:,:3]]
+                site.neighbors_analysis(self.grid_crystal,self.latt.get_neighbors(idx)[:,:3],neighbors_positions)
+        
+            
+            
         
     def available_sites(self):
         
-        for idx,node in self.grid_crystal.items():
-            if (len(node.supp_by) > 0) and (node.chemical_specie == 'Empty'):
+        for idx,site in self.grid_crystal.items():
+            if (len(site.supp_by) > 0) and (site.chemical_specie == 'Empty'):
                 self.sites_available.append(idx)
                 
     def transition_rate_adsorption(self,experimental_conditions):
@@ -101,8 +145,8 @@ class Crystal_Lattice():
         else:
             # Otherwise, we count the sites in the layer 0
             n_sites_layer_0 = 0
-            for node in self.grid_crystal.values():
-                if node.position[2] < self.lattice_constants[2] * 0.1:
+            for site in self.grid_crystal.values():
+                if site.position[2] < self.lattice_constants[2] * 0.1:
                     n_sites_layer_0 += 1
 
 
@@ -170,7 +214,9 @@ class Crystal_Lattice():
         # Single particle in a determined place
         elif test == 1:
             
-            idx = (3,2,-2)
+            if self.latt_orientation == '001': idx = (3,2,-2)
+            elif self.latt_orientation == '111': idx = (1,11,-12)
+                
             
             # Introduce specie in the site
             sites_not_available,need_to_update = self.introduce_specie_site(idx,sites_not_available,need_to_update)
@@ -186,7 +232,8 @@ class Crystal_Lattice():
         # Single particle that disappear or migrate
         elif test == 2:
 
-            idx = (3,2,-2)
+            if self.latt_orientation == '001': idx = (3,2,-2)
+            elif self.latt_orientation == '111': idx = (1,11,-12)
             
             # Introduce specie in the site
             sites_not_available,need_to_update = self.introduce_specie_site(idx,sites_not_available,need_to_update)
@@ -277,13 +324,12 @@ class Crystal_Lattice():
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         
-        x = self.position_cartesian[:,0]
-        y = self.position_cartesian[:,1]
-        z = self.position_cartesian[:,2]
+        x,y,z = zip(*self.positions_cartesian)
         
         ax.scatter3D(x, y, z, c='blue', marker='o')
         ax.set_aspect('equal', 'box')
-        
+        ax.view_init(azim=60, elev=90)
+
         ax.set_xlabel('x-axis (nm)')
         ax.set_ylabel('y-axis (nm)')
         ax.set_zlabel('z-axis (nm)')
@@ -295,11 +341,9 @@ class Crystal_Lattice():
         
         fig = plt.figure(dpi=300)
         ax = fig.add_subplot(111, projection='3d')
-        
-        x = [site.position[0] for site in (self.grid_crystal[idx] for idx in self.sites_occupied)]
-        y = [site.position[1] for site in (self.grid_crystal[idx] for idx in self.sites_occupied)]
-        z = [site.position[2] for site in (self.grid_crystal[idx] for idx in self.sites_occupied)]
-                
+           
+        positions = np.array([self.grid_crystal[idx].position for idx in self.sites_occupied])
+        x, y, z = positions[:, 0], positions[:, 1], positions[:, 2]
         ax.scatter3D(x, y, z, c='blue', marker='o')
         
         ax.set_xlabel('x-axis (nm)')
@@ -312,3 +356,77 @@ class Crystal_Lattice():
         ax.set_aspect('equal', 'box')
 
         plt.show()
+        
+# =============================================================================
+#     Auxiliary functions
+#     
+# =============================================================================
+    # Function to rotate a vector
+    def rotate_vector(self,vector, axis, theta):
+        """
+        Rotates a 3D vector around a specified axis.
+    
+        Parameters:
+        - vector: The 3D vector to rotate.
+        - axis: The axis of rotation ('x', 'y', or 'z').
+        - theta: The rotation angle in radians.
+    
+        Returns:
+        The rotated vector.
+        """
+        if axis == 'x':
+            R = np.array([[1, 0, 0], [0, np.cos(theta), -np.sin(theta)], [0, np.sin(theta), np.cos(theta)]])
+        elif axis == 'y':
+            R = np.array([[np.cos(theta), 0, np.sin(theta)], [0, 1, 0], [-np.sin(theta), 0, np.cos(theta)]])
+        elif axis == 'z':
+            R = np.array([[np.cos(theta), -np.sin(theta), 0], [np.sin(theta), np.cos(theta), 0], [0, 0, 1]])
+        else:
+            raise ValueError("Invalid axis. Use 'x', 'y', or 'z'.")
+        
+        return np.dot(R, vector)
+    
+    # Depth-First Search - Traverse a network or a graph -> grid_crystal
+    def dfs_recursive(self, idx_site, visited):
+        # We calculate the cartesian coordinates of the site using the basis vectors
+        cart_site = self.idx_to_cart(idx_site)
+        # cart_site[2] >= -1e-3 to avoid that some sites in the zero layer get outside
+        if idx_site not in visited and (cart_site[0] >= 0 and cart_site[0] <= self.crystal_size[0]) and (cart_site[1] >= 0 and cart_site[1] <= self.crystal_size[1]) and (cart_site[2] >= -1e-3 and cart_site[2] <= self.crystal_size[2]):
+            # We track the created sites
+            visited.add(idx_site)
+            # We create the site with the cartesian coordinates
+            self.grid_crystal[idx_site] = Site("Empty",
+                tuple(cart_site),
+                self.activation_energies)
+            
+            for neighbor in self.latt.get_neighbors(idx_site):
+                self.dfs_recursive(tuple(neighbor[:3]), visited)
+                
+    def dfs_iterative(self, start_idx_site):
+        visited = set()
+        stack = [start_idx_site]
+    
+        while stack:
+            current_idx_site = stack.pop()
+            if current_idx_site in visited:
+                continue
+    
+            # Calculate the cartesian coordinates of the site using the basis vectors
+            cart_site = self.idx_to_cart(current_idx_site)
+    
+            if (
+                0 <= cart_site[0] <= self.crystal_size[0]
+                and 0 <= cart_site[1] <= self.crystal_size[1]
+                and -1e-3 <= cart_site[2] <= self.crystal_size[2]
+            ):
+                # Track the created site
+                visited.add(current_idx_site)
+                # Create the site with the cartesian coordinates
+                self.grid_crystal[current_idx_site] = Site(
+                    "Empty", tuple(cart_site), self.activation_energies
+                )
+    
+                # Push neighbors onto the stack
+                stack.extend(tuple(neighbor[:3]) for neighbor in self.latt.get_neighbors(current_idx_site))
+    
+    def idx_to_cart(self,idx):
+        return tuple(np.sum(idx * np.transpose(self.basis_vectors), axis=1))
