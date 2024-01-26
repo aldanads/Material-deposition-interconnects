@@ -27,6 +27,10 @@ class Crystal_Lattice():
         self.time = 0
         
         self.lattice_model()
+        
+        """ 
+        Need to establish boundary conditions in the xy plane 
+        """
         self.crystal_grid()
         
         self.sites_occupied = [] # Sites occupy be a chemical specie
@@ -114,17 +118,26 @@ class Crystal_Lattice():
             for idx,site in self.grid_crystal.items():
                 # Neighbors for each idx in grid_crystal
                 neighbors_positions = [self.idx_to_cart(idx) for idx in self.latt.get_neighbors(idx)[:,:3]]
-                site.neighbors_analysis(self.grid_crystal,self.latt.get_neighbors(idx)[:,:3],neighbors_positions)
+                site.neighbors_analysis(self.grid_crystal,self.latt.get_neighbors(idx)[:,:3],neighbors_positions,self.crystal_size)
         
             
             
         
-    def available_sites(self):
+    def available_sites(self, update_supp_av = []):
         
-        for idx,site in self.grid_crystal.items():
-            if (len(site.supp_by) > 0) and (site.chemical_specie == 'Empty'):
-                self.sites_available.append(idx)
-                
+        
+        if update_supp_av == []:
+            for idx,site in self.grid_crystal.items():
+                if (len(site.supp_by) > 0) and (site.chemical_specie == 'Empty'):
+                    self.sites_available.append(idx)
+        else:
+            for idx in update_supp_av:
+                if (idx in self.sites_available) and ((len(self.grid_crystal[idx].supp_by) == 0) or (self.grid_crystal[idx].chemical_specie != 'Empty')):
+                    self.sites_available.remove(idx)
+                    
+                elif (idx not in self.sites_available) and (len(self.grid_crystal[idx].supp_by) > 0) and self.grid_crystal[idx].chemical_specie == 'Empty':
+                    self.sites_available.append(idx)
+                    
     def transition_rate_adsorption(self,experimental_conditions):
 # =============================================================================
 #         Kim, S., An, H., Oh, S., Jung, J., Kim, B., Nam, S. K., & Han, S. (2022).
@@ -161,42 +174,46 @@ class Crystal_Lattice():
 # =============================================================================
 #             Introduce particle
 # =============================================================================
-    def introduce_specie_site(self,idx,sites_not_available,need_to_update):
+    def introduce_specie_site(self,idx,update_specie_events,update_supp_av):
         
         # Chemical specie deposited
         self.grid_crystal[idx].introduce_specie(self.chemical_specie)
-        self.sites_available.remove(idx)
         # Track sites occupied
         self.sites_occupied.append(idx) 
         # Track sites available
-        sites_not_available.append(idx)
+        update_specie_events.append(idx)
         # Nodes we need to update
-        need_to_update.update(self.grid_crystal[idx].nearest_neighbors_idx)
-        
-        return sites_not_available,need_to_update
+        update_supp_av.update(self.grid_crystal[idx].nearest_neighbors_idx)
+        update_supp_av.add(idx) # Update the new specie to calculate its supp_by
+
+        return update_specie_events,update_supp_av
     
 # =============================================================================
 #             Remove particle 
 # =============================================================================
-    def remove_specie_site(self,idx,sites_not_available,need_to_update):
+    def remove_specie_site(self,idx,update_specie_events,update_supp_av):
+        
         # Chemical specie removed
         self.grid_crystal[idx].remove_specie()
         # Track sites occupied
         self.sites_occupied.remove(idx) 
         # Track sites available
-        sites_not_available.remove(idx)
-        self.sites_available.append(idx)
+        update_specie_events.remove(idx)
+
         # Nodes we need to update
-        need_to_update.update(self.grid_crystal[idx].nearest_neighbors_idx)
+        update_supp_av.update(self.grid_crystal[idx].nearest_neighbors_idx)
+        update_supp_av.add(idx) # Update the new empty space to calculate its supp_by
         
-        return sites_not_available,need_to_update
+        return update_specie_events,update_supp_av
 
     def deposition_specie(self,t,rng,test = 0):
         
-        need_to_update = set()
+
+        update_supp_av = set()
         # We need to do a copy if we don't want to modify self.sites_occupied when
-        # we modify sites_not_available
-        sites_not_available = (self.sites_occupied).copy()
+        # we modify update_specie_events
+        # update_specie_events = (self.sites_occupied).copy()
+        update_specie_events = []
         
         if test == 0:
             
@@ -205,10 +222,10 @@ class Crystal_Lattice():
                 P = 1-np.exp(-self.TR_ad*t) # Adsorption probability in time t
                 if rng.random() < P:   
                     # Introduce specie in the site
-                    sites_not_available,need_to_update = self.introduce_specie_site(idx,sites_not_available,need_to_update)
+                    update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
 
-            # Update sites availables, the support to each site and available migrations
-            self.update_sites(sites_not_available,need_to_update)
+                    # Update sites availables, the support to each site and available migrations
+                    self.update_sites(update_specie_events,update_supp_av)
             
 
         # Single particle in a determined place
@@ -217,11 +234,10 @@ class Crystal_Lattice():
             if self.latt_orientation == '001': idx = (3,2,-2)
             elif self.latt_orientation == '111': idx = (1,11,-12)
                 
-            
             # Introduce specie in the site
-            sites_not_available,need_to_update = self.introduce_specie_site(idx,sites_not_available,need_to_update)
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
             # Update sites availables, the support to each site and available migrations
-            self.update_sites(sites_not_available,need_to_update)
+            self.update_sites(update_specie_events,update_supp_av)
                 
             print('Particle in position: ',idx, ' is a ', self.grid_crystal[idx].chemical_specie)
             print('Neighbors of that particle: ', self.grid_crystal[idx].nearest_neighbors_idx)
@@ -236,9 +252,9 @@ class Crystal_Lattice():
             elif self.latt_orientation == '111': idx = (1,11,-12)
             
             # Introduce specie in the site
-            sites_not_available,need_to_update = self.introduce_specie_site(idx,sites_not_available,need_to_update)
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
             # Update sites availables, the support to each site and available migrations
-            self.update_sites(sites_not_available,need_to_update)
+            self.update_sites(update_specie_events,update_supp_av)
                  
             print('Particle in position: ',idx, ' is a ', self.grid_crystal[idx].chemical_specie)
             print('Neighbors of that particle: ', self.grid_crystal[idx].nearest_neighbors_idx)
@@ -249,11 +265,10 @@ class Crystal_Lattice():
             print('Sites occupied: ', self.sites_occupied)
             print('Number of sites availables: ', len(self.sites_available))
             print('Possible events: ', self.grid_crystal[idx].site_events)
-
             # Remove particle
-            sites_not_available,need_to_update = self.remove_specie_site(idx,sites_not_available,need_to_update)
+            update_specie_events,update_supp_av = self.remove_specie_site(idx,update_specie_events,update_supp_av)
             # Update sites availables, the support to each site and available migrations
-            self.update_sites(sites_not_available,need_to_update)
+            self.update_sites(update_specie_events,update_supp_av)
                  
             print('Particle in position: ',idx, ' is a ', self.grid_crystal[idx].chemical_specie)
             print('Neighbors of that particle: ', self.grid_crystal[idx].nearest_neighbors_idx)
@@ -268,10 +283,15 @@ class Crystal_Lattice():
 
     
     def processes(self,chosen_event):
+        """
+        Need to change these names update_specie_events,need_to_update to something like
+        update_supp
+        update_specie_events
         
+        """
         site_affected = self.grid_crystal[chosen_event[-1]]
-        need_to_update = set()
-        sites_not_available = [chosen_event[-1]]
+        update_supp_av = set()
+        update_specie_events = [chosen_event[-1]]
         
 
 # =============================================================================
@@ -279,37 +299,36 @@ class Crystal_Lattice():
 # =============================================================================
         if chosen_event[2] < site_affected.num_mig_path:
             
+            
+            if (chosen_event[1] in self.grid_crystal[chosen_event[-1]].supp_by):
+                print('Problematic site events: ',self.grid_crystal[chosen_event[-1]].site_events)
+                print('Site origin: ', chosen_event[-1], 'Site destiny: ', chosen_event[1])
+                print('Support by: ',self.grid_crystal[chosen_event[-1]].supp_by)
+                print('Specie origin: ', self.grid_crystal[chosen_event[-1]].chemical_specie, 'Specie destiny: ', self.grid_crystal[chosen_event[1]].chemical_specie)
             # Introduce specie in the site
-            sites_not_available,need_to_update = self.introduce_specie_site(chosen_event[1],sites_not_available,need_to_update)
+            update_specie_events,update_supp_av = self.introduce_specie_site(chosen_event[1],update_specie_events,update_supp_av)
             
             # Remove particle
-            sites_not_available,need_to_update = self.remove_specie_site(chosen_event[-1],sites_not_available,need_to_update)
+            update_specie_events,update_supp_av = self.remove_specie_site(chosen_event[-1],update_specie_events,update_supp_av)
             # Update sites availables, the support to each site and available migrations
-            self.update_sites(sites_not_available,need_to_update)
+            self.update_sites(update_specie_events,update_supp_av)
   
     
-    def update_sites(self,sites_not_available,need_to_update):
-        
-        
-        if len(need_to_update) > 0:
+    def update_sites(self,update_specie_events,update_supp_av):
+
+        if update_supp_av:
             # There are new sites supported by the deposited chemical species
             # For loop over neighbors
-            for idx in need_to_update:
+            for idx in update_supp_av:
                 self.grid_crystal[idx].supported_by(self.grid_crystal)
-                
-                # If the site is supported by at least one specie, it becames 
-                # available
-                if len(self.grid_crystal[idx].supp_by) > 0:
-                    self.sites_available.append(idx)
-                
-        if len(sites_not_available) > 0: 
-            # Function filter() use a function and an iterable. 
-            # When the function is true, take the element from iterable
-            # Remove elements from "sites_not_available" that are in "sites_available"
-            #self.sites_available = list(filter(lambda i: i not in sites_not_available, self.sites_available))
+                self.available_sites(update_supp_av)
+                if self.grid_crystal[idx].chemical_specie != 'Empty':
+                    update_specie_events.append(idx)
         
+        
+        if update_specie_events: 
             # Sites are not available because a particle has migrated there
-            for idx in sites_not_available:
+            for idx in update_specie_events:
                 self.grid_crystal[idx].available_migrations(self.grid_crystal)
                 self.grid_crystal[idx].transition_rates()
 
@@ -412,11 +431,12 @@ class Crystal_Lattice():
     
             # Calculate the cartesian coordinates of the site using the basis vectors
             cart_site = self.idx_to_cart(current_idx_site)
-    
+   
+            
             if (
                 0 <= cart_site[0] <= self.crystal_size[0]
                 and 0 <= cart_site[1] <= self.crystal_size[1]
-                and -1e-3 <= cart_site[2] <= self.crystal_size[2]
+                and 0 <= cart_site[2] <= self.crystal_size[2]
             ):
                 # Track the created site
                 visited.add(current_idx_site)
@@ -429,4 +449,4 @@ class Crystal_Lattice():
                 stack.extend(tuple(neighbor[:3]) for neighbor in self.latt.get_neighbors(current_idx_site))
     
     def idx_to_cart(self,idx):
-        return tuple(np.sum(idx * np.transpose(self.basis_vectors), axis=1))
+        return tuple(round(element,3) for element in np.sum(idx * np.transpose(self.basis_vectors), axis=1))

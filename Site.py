@@ -30,7 +30,7 @@ class Site():
 # =============================================================================
 #     We only consider the neighbors within the lattice domain            
 # =============================================================================
-    def neighbors_analysis(self,grid_crystal,neigh_idx,neigh_cart):
+    def neighbors_analysis(self,grid_crystal,neigh_idx,neigh_cart,crystal_size):
        
         self.num_mig_path = len(neigh_idx)
         num_event = 0
@@ -39,6 +39,25 @@ class Site():
                 self.nearest_neighbors_idx.append(tuple(idx))             
                 self.nearest_neighbors_cart.append(tuple(pos))
                 self.migration_paths.append([tuple(idx),num_event])
+            
+            # Establish boundary conditions for neighbors in xy plane
+            # If pos is out of the boundary in xy but within z limits:
+            elif (0 <= pos[2] <= crystal_size[2]):
+                # Apply periodic boundary conditions in the xy plane
+                pos = (round(pos[0] % crystal_size[0], 3), round(pos[1] % crystal_size[1], 3), pos[2])
+    
+                # Find the nearest neighbor within the grid
+                min_dist, min_dist_idx = min(
+                    ((np.linalg.norm(np.array(site.position) - np.array(pos)), idx) for idx, site in grid_crystal.items()),
+                    key=lambda x: x[0]
+                )
+    
+                self.nearest_neighbors_idx.append(tuple(min_dist_idx))
+                self.nearest_neighbors_cart.append(tuple(grid_crystal[min_dist_idx].position))
+                self.migration_paths.append([tuple(min_dist_idx), num_event])
+                
+                
+                
             num_event+= 1
         self.num_event = num_event
             
@@ -78,22 +97,34 @@ class Site():
 
     # Calculate posible migration sites
     def available_migrations(self,grid_crystal):
-        # Remove the sites that are already occupied - can't migrate to that site
-        # self.site_events = list(filter(lambda x: x[0] != self.supp_by,
-        #                                self.migration_paths)) + self.site_events
+      
+        new_site_events = []
+        """
+        CAREFUL!!!!!, the movement of the particles shouldn't destroy any structure
+        For example, can atoms forming a tower lose one of the atoms in the middle?
+        """
+        
+        """
+        Two particles together on the substrate can support sites on the next layer and
+        make both to migrate without support under them --> Solve this issue
+        
+        --> When a particle migrate to some site, it should be supported at least 
+        """
         
         for item in self.migration_paths:
 
             # It should be supported by more than one, that is, not only by the migrating particle
             if (item[0] not in self.supp_by) and (len(grid_crystal[item[0]].supp_by) > 1):
+                
                 # It should be a copy of item to not modify item in place -->
                 # That modify migration_paths when we modify site_events
-                self.site_events.append(item.copy())
+                new_site_events.append(item.copy())
+                
+        self.site_events = new_site_events
+      
                 
         
-        """
-        The migration site should be supported by at least one specie
-        """
+
 
  
     

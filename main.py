@@ -20,8 +20,12 @@ for i in range(50):
     
     if i%1 == 0:
         Co_latt.plot_crystal()
+        """
+        I am using the total time for the "deposition_specie()" and it should be the 
+        KMC time step
+        """
         Co_latt.deposition_specie(Co_latt.time,rng)
-        print(len(Co_latt.sites_occupied))
+        print(len(Co_latt.sites_occupied) - len(set(Co_latt.sites_occupied)))
 
     
 Co_latt.deposition_specie(Co_latt.time,rng)

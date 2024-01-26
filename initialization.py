@@ -81,7 +81,7 @@ def initialization(n_sim,save_data):
     test = [0,1,2]
 
     # Deposition process of chemical species
-    Co_latt.deposition_specie(0.0001,rng,test[1])
+    Co_latt.deposition_specie(0.0001,rng,test[0])
 
 
     return Co_latt,rng    
