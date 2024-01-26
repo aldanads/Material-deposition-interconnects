@@ -283,12 +283,7 @@ class Crystal_Lattice():
 
     
     def processes(self,chosen_event):
-        """
-        Need to change these names update_specie_events,need_to_update to something like
-        update_supp
-        update_specie_events
-        
-        """
+ 
         site_affected = self.grid_crystal[chosen_event[-1]]
         update_supp_av = set()
         update_specie_events = [chosen_event[-1]]
@@ -299,7 +294,7 @@ class Crystal_Lattice():
 # =============================================================================
         if chosen_event[2] < site_affected.num_mig_path:
             
-            
+            print(chosen_event)
             if (chosen_event[1] in self.grid_crystal[chosen_event[-1]].supp_by):
                 print('Problematic site events: ',self.grid_crystal[chosen_event[-1]].site_events)
                 print('Site origin: ', chosen_event[-1], 'Site destiny: ', chosen_event[1])

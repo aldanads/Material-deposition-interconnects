@@ -59,18 +59,44 @@ def initialization(n_sim,save_data):
     
 # =============================================================================
 #     Activation energies
-#     
+#       - Migrating upward/downward one layer - It seems is promoted by other atoms surrounding
+#       - Migrating upward/downward two layers in one jump
+#           Nies, C. L., Natarajan, S. K., & Nolan, M. (2022). 
+#           Control of the Cu morphology on Ru-passivated and Ru-doped TaN surfaces-promoting growth of 2D conducting copper for CMOS interconnects. 
+#           Chemical Science, 13(3), 713–725. https://doi.org/10.1039/d1sc04708f
+#       - Migrating in plane
+#       - Clustering: Once they are together, difficult to split? Do they promote 
+#       specific migrations?
+#
 # =============================================================================
-    E_mig = 0.4 # (eV)
+    select_dataset = 0    
+    Act_E_dataset = ['TaN','Ru25','Ru50','Ru100','1 ML Ru']   
+    E_dataset = {'TaN':[0.4,0.7,0.33,0.84,0.44,0.76,0.74],
+              'Ru25':[0.4,0.92,1.58,0.94,0.30,1.21,1.25],
+              'Ru50':[0.4,0.62,0.78,1.18,1.08,1.86,1.82]}
+    E_mig_plane = E_dataset[Act_E_dataset[select_dataset]][0] # (eV)
+    E_mig_upward_subs_layer1 = E_dataset[Act_E_dataset[select_dataset]][1]
+    E_mig_downward_layer1_subs = E_dataset[Act_E_dataset[select_dataset]][2]
+    E_mig_upward_layer1_layer2 = E_dataset[Act_E_dataset[select_dataset]][3]
+    E_mig_upward_layer2_layer1 = E_dataset[Act_E_dataset[select_dataset]][4]
+    E_mig_upward_subs_layer2 = E_dataset[Act_E_dataset[select_dataset]][5]
+    E_mig_upward_layer2_subs = E_dataset[Act_E_dataset[select_dataset]][6]
+    
+    Act_E_list = [E_mig_plane,
+                  E_mig_upward_subs_layer1,E_mig_downward_layer1_subs,
+                  E_mig_upward_layer1_layer2,E_mig_upward_layer2_layer1,
+                  E_mig_upward_subs_layer2,E_mig_upward_layer2_subs]
+
 
     # Binding energy | Desorption energy: https://doi.org/10.1039/D1SC04708F
     # Surface: [0]-TaN, [1]-Ru25, [2]-Ru50, [3]-Ru100, [4]-1 ML Ru passivation
-    desorption_energy = [3.49, 3.58, 3.59, 3.64, 4.12]
+    desorption_energy = {'TaN':3.49, 'Ru25':3.58, 'Ru50':3.59, 'Ru100':3.64, '1 ML Ru': 4.12}
+    
 
 # =============================================================================
 #     Initialize the crystal grid structure - nodes with empty spaces
 # =============================================================================
-    Co_latt = Crystal_Lattice(lattice_properties,experimental_conditions,E_mig)
+    Co_latt = Crystal_Lattice(lattice_properties,experimental_conditions,Act_E_list)
     
     
 # =============================================================================

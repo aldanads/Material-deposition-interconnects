@@ -9,21 +9,21 @@ import numpy as np
 
 class Site():
     
-    def __init__(self,chemical_specie,position,activation_energies):
+    def __init__(self,chemical_specie,position,Act_E_list):
         
         self.chemical_specie = chemical_specie
         self.position = position
         self.nearest_neighbors_idx = [] # Nearest neighbors indexes
         self.nearest_neighbors_cart = [] # Nearest neighbors cartesian coordinates
-        self.activation_energies = activation_energies
+        self.Act_E_list = Act_E_list
         self.site_events = [] # Possible events corresponding to this node
-        self.migration_paths = [] # Possible migration sites with the corresponding label
+        self.migration_paths = {'Plane':[],'Up':[],'Down':[]} # Possible migration sites with the corresponding label
        
         # Set() to store the occupied sites that support this node
         # We start from zero everytime in case the 
         self.supp_by = set()
         # Position close to 0 are supported by the substrate
-        if self.position[2] < 1e-16:
+        if self.position[2] == 0:
             self.supp_by.add('Substrate')
         
             
@@ -32,14 +32,33 @@ class Site():
 # =============================================================================
     def neighbors_analysis(self,grid_crystal,neigh_idx,neigh_cart,crystal_size):
        
-        self.num_mig_path = len(neigh_idx)
+        self.num_mig_path = len(neigh_idx) + 2 # We consider two layers jumps: +1 upward, +1 downward
         num_event = 0
         for idx,pos in zip(neigh_idx,neigh_cart):
             if tuple(idx) in grid_crystal:
                 self.nearest_neighbors_idx.append(tuple(idx))             
                 self.nearest_neighbors_cart.append(tuple(pos))
-                self.migration_paths.append([tuple(idx),num_event])
-            
+                # Migration in the plane
+                if round(pos[2]-self.position[2],3) == 0:
+                    self.migration_paths['Plane'].append([tuple(idx),num_event,self.Act_E_list[0]])
+                # Migration upward
+                elif round(pos[2]-self.position[2],3) > 0:
+                    # From substrate to layer 1
+                    if 'Substrate' in self.supp_by:
+                        self.migration_paths['Up'].append([tuple(idx),num_event,self.Act_E_list[1]])
+                    # From layer_n to layer_n+1
+                    else:
+                        self.migration_paths['Up'].append([tuple(idx),num_event,self.Act_E_list[3]])
+                # Migration downward
+                elif round(pos[2]-self.position[2],3) < 0:
+                    # From layer 1 to substrate
+                    if 'Substrate' in grid_crystal[tuple(idx)].supp_by:
+                        self.migration_paths['Down'].append([tuple(idx),num_event,self.Act_E_list[2]])
+                    # From layer_n to layer_n-1
+                    else:
+                        self.migration_paths['Down'].append([tuple(idx),num_event,self.Act_E_list[4]])
+
+                    
             # Establish boundary conditions for neighbors in xy plane
             # If pos is out of the boundary in xy but within z limits:
             elif (0 <= pos[2] <= crystal_size[2]):
@@ -54,8 +73,27 @@ class Site():
     
                 self.nearest_neighbors_idx.append(tuple(min_dist_idx))
                 self.nearest_neighbors_cart.append(tuple(grid_crystal[min_dist_idx].position))
-                self.migration_paths.append([tuple(min_dist_idx), num_event])
-                
+                # Migration in the plane
+                if round(pos[2]-self.position[2],3) == 0:
+                    self.migration_paths['Plane'].append([tuple(min_dist_idx),num_event,self.Act_E_list[0]])
+                # Migration upward
+                elif round(pos[2]-self.position[2],3) > 0:
+                    # From substrate to layer 1
+                    if 'Substrate' in self.supp_by:
+                        self.migration_paths['Up'].append([tuple(min_dist_idx),num_event,self.Act_E_list[1]])
+                    # From layer_n to layer_n+1
+                    else:
+                        self.migration_paths['Up'].append([tuple(min_dist_idx),num_event,self.Act_E_list[3]])
+                # Migration downward
+                elif round(pos[2]-self.position[2],3) < 0:
+                    # From layer 1 to substrate
+                    if 'Substrate' in grid_crystal[tuple(min_dist_idx)].supp_by:
+                        self.migration_paths['Down'].append([tuple(min_dist_idx),num_event,self.Act_E_list[2]])
+                    # From layer_n to layer_n-1
+                    else:
+                        self.migration_paths['Down'].append([tuple(min_dist_idx),num_event,self.Act_E_list[4]])
+ 
+                 
                 
                 
             num_event+= 1
@@ -108,10 +146,13 @@ class Site():
         Two particles together on the substrate can support sites on the next layer and
         make both to migrate without support under them --> Solve this issue
         
-        --> When a particle migrate to some site, it should be supported at least 
+        --> When a particle migrate to some site, it should be supported at least by two other species
+        --> The migration shouldn't leave a broken structure 
+        --> Each site only has three neighbors upward and three downward
+        --> To migrate upward, should that site be supported by three neighbors?
         """
         
-        for item in self.migration_paths:
+        for item in self.migration_paths['Plane']:
 
             # It should be supported by more than one, that is, not only by the migrating particle
             if (item[0] not in self.supp_by) and (len(grid_crystal[item[0]].supp_by) > 1):
@@ -119,6 +160,39 @@ class Site():
                 # It should be a copy of item to not modify item in place -->
                 # That modify migration_paths when we modify site_events
                 new_site_events.append(item.copy())
+                
+        for item in self.migration_paths['Up']:
+            # It should be supported by more than one, that is, not only by the migrating particle
+            if (item[0] not in self.supp_by) and (len(grid_crystal[item[0]].supp_by) > 2):
+                # It should be a copy of item to not modify item in place -->
+                # That modify migration_paths when we modify site_events
+                new_site_events.append(item.copy())
+                
+                for next_neighbor in grid_crystal[item[0]].migration_paths['Up']:
+                    # No need to include (item[0] not in self.supp_by), as it is too far
+                    # We only need two or more supports because the migrating particle is too far
+                    # for supporting the site by itself.
+                    if len(grid_crystal[next_neighbor[0]].supp_by) > 1:
+                        # It should be a copy of item to not modify item in place -->
+                        # That modify migration_paths when we modify site_events
+                        new_site_events.append([next_neighbor[0],self.num_event+1,self.Act_E_list[5]])
+                
+        for item in self.migration_paths['Down']:
+            # It should be supported by more than one, that is, not only by the migrating particle
+            if (item[0] not in self.supp_by) and (len(grid_crystal[item[0]].supp_by) > 1):
+                # It should be a copy of item to not modify item in place -->
+                # That modify migration_paths when we modify site_events
+                new_site_events.append(item.copy())
+                
+                for next_neighbor in grid_crystal[item[0]].migration_paths['Down']:
+                    # No need to include (item[0] not in self.supp_by), as it is too far
+                    # We only need two or more supports because the migrating particle is too far
+                    # for supporting the site by itself.
+                    if len(grid_crystal[next_neighbor[0]].supp_by) > 1:
+                        # It should be a copy of item to not modify item in place -->
+                        # That modify migration_paths when we modify site_events
+                        new_site_events.append([next_neighbor[0],self.num_event+2,self.Act_E_list[5]])
+                
                 
         self.site_events = new_site_events
       
@@ -135,15 +209,16 @@ class Site():
         
         kb = constants.physical_constants['Boltzmann constant in eV/K'][0]
         nu0=7E13;  # nu0 (s^-1) bond vibration frequency
-        TR = (nu0*np.exp(-np.array(self.activation_energies)/(kb*T)))
         
-        for i in range(len(self.site_events)):
-            
-            if len(self.site_events[i]) == 2:
+        TR = [nu0*np.exp(-event[2])/(kb*T) for event in self.site_events]
+        
+        # Iterate over site_events directly, no need to use range(len(...))
+        for event, tr_value in zip(self.site_events, TR):
+            # Use the length of event to determine the appropriate action
+            if len(event) == 3:
                 # Insert at the beginning of the list for the binary tree
-                self.site_events[i].insert(0,TR)
-            elif len(self.site_events[i]) == 3:
-                self.site_events[i][0] = TR
-            
-        
+                event.insert(0, tr_value)
+            elif len(event) == 4:
+                event[0] = tr_value
+                
         
