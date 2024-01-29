@@ -69,11 +69,12 @@ def initialization(n_sim,save_data):
 #       specific migrations?
 #
 # =============================================================================
-    select_dataset = 0    
-    Act_E_dataset = ['TaN','Ru25','Ru50','Ru100','1 ML Ru']   
+    select_dataset = 5    
+    Act_E_dataset = ['TaN','Ru25','Ru50','Ru100','1 ML Ru','test']   
     E_dataset = {'TaN':[0.4,0.7,0.33,0.84,0.44,0.76,0.74],
               'Ru25':[0.4,0.92,1.58,0.94,0.30,1.21,1.25],
-              'Ru50':[0.4,0.62,0.78,1.18,1.08,1.86,1.82]}
+              'Ru50':[0.4,0.62,0.78,1.18,1.08,1.86,1.82],
+              'test':[0.1,0.2,0.3,0.4,0.5,0.6,0.7]}
     E_mig_plane = E_dataset[Act_E_dataset[select_dataset]][0] # (eV)
     E_mig_upward_subs_layer1 = E_dataset[Act_E_dataset[select_dataset]][1]
     E_mig_downward_layer1_subs = E_dataset[Act_E_dataset[select_dataset]][2]
@@ -102,12 +103,14 @@ def initialization(n_sim,save_data):
 # =============================================================================
 #     - test[0] - Normal deposition
 #     - test[1] - Introduce a single particle in a determined site
-#     - test[2] - Introduce and remove a single particle in a determined site
+#     - test[2] - Introduce and remove a single particle in a determined site: 
+#     - test[3] - Hexagonal seed - 7 particles in plane
+#     - test[4] - Hexagonal seed - 7 particles in plane and 1 on the top of the layer
 # =============================================================================
-    test = [0,1,2]
+    test = [0,1,2,3,4,5]
 
     # Deposition process of chemical species
-    Co_latt.deposition_specie(0.0001,rng,test[0])
+    Co_latt.deposition_specie(0.0001,rng,test[5])
 
 
     return Co_latt,rng    

@@ -245,7 +245,7 @@ class Crystal_Lattice():
             for idx_3 in self.grid_crystal[idx].nearest_neighbors_idx:
                 print(self.grid_crystal[idx_3].supp_by)
                 
-        # Single particle that disappear or migrate
+        # Single particle introduced and removed
         elif test == 2:
 
             if self.latt_orientation == '001': idx = (3,2,-2)
@@ -280,7 +280,88 @@ class Crystal_Lattice():
             print('Number of sites availables: ', len(self.adsorption_sites))
             print('Possible events: ', self.grid_crystal[idx].site_events)
 
+        # Hexagonal seed - 7 particles in plane
+        elif test == 3:
+            
+            update_supp_av = set()
+            update_specie_events = []
+            idx = self.adsorption_sites[46]
+            # Introduce specie in the site
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
+            self.update_sites(update_specie_events,update_supp_av)
 
+            for neighbor in self.grid_crystal[idx].migration_paths['Plane']:
+                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
+                self.update_sites(update_specie_events,update_supp_av)
+        
+        # Hexagonal seed - 7 particles in plane, one on top
+        elif test == 4:
+            
+            update_supp_av = set()
+            update_specie_events = []
+            idx = self.adsorption_sites[46]
+            # Introduce specie in the site
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
+            self.update_sites(update_specie_events,update_supp_av)
+
+            for neighbor in self.grid_crystal[idx].migration_paths['Plane']:
+                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
+                self.update_sites(update_specie_events,update_supp_av)
+                
+            idx_neighbor_top = self.grid_crystal[neighbor[0]].migration_paths['Up'][0][0]
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_top,update_specie_events,update_supp_av)
+            self.update_sites(update_specie_events,update_supp_av)
+            
+        # 2 hexagonal seeds - 2 layers and one particle on the top 
+        elif test == 5:
+            
+            update_supp_av = set()
+            update_specie_events = []
+            idx = self.adsorption_sites[46]
+            # Introduce specie in the site
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
+            self.update_sites(update_specie_events,update_supp_av)
+
+            for neighbor in self.grid_crystal[idx].migration_paths['Plane']:
+                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
+                self.update_sites(update_specie_events,update_supp_av)
+                
+            idx_neighbor_top = self.grid_crystal[idx].migration_paths['Up'][0][0]
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_top,update_specie_events,update_supp_av)
+            self.update_sites(update_specie_events,update_supp_av)
+            for neighbor in self.grid_crystal[idx_neighbor_top].migration_paths['Plane']:
+                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
+                self.update_sites(update_specie_events,update_supp_av)
+            
+            idx_neighbor_top = self.grid_crystal[neighbor[0]].migration_paths['Up'][0][0]
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_top,update_specie_events,update_supp_av)
+            self.update_sites(update_specie_events,update_supp_av)
+            
+        # 2 hexagonal seeds - 2 layers and one particle on the substrate 
+        elif test == 6:
+            
+            update_supp_av = set()
+            update_specie_events = []
+            idx = self.adsorption_sites[46]
+            # Introduce specie in the site
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
+            self.update_sites(update_specie_events,update_supp_av)
+    
+            for neighbor in self.grid_crystal[idx].migration_paths['Plane']:
+                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
+                self.update_sites(update_specie_events,update_supp_av)
+                
+            idx_neighbor_top = self.grid_crystal[idx].migration_paths['Up'][0][0]
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_top,update_specie_events,update_supp_av)
+            self.update_sites(update_specie_events,update_supp_av)
+            for neighbor in self.grid_crystal[idx_neighbor_top].migration_paths['Plane']:
+                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
+                self.update_sites(update_specie_events,update_supp_av)
+                
+            
+
+            
+            
     
     def processes(self,chosen_event):
  

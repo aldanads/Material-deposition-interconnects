@@ -172,7 +172,7 @@ class Site():
                     # No need to include (item[0] not in self.supp_by), as it is too far
                     # We only need two or more supports because the migrating particle is too far
                     # for supporting the site by itself.
-                    if len(grid_crystal[next_neighbor[0]].supp_by) > 1:
+                    if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and len(grid_crystal[next_neighbor[0]].supp_by) > 1:
                         # It should be a copy of item to not modify item in place -->
                         # That modify migration_paths when we modify site_events
                         new_site_events.append([next_neighbor[0],self.num_event+1,self.Act_E_list[5]])
@@ -188,10 +188,10 @@ class Site():
                     # No need to include (item[0] not in self.supp_by), as it is too far
                     # We only need two or more supports because the migrating particle is too far
                     # for supporting the site by itself.
-                    if len(grid_crystal[next_neighbor[0]].supp_by) > 1:
+                    if (grid_crystal[next_neighbor[0]].chemical_specie == 'Empty') and (('Substrate' in grid_crystal[next_neighbor[0]].supp_by) or len(grid_crystal[next_neighbor[0]].supp_by) > 1):
                         # It should be a copy of item to not modify item in place -->
                         # That modify migration_paths when we modify site_events
-                        new_site_events.append([next_neighbor[0],self.num_event+2,self.Act_E_list[5]])
+                        new_site_events.append([next_neighbor[0],self.num_event+2,self.Act_E_list[6]])
                 
                 
         self.site_events = new_site_events
