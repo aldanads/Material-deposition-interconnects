@@ -37,7 +37,7 @@ def initialization(n_sim,save_data):
 #         
 # =============================================================================
     sticking_coeff = 1
-    partial_pressure = 1 # (Pa = N m^-2 = kg m^-1 s^-2)
+    partial_pressure = 2 # (Pa = N m^-2 = kg m^-1 s^-2)
     mass_specie = 63.546 # (mass of Copper in u) 
     chemical_specie = 'Cu'
     T = 300 # (K)

@@ -34,10 +34,10 @@ class Crystal_Lattice():
         self.crystal_grid()
         
         self.sites_occupied = [] # Sites occupy be a chemical specie
-        self.sites_available = [] # Sites availables for deposition or migration
+        self.adsorption_sites = [] # Sites availables for deposition or migration
         # Obtain all the positions in the grid that are supported by the
         # substrate or other deposited chemical species
-        self.available_sites() 
+        self.available_adsorption_sites() 
         
         #Transition rate for adsortion of chemical species
         self.transition_rate_adsorption(experimental_conditions[0:4])
@@ -123,20 +123,20 @@ class Crystal_Lattice():
             
             
         
-    def available_sites(self, update_supp_av = []):
+    def available_adsorption_sites(self, update_supp_av = []):
         
         
         if update_supp_av == []:
             for idx,site in self.grid_crystal.items():
-                if (len(site.supp_by) > 0) and (site.chemical_specie == 'Empty'):
-                    self.sites_available.append(idx)
+                if ('Substrate' in site.supp_by or len(site.supp_by) > 1) and (site.chemical_specie == 'Empty'):
+                    self.adsorption_sites.append(idx)
         else:
             for idx in update_supp_av:
-                if (idx in self.sites_available) and ((len(self.grid_crystal[idx].supp_by) == 0) or (self.grid_crystal[idx].chemical_specie != 'Empty')):
-                    self.sites_available.remove(idx)
+                if (idx in self.adsorption_sites) and (('Substrate' not in self.grid_crystal[idx].supp_by and len(self.grid_crystal[idx].supp_by) < 2) or (self.grid_crystal[idx].chemical_specie != 'Empty')):
+                    self.adsorption_sites.remove(idx)
                     
-                elif (idx not in self.sites_available) and (len(self.grid_crystal[idx].supp_by) > 0) and self.grid_crystal[idx].chemical_specie == 'Empty':
-                    self.sites_available.append(idx)
+                elif (idx not in self.adsorption_sites) and ('Substrate' in self.grid_crystal[idx].supp_by or len(self.grid_crystal[idx].supp_by) > 1) and self.grid_crystal[idx].chemical_specie == 'Empty':
+                    self.adsorption_sites.append(idx)
                     
     def transition_rate_adsorption(self,experimental_conditions):
 # =============================================================================
@@ -154,7 +154,7 @@ class Crystal_Lattice():
         # If the substrate surface is pristine, we take the supported sites,
         # which are actually those ones supported by the substrate
         if len(self.sites_occupied) == 0:
-            n_sites_layer_0 = len(self.sites_available)
+            n_sites_layer_0 = len(self.adsorption_sites)
         else:
             # Otherwise, we count the sites in the layer 0
             n_sites_layer_0 = 0
@@ -218,7 +218,7 @@ class Crystal_Lattice():
         if test == 0:
             
             # Indexes of sites availables: supported by substrates or other species
-            for idx in self.sites_available:
+            for idx in self.adsorption_sites:
                 P = 1-np.exp(-self.TR_ad*t) # Adsorption probability in time t
                 if rng.random() < P:   
                     # Introduce specie in the site
@@ -263,7 +263,7 @@ class Crystal_Lattice():
                 print(self.grid_crystal[idx_3].supp_by)
                 
             print('Sites occupied: ', self.sites_occupied)
-            print('Number of sites availables: ', len(self.sites_available))
+            print('Number of sites availables: ', len(self.adsorption_sites))
             print('Possible events: ', self.grid_crystal[idx].site_events)
             # Remove particle
             update_specie_events,update_supp_av = self.remove_specie_site(idx,update_specie_events,update_supp_av)
@@ -277,7 +277,7 @@ class Crystal_Lattice():
                 print(self.grid_crystal[idx_3].supp_by)
                 
             print('Sites occupied: ', self.sites_occupied)
-            print('Number of sites availables: ', len(self.sites_available))
+            print('Number of sites availables: ', len(self.adsorption_sites))
             print('Possible events: ', self.grid_crystal[idx].site_events)
 
 
@@ -316,7 +316,7 @@ class Crystal_Lattice():
             # For loop over neighbors
             for idx in update_supp_av:
                 self.grid_crystal[idx].supported_by(self.grid_crystal)
-                self.available_sites(update_supp_av)
+                self.available_adsorption_sites(update_supp_av)
                 if self.grid_crystal[idx].chemical_specie != 'Empty':
                     update_specie_events.append(idx)
         
