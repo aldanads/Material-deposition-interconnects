@@ -137,30 +137,23 @@ class Site():
     def available_migrations(self,grid_crystal):
       
         new_site_events = []
-        """
-        CAREFUL!!!!!, the movement of the particles shouldn't destroy any structure
-        For example, can atoms forming a tower lose one of the atoms in the middle?
-        """
-        
-        """
-        Two particles together on the substrate can support sites on the next layer and
-        make both to migrate without support under them --> Solve this issue
-        
-        --> When a particle migrate to some site, it should be supported at least by two other species
-        --> The migration shouldn't leave a broken structure 
-        --> Each site only has three neighbors upward and three downward
-        --> To migrate upward, should that site be supported by three neighbors?
-        """
         
         for item in self.migration_paths['Plane']:
 
             # It should be supported by more than one, that is, not only by the migrating particle
-            if (item[0] not in self.supp_by) and (len(grid_crystal[item[0]].supp_by) > 1):
+            if (item[0] not in self.supp_by) and ('Substrate' in grid_crystal[item[0]].supp_by or len(grid_crystal[item[0]].supp_by) > 2):
                 
                 # It should be a copy of item to not modify item in place -->
                 # That modify migration_paths when we modify site_events
                 new_site_events.append(item.copy())
                 
+# =============================================================================
+#         Kondati Natarajan, S., Nies, C. L., & Nolan, M. (2020). 
+#         The role of Ru passivation and doping on the barrier and seed layer properties of Ru-modified TaN for copper interconnects. 
+#         Journal of Chemical Physics, 152(14). https://doi.org/10.1063/5.0003852
+#   
+#         - Migration upward stable is supported by three particles  
+# =============================================================================
         for item in self.migration_paths['Up']:
             # It should be supported by more than one, that is, not only by the migrating particle
             if (item[0] not in self.supp_by) and (len(grid_crystal[item[0]].supp_by) > 2):
@@ -173,24 +166,20 @@ class Site():
                     # We only need two or more supports because the migrating particle is too far
                     # for supporting the site by itself.
                     if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and len(grid_crystal[next_neighbor[0]].supp_by) > 1:
-                        # It should be a copy of item to not modify item in place -->
-                        # That modify migration_paths when we modify site_events
                         new_site_events.append([next_neighbor[0],self.num_event+1,self.Act_E_list[5]])
                 
         for item in self.migration_paths['Down']:
             # It should be supported by more than one, that is, not only by the migrating particle
-            if (item[0] not in self.supp_by) and (len(grid_crystal[item[0]].supp_by) > 1):
+            if (item[0] not in self.supp_by) and ('Substrate' in grid_crystal[item[0]].supp_by or len(grid_crystal[item[0]].supp_by) > 2):
                 # It should be a copy of item to not modify item in place -->
                 # That modify migration_paths when we modify site_events
                 new_site_events.append(item.copy())
                 
                 for next_neighbor in grid_crystal[item[0]].migration_paths['Down']:
                     # No need to include (item[0] not in self.supp_by), as it is too far
-                    # We only need two or more supports because the migrating particle is too far
+                    # We only need two or more or the substrate supports because the migrating particle is too far
                     # for supporting the site by itself.
                     if (grid_crystal[next_neighbor[0]].chemical_specie == 'Empty') and (('Substrate' in grid_crystal[next_neighbor[0]].supp_by) or len(grid_crystal[next_neighbor[0]].supp_by) > 1):
-                        # It should be a copy of item to not modify item in place -->
-                        # That modify migration_paths when we modify site_events
                         new_site_events.append([next_neighbor[0],self.num_event+2,self.Act_E_list[6]])
                 
                 

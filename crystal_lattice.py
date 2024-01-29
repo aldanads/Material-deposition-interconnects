@@ -128,14 +128,14 @@ class Crystal_Lattice():
         
         if update_supp_av == []:
             for idx,site in self.grid_crystal.items():
-                if ('Substrate' in site.supp_by or len(site.supp_by) > 1) and (site.chemical_specie == 'Empty'):
+                if ('Substrate' in site.supp_by or len(site.supp_by) > 2) and (site.chemical_specie == 'Empty'):
                     self.adsorption_sites.append(idx)
         else:
             for idx in update_supp_av:
-                if (idx in self.adsorption_sites) and (('Substrate' not in self.grid_crystal[idx].supp_by and len(self.grid_crystal[idx].supp_by) < 2) or (self.grid_crystal[idx].chemical_specie != 'Empty')):
+                if (idx in self.adsorption_sites) and (('Substrate' not in self.grid_crystal[idx].supp_by and len(self.grid_crystal[idx].supp_by) < 3) or (self.grid_crystal[idx].chemical_specie != 'Empty')):
                     self.adsorption_sites.remove(idx)
                     
-                elif (idx not in self.adsorption_sites) and ('Substrate' in self.grid_crystal[idx].supp_by or len(self.grid_crystal[idx].supp_by) > 1) and self.grid_crystal[idx].chemical_specie == 'Empty':
+                elif (idx not in self.adsorption_sites) and ('Substrate' in self.grid_crystal[idx].supp_by or len(self.grid_crystal[idx].supp_by) > 2) and self.grid_crystal[idx].chemical_specie == 'Empty':
                     self.adsorption_sites.append(idx)
                     
     def transition_rate_adsorption(self,experimental_conditions):
@@ -336,29 +336,6 @@ class Crystal_Lattice():
             idx_neighbor_top = self.grid_crystal[neighbor[0]].migration_paths['Up'][0][0]
             update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_top,update_specie_events,update_supp_av)
             self.update_sites(update_specie_events,update_supp_av)
-            
-        # 2 hexagonal seeds - 2 layers and one particle on the substrate 
-        elif test == 6:
-            
-            update_supp_av = set()
-            update_specie_events = []
-            idx = self.adsorption_sites[46]
-            # Introduce specie in the site
-            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
-            self.update_sites(update_specie_events,update_supp_av)
-    
-            for neighbor in self.grid_crystal[idx].migration_paths['Plane']:
-                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
-                self.update_sites(update_specie_events,update_supp_av)
-                
-            idx_neighbor_top = self.grid_crystal[idx].migration_paths['Up'][0][0]
-            update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_top,update_specie_events,update_supp_av)
-            self.update_sites(update_specie_events,update_supp_av)
-            for neighbor in self.grid_crystal[idx_neighbor_top].migration_paths['Plane']:
-                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
-                self.update_sites(update_specie_events,update_supp_av)
-                
-            
 
             
             
@@ -375,12 +352,6 @@ class Crystal_Lattice():
 # =============================================================================
         if chosen_event[2] < site_affected.num_mig_path:
             
-            print(chosen_event)
-            if (chosen_event[1] in self.grid_crystal[chosen_event[-1]].supp_by):
-                print('Problematic site events: ',self.grid_crystal[chosen_event[-1]].site_events)
-                print('Site origin: ', chosen_event[-1], 'Site destiny: ', chosen_event[1])
-                print('Support by: ',self.grid_crystal[chosen_event[-1]].supp_by)
-                print('Specie origin: ', self.grid_crystal[chosen_event[-1]].chemical_specie, 'Specie destiny: ', self.grid_crystal[chosen_event[1]].chemical_specie)
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(chosen_event[1],update_specie_events,update_supp_av)
             

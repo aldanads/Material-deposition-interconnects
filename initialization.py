@@ -52,7 +52,7 @@ def initialization(n_sim,save_data):
     b = 0.358 # (nm)
     c = 0.358 # (nm)
     lattice_constants = (a,b,c)
-    crystal_size = (3, 3,1)
+    crystal_size = (3, 3,1) # (nm)
     bravais_latt = ['fcc']
     orientation = ['001','111']
     lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
@@ -65,12 +65,16 @@ def initialization(n_sim,save_data):
 #           Control of the Cu morphology on Ru-passivated and Ru-doped TaN surfaces-promoting growth of 2D conducting copper for CMOS interconnects. 
 #           Chemical Science, 13(3), 713–725. https://doi.org/10.1039/d1sc04708f
 #       - Migrating in plane
-#       - Clustering: Once they are together, difficult to split? Do they promote 
-#       specific migrations?
+#       - Clustering: Once they are together, difficult to split? 
 #
+# 
+#       Jamnig, A., Sangiovanni, D. G., Abadias, G., & Sarakinos, K. (2019). 
+#       Atomic-scale diffusion rates during growth of thin metal films on weakly-interacting substrates. 
+#       Scientific Reports, 9(1). https://doi.org/10.1038/s41598-019-43107-8
+#       - Migration of Cu on graphite - 0.05-0.13 eV
 # =============================================================================
-    select_dataset = 5    
-    Act_E_dataset = ['TaN','Ru25','Ru50','Ru100','1 ML Ru','test']   
+    select_dataset = 0    
+    Act_E_dataset = ['TaN','Ru25','Ru50','test']   
     E_dataset = {'TaN':[0.4,0.7,0.33,0.84,0.44,0.76,0.74],
               'Ru25':[0.4,0.92,1.58,0.94,0.30,1.21,1.25],
               'Ru50':[0.4,0.62,0.78,1.18,1.08,1.86,1.82],
@@ -106,6 +110,7 @@ def initialization(n_sim,save_data):
 #     - test[2] - Introduce and remove a single particle in a determined site: 
 #     - test[3] - Hexagonal seed - 7 particles in plane
 #     - test[4] - Hexagonal seed - 7 particles in plane and 1 on the top of the layer
+#     - test[5] - 2 hexagonal seeds - 2 layers and one particle on the top 
 # =============================================================================
     test = [0,1,2,3,4,5]
 
