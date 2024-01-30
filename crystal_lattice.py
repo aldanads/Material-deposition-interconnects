@@ -247,7 +247,7 @@ class Crystal_Lattice():
                 
         # Single particle introduced and removed
         elif test == 2:
-
+            
             if self.latt_orientation == '001': idx = (3,2,-2)
             elif self.latt_orientation == '111': idx = (1,11,-12)
             
@@ -280,8 +280,26 @@ class Crystal_Lattice():
             print('Number of sites availables: ', len(self.adsorption_sites))
             print('Possible events: ', self.grid_crystal[idx].site_events)
 
-        # Hexagonal seed - 7 particles in plane
+        # Introduce two adjacent particles
         elif test == 3:
+            
+            if self.latt_orientation == '001': idx = (3,2,-2)
+            elif self.latt_orientation == '111': idx = (1,11,-12)
+            
+            # Introduce specie in the site
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
+            # Update sites availables, the support to each site and available migrations
+            self.update_sites(update_specie_events,update_supp_av)
+            
+            neighbor = self.grid_crystal[idx].migration_paths['Plane'][0]
+            # Introduce specie in the neighbor site
+            update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
+            # Update sites availables, the support to each site and available migrations
+            self.update_sites(update_specie_events,update_supp_av)
+            
+
+        # Hexagonal seed - 7 particles in plane
+        elif test == 4:
             
             update_supp_av = set()
             update_specie_events = []
@@ -295,7 +313,7 @@ class Crystal_Lattice():
                 self.update_sites(update_specie_events,update_supp_av)
         
         # Hexagonal seed - 7 particles in plane, one on top
-        elif test == 4:
+        elif test == 5:
             
             update_supp_av = set()
             update_specie_events = []
@@ -313,7 +331,7 @@ class Crystal_Lattice():
             self.update_sites(update_specie_events,update_supp_av)
             
         # 2 hexagonal seeds - 2 layers and one particle on the top 
-        elif test == 5:
+        elif test == 6:
             
             update_supp_av = set()
             update_specie_events = []
@@ -338,8 +356,6 @@ class Crystal_Lattice():
             self.update_sites(update_specie_events,update_supp_av)
 
             
-            
-    
     def processes(self,chosen_event):
  
         site_affected = self.grid_crystal[chosen_event[-1]]
@@ -415,7 +431,8 @@ class Crystal_Lattice():
         ax.set_xlabel('x-axis (nm)')
         ax.set_ylabel('y-axis (nm)')
         ax.set_zlabel('z-axis (nm)')
-        
+        ax.view_init(azim=60, elev=45)
+
         ax.set_xlim([0, self.crystal_size[0]]) 
         ax.set_ylim([0, self.crystal_size[1]])
         ax.set_zlim([0, 2*self.crystal_size[2]])

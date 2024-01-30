@@ -75,10 +75,17 @@ def initialization(n_sim,save_data):
 # =============================================================================
     select_dataset = 0    
     Act_E_dataset = ['TaN','Ru25','Ru50','test']   
-    E_dataset = {'TaN':[0.4,0.7,0.33,0.84,0.44,0.76,0.74],
+    E_dataset = {'TaN':[0.7,0.7,0.33,0.84,0.44,0.76,0.74],
               'Ru25':[0.4,0.92,1.58,0.94,0.30,1.21,1.25],
               'Ru50':[0.4,0.62,0.78,1.18,1.08,1.86,1.82],
               'test':[0.1,0.2,0.3,0.4,0.5,0.6,0.7]}
+# =============================================================================
+#     Böyükata, M., & Belchior, J. C. (2008). 
+#     Structural and Energetic Analysis of Copper Clusters: MD Study of Cu n (n = 2-45). 
+#     In J. Braz. Chem. Soc (Vol. 19, Issue 5).
+#      - Clustering energy
+# =============================================================================
+    E_clustering = [0,0,-0.577,-1.732,-3.465,-5.281,-7.566,-9.676,-11.902,-14.228,-16.848,-19.643,-22.818] 
     E_mig_plane = E_dataset[Act_E_dataset[select_dataset]][0] # (eV)
     E_mig_upward_subs_layer1 = E_dataset[Act_E_dataset[select_dataset]][1]
     E_mig_downward_layer1_subs = E_dataset[Act_E_dataset[select_dataset]][2]
@@ -86,17 +93,15 @@ def initialization(n_sim,save_data):
     E_mig_upward_layer2_layer1 = E_dataset[Act_E_dataset[select_dataset]][4]
     E_mig_upward_subs_layer2 = E_dataset[Act_E_dataset[select_dataset]][5]
     E_mig_upward_layer2_subs = E_dataset[Act_E_dataset[select_dataset]][6]
-    
-    Act_E_list = [E_mig_plane,
-                  E_mig_upward_subs_layer1,E_mig_downward_layer1_subs,
-                  E_mig_upward_layer1_layer2,E_mig_upward_layer2_layer1,
-                  E_mig_upward_subs_layer2,E_mig_upward_layer2_subs]
-
 
     # Binding energy | Desorption energy: https://doi.org/10.1039/D1SC04708F
     # Surface: [0]-TaN, [1]-Ru25, [2]-Ru50, [3]-Ru100, [4]-1 ML Ru passivation
-    desorption_energy = {'TaN':3.49, 'Ru25':3.58, 'Ru50':3.59, 'Ru100':3.64, '1 ML Ru': 4.12}
-    
+    binding_energy = {'TaN':-3.49, 'Ru25':-3.58, 'Ru50':-3.59, 'Ru100':-3.64, '1 ML Ru':-4.12, 'test':-3.49}
+    Act_E_list = [E_mig_plane,
+                  E_mig_upward_subs_layer1,E_mig_downward_layer1_subs,
+                  E_mig_upward_layer1_layer2,E_mig_upward_layer2_layer1,
+                  E_mig_upward_subs_layer2,E_mig_upward_layer2_subs,
+                  binding_energy[Act_E_dataset[select_dataset]],E_clustering]
 
 # =============================================================================
 #     Initialize the crystal grid structure - nodes with empty spaces
@@ -107,15 +112,16 @@ def initialization(n_sim,save_data):
 # =============================================================================
 #     - test[0] - Normal deposition
 #     - test[1] - Introduce a single particle in a determined site
-#     - test[2] - Introduce and remove a single particle in a determined site: 
-#     - test[3] - Hexagonal seed - 7 particles in plane
-#     - test[4] - Hexagonal seed - 7 particles in plane and 1 on the top of the layer
-#     - test[5] - 2 hexagonal seeds - 2 layers and one particle on the top 
+#     - test[2] - Introduce and remove a single particle in a determined site 
+#     - test[3] - Introduce two adjacent particles
+#     - test[4] - Hexagonal seed - 7 particles in plane
+#     - test[5] - Hexagonal seed - 7 particles in plane and 1 on the top of the layer
+#     - test[6] - 2 hexagonal seeds - 2 layers and one particle on the top 
 # =============================================================================
     test = [0,1,2,3,4,5]
 
     # Deposition process of chemical species
-    Co_latt.deposition_specie(0.0001,rng,test[5])
+    Co_latt.deposition_specie(0.0001,rng,test[0])
 
 
     return Co_latt,rng    

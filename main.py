@@ -16,7 +16,7 @@ Co_latt,rng = initialization(n_sim,save_data)
 print(Co_latt.time)
 Co_latt.plot_crystal()
 
-for i in range(3):
+for i in range(2):
     Co_latt = KMC(Co_latt,rng)
     
     if i%1 == 0:
@@ -26,8 +26,7 @@ for i in range(3):
         KMC time step
         """
         Co_latt.deposition_specie(Co_latt.time,rng)
-        print(len(Co_latt.sites_occupied) - len(set(Co_latt.sites_occupied)))
-
+        print(Co_latt.time)
     
 Co_latt.deposition_specie(Co_latt.time,rng)
 print(Co_latt.time)

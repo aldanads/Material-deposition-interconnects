@@ -116,6 +116,22 @@ class Site():
             # it from the supp_by set()
             elif (grid_crystal[idx].chemical_specie == "Empty") and (idx in self.supp_by):
                 self.supp_by.remove(idx)
+                
+        self.calculate_clustering_energy()
+                
+    def calculate_clustering_energy(self):
+        
+        # If this site is supported by the substrate, we add the binding energy to the substrate
+        # We reduce 1 if it is supported by the substrate
+        # We add 1 because if the site is occupied
+        if 'Substrate' in self.supp_by and self.chemical_specie != 'Empty':
+            self.energy_site = self.Act_E_list[-1][len(self.supp_by)] + self.Act_E_list[-2]
+        elif 'Substrate' in self.supp_by and self.chemical_specie == 'Empty':
+            self.energy_site = self.Act_E_list[-1][len(self.supp_by)-1] + self.Act_E_list[-2]
+        elif 'Substrate' not in self.supp_by and self.chemical_specie != 'Empty':
+            self.energy_site = self.Act_E_list[-1][len(self.supp_by)+1]
+        elif 'Substrate' not in self.supp_by and self.chemical_specie == 'Empty':
+            self.energy_site = self.Act_E_list[-1][len(self.supp_by)]
    
 # =============================================================================
 #       Calculate the possible events corresponding to this node
@@ -136,24 +152,46 @@ class Site():
     # Calculate posible migration sites
     def available_migrations(self,grid_crystal):
       
+# =============================================================================
+#         Lü, B., Almyras, G. A., Gervilla, V., Greene, J. E., & Sarakinos, K. (2018). 
+#         Formation and morphological evolution of self-similar 3D nanostructures on weakly interacting substrates. 
+#         Physical Review Materials, 2(6). https://doi.org/10.1103/PhysRevMaterials.2.063401
+#         - Number of nearest neighbors needed to support a site so a particle can migrate there
+# =============================================================================
         new_site_events = []
+        """
+        If the code works properly, remove this part
         
         for item in self.migration_paths['Plane']:
-
+            site_idx, num_event, act_energy = item
             # It should be supported by more than one, that is, not only by the migrating particle
-            if (item[0] not in self.supp_by) and ('Substrate' in grid_crystal[item[0]].supp_by or len(grid_crystal[item[0]].supp_by) > 2):
+            if (site_idx not in self.supp_by) and ('Substrate' in grid_crystal[item[0]].supp_by or len(grid_crystal[item[0]].supp_by) > 2):
                 
+                aux_item = item.copy()
+                aux_item[2] = aux_item[2] + grid_crystal[item[0]].energy_site - self.energy_site if (grid_crystal[item[0]].energy_site - self.energy_site > 0) else aux_item[2]
                 # It should be a copy of item to not modify item in place -->
                 # That modify migration_paths when we modify site_events
-                new_site_events.append(item.copy())
+                new_site_events.append(aux_item)
+        """
+                
+        # Plane migrations
+        for site_idx, num_event, act_energy in self.migration_paths['Plane']:
+            if site_idx not in self.supp_by and ('Substrate' in grid_crystal[site_idx].supp_by or len(grid_crystal[site_idx].supp_by) > 2):
+                energy_change = max(grid_crystal[site_idx].energy_site - self.energy_site, 0)
+                new_site_events.append([site_idx, num_event, act_energy + energy_change])
+
                 
 # =============================================================================
 #         Kondati Natarajan, S., Nies, C. L., & Nolan, M. (2020). 
 #         The role of Ru passivation and doping on the barrier and seed layer properties of Ru-modified TaN for copper interconnects. 
 #         Journal of Chemical Physics, 152(14). https://doi.org/10.1063/5.0003852
 #   
-#         - Migration upward stable is supported by three particles  
+#         - Migration upward stable is supported by three particles??  
 # =============================================================================
+        
+        """
+        If the code works properly, remove this part
+
         for item in self.migration_paths['Up']:
             # It should be supported by more than one, that is, not only by the migrating particle
             if (item[0] not in self.supp_by) and (len(grid_crystal[item[0]].supp_by) > 2):
@@ -167,7 +205,24 @@ class Site():
                     # for supporting the site by itself.
                     if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and len(grid_crystal[next_neighbor[0]].supp_by) > 1:
                         new_site_events.append([next_neighbor[0],self.num_event+1,self.Act_E_list[5]])
+                        
+        """
+                        
+        # Upward migrations
+        for site_idx, num_event, act_energy in self.migration_paths['Up']:
+            # Supported by at least 2 particles (excluding this site)
+            if site_idx not in self.supp_by and len(grid_crystal[site_idx].supp_by) > 2:
+                energy_change = max(grid_crystal[site_idx].energy_site - self.energy_site, 0)
+                new_site_events.append([site_idx, num_event, act_energy + energy_change])
                 
+                # 2 layers jump upward
+                for next_neighbor in grid_crystal[site_idx].migration_paths['Up']:
+                    # Supported by at least 2 particles (this site is too far)
+                    if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and len(grid_crystal[next_neighbor[0]].supp_by) > 1:
+                        energy_change = max(grid_crystal[next_neighbor[0]].energy_site - self.energy_site, 0)
+                        new_site_events.append([next_neighbor[0], self.num_event + 1, self.Act_E_list[5] + energy_change])
+
+        """              
         for item in self.migration_paths['Down']:
             # It should be supported by more than one, that is, not only by the migrating particle
             if (item[0] not in self.supp_by) and ('Substrate' in grid_crystal[item[0]].supp_by or len(grid_crystal[item[0]].supp_by) > 2):
@@ -181,6 +236,22 @@ class Site():
                     # for supporting the site by itself.
                     if (grid_crystal[next_neighbor[0]].chemical_specie == 'Empty') and (('Substrate' in grid_crystal[next_neighbor[0]].supp_by) or len(grid_crystal[next_neighbor[0]].supp_by) > 1):
                         new_site_events.append([next_neighbor[0],self.num_event+2,self.Act_E_list[6]])
+        """
+                        
+        # Downward migrations
+        for site_idx, num_event, act_energy in self.migration_paths['Down']:
+            # Supported by at least 2 particles (excluding this site)
+            if site_idx not in self.supp_by and ('Substrate' in grid_crystal[site_idx].supp_by or len(grid_crystal[site_idx].supp_by) > 2):
+                energy_change = max(grid_crystal[site_idx].energy_site - self.energy_site, 0)
+                new_site_events.append([site_idx, num_event, act_energy + energy_change])
+                
+                # 2 layers jump downward
+                for next_neighbor in grid_crystal[site_idx].migration_paths['Down']:
+                    # Supported by at least 2 particles (this site is too far)
+                    if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and (('Substrate' in grid_crystal[next_neighbor[0]].supp_by) or len(grid_crystal[next_neighbor[0]].supp_by) > 1):
+                        energy_change = max(grid_crystal[next_neighbor[0]].energy_site - self.energy_site, 0)
+                        new_site_events.append([next_neighbor[0], self.num_event + 2, self.Act_E_list[6] + energy_change])
+
                 
                 
         self.site_events = new_site_events
@@ -200,7 +271,7 @@ class Site():
         nu0=7E13;  # nu0 (s^-1) bond vibration frequency
         
         TR = [nu0*np.exp(-event[2])/(kb*T) for event in self.site_events]
-        
+                
         # Iterate over site_events directly, no need to use range(len(...))
         for event, tr_value in zip(self.site_events, TR):
             # Use the length of event to determine the appropriate action
