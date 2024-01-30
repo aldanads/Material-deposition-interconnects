@@ -212,7 +212,7 @@ class Site():
         kb = constants.physical_constants['Boltzmann constant in eV/K'][0]
         nu0=7E12;  # nu0 (s^-1) bond vibration frequency
         
-        TR = [nu0*np.exp(-event[2])/(kb*T) for event in self.site_events]
+        TR = [nu0*np.exp(-event[-1]/(kb*T)) for event in self.site_events]
                 
         # Iterate over site_events directly, no need to use range(len(...))
         for event, tr_value in zip(self.site_events, TR):

@@ -330,7 +330,9 @@ class Crystal_Lattice():
             
         # 2 hexagonal seeds - 2 layers and one particle on the top 
         elif test == 6:
-            
+            """
+            Need to debug
+            """
             update_supp_av = set()
             update_specie_events = []
             idx = self.adsorption_sites[46]

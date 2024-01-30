@@ -17,13 +17,13 @@ print(Co_latt.time)
 Co_latt.add_time()
 Co_latt.plot_crystal()
 
-for i in range(100000):
+for i in range(10000):
     Co_latt = KMC(Co_latt,rng)
     
-    if i%1000 == 0:
-        Co_latt.plot_crystal(60,10)      
+    if i%100 == 0:
+        Co_latt.plot_crystal()      
         Co_latt.add_time()
-        print('Time between depositions: ',Co_latt.list_time[-1] - Co_latt.list_time[-2])
+        print('Total time: ',Co_latt.list_time[-1])
         Co_latt.deposition_specie(Co_latt.list_time[-1] - Co_latt.list_time[-2],rng)
 
     

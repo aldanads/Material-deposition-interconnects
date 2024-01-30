@@ -52,7 +52,7 @@ def initialization(n_sim,save_data):
     b = 0.358 # (nm)
     c = 0.358 # (nm)
     lattice_constants = (a,b,c)
-    crystal_size = (3, 3,0.2) # (nm)
+    crystal_size = (3, 3,1) # (nm)
     bravais_latt = ['fcc']
     orientation = ['001','111']
     lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
@@ -73,12 +73,13 @@ def initialization(n_sim,save_data):
 #       Scientific Reports, 9(1). https://doi.org/10.1038/s41598-019-43107-8
 #       - Migration of Cu on graphite - 0.05-0.13 eV
 # =============================================================================
-    select_dataset = 3    
+    select_dataset = 0    
     Act_E_dataset = ['TaN','Ru25','Ru50','test']   
-    E_dataset = {'TaN':[0.05,0.7,0.33,0.84,0.44,0.76,0.74],
+    E_dataset = {'TaN':[0.4,0.7,0.33,0.84,0.44,0.76,0.74],
               'Ru25':[0.4,0.92,1.58,0.94,0.30,1.21,1.25],
               'Ru50':[0.4,0.62,0.78,1.18,1.08,1.86,1.82],
-              'test':[0.5,0.2,0.4,0.4,0.5,0.6,0.7]}
+              # 'test':[0.5,0.2,0.4,0.4,0.5,0.6,0.7]}
+              'test':[2,2,2,2,2,2,2]}
 # =============================================================================
 #     Böyükata, M., & Belchior, J. C. (2008). 
 #     Structural and Energetic Analysis of Copper Clusters: MD Study of Cu n (n = 2-45). 
@@ -118,7 +119,7 @@ def initialization(n_sim,save_data):
 #     - test[5] - Hexagonal seed - 7 particles in plane and 1 on the top of the layer
 #     - test[6] - 2 hexagonal seeds - 2 layers and one particle on the top 
 # =============================================================================
-    test = [0,1,2,3,4,5]
+    test = [0,1,2,3,4,5,6]
 
     # Deposition process of chemical species
     Co_latt.deposition_specie(1e-5,rng,test[0])
