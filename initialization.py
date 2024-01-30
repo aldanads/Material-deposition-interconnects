@@ -37,7 +37,7 @@ def initialization(n_sim,save_data):
 #         
 # =============================================================================
     sticking_coeff = 1
-    partial_pressure = 2 # (Pa = N m^-2 = kg m^-1 s^-2)
+    partial_pressure = 40 # (Pa = N m^-2 = kg m^-1 s^-2)
     mass_specie = 63.546 # (mass of Copper in u) 
     chemical_specie = 'Cu'
     T = 300 # (K)
@@ -73,19 +73,19 @@ def initialization(n_sim,save_data):
 #       Scientific Reports, 9(1). https://doi.org/10.1038/s41598-019-43107-8
 #       - Migration of Cu on graphite - 0.05-0.13 eV
 # =============================================================================
-    select_dataset = 0    
+    select_dataset = 3    
     Act_E_dataset = ['TaN','Ru25','Ru50','test']   
-    E_dataset = {'TaN':[0.7,0.7,0.33,0.84,0.44,0.76,0.74],
+    E_dataset = {'TaN':[0.05,0.7,0.33,0.84,0.44,0.76,0.74],
               'Ru25':[0.4,0.92,1.58,0.94,0.30,1.21,1.25],
               'Ru50':[0.4,0.62,0.78,1.18,1.08,1.86,1.82],
-              'test':[0.1,0.2,0.3,0.4,0.5,0.6,0.7]}
+              'test':[0.5,0.2,0.4,0.4,0.5,0.6,0.7]}
 # =============================================================================
 #     Böyükata, M., & Belchior, J. C. (2008). 
 #     Structural and Energetic Analysis of Copper Clusters: MD Study of Cu n (n = 2-45). 
 #     In J. Braz. Chem. Soc (Vol. 19, Issue 5).
 #      - Clustering energy
 # =============================================================================
-    E_clustering = [0,0,-0.577,-1.732,-3.465,-5.281,-7.566,-9.676,-11.902,-14.228,-16.848,-19.643,-22.818] 
+    E_clustering = [0,0,-0.577,-1.732,-3.465,-5.281,-7.566,-9.676,-11.902,-14.228,-16.848,-19.643,-22.818,-26.710] 
     E_mig_plane = E_dataset[Act_E_dataset[select_dataset]][0] # (eV)
     E_mig_upward_subs_layer1 = E_dataset[Act_E_dataset[select_dataset]][1]
     E_mig_downward_layer1_subs = E_dataset[Act_E_dataset[select_dataset]][2]

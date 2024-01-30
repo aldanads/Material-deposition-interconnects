@@ -25,12 +25,9 @@ class Crystal_Lattice():
         self.chemical_specie = experimental_conditions[4]
         self.activation_energies = E_mig
         self.time = 0
+        self.list_time = []
         
         self.lattice_model()
-        
-        """ 
-        Need to establish boundary conditions in the xy plane 
-        """
         self.crystal_grid()
         
         self.sites_occupied = [] # Sites occupy be a chemical specie
@@ -159,7 +156,7 @@ class Crystal_Lattice():
             # Otherwise, we count the sites in the layer 0
             n_sites_layer_0 = 0
             for site in self.grid_crystal.values():
-                if site.position[2] < self.lattice_constants[2] * 0.1:
+                if site.position[2] == 0:
                     n_sites_layer_0 += 1
 
 
@@ -367,7 +364,7 @@ class Crystal_Lattice():
 #         Specie migration
 # =============================================================================
         if chosen_event[2] < site_affected.num_mig_path:
-            
+            # print('Support balance: ',len(self.grid_crystal[chosen_event[-1]].supp_by)-len(self.grid_crystal[chosen_event[1]].supp_by))
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(chosen_event[1],update_specie_events,update_supp_av)
             
@@ -398,6 +395,10 @@ class Crystal_Lattice():
     def track_time(self,t):
         
         self.time += t
+        
+    def add_time(self):
+        
+        self.list_time.append(self.time)
 
 
 
@@ -419,7 +420,7 @@ class Crystal_Lattice():
         plt.show()
         
         
-    def plot_crystal(self):
+    def plot_crystal(self,azim = 60,elev = 45):
         
         fig = plt.figure(dpi=300)
         ax = fig.add_subplot(111, projection='3d')
@@ -431,7 +432,7 @@ class Crystal_Lattice():
         ax.set_xlabel('x-axis (nm)')
         ax.set_ylabel('y-axis (nm)')
         ax.set_zlabel('z-axis (nm)')
-        ax.view_init(azim=60, elev=45)
+        ax.view_init(azim=azim, elev = elev)
 
         ax.set_xlim([0, self.crystal_size[0]]) 
         ax.set_ylim([0, self.crystal_size[1]])
