@@ -40,7 +40,7 @@ def initialization(n_sim,save_data):
     partial_pressure = 40 # (Pa = N m^-2 = kg m^-1 s^-2)
     mass_specie = 63.546 # (mass of Copper in u) 
     chemical_specie = 'Cu'
-    T = 300 # (K)
+    T = 500 # (K)
     
     experimental_conditions = [sticking_coeff,partial_pressure,mass_specie,T,chemical_specie]
     
@@ -52,7 +52,7 @@ def initialization(n_sim,save_data):
     b = 0.358 # (nm)
     c = 0.358 # (nm)
     lattice_constants = (a,b,c)
-    crystal_size = (3, 3,1) # (nm)
+    crystal_size = (3, 3,0.2) # (nm)
     bravais_latt = ['fcc']
     orientation = ['001','111']
     lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
@@ -121,7 +121,7 @@ def initialization(n_sim,save_data):
     test = [0,1,2,3,4,5]
 
     # Deposition process of chemical species
-    Co_latt.deposition_specie(0.0001,rng,test[0])
+    Co_latt.deposition_specie(1e-5,rng,test[0])
 
 
     return Co_latt,rng    

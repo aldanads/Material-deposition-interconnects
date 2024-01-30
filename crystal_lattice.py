@@ -214,15 +214,16 @@ class Crystal_Lattice():
         
         if test == 0:
             
+            P = 1-np.exp(-self.TR_ad*t) # Adsorption probability in time t
             # Indexes of sites availables: supported by substrates or other species
             for idx in self.adsorption_sites:
-                P = 1-np.exp(-self.TR_ad*t) # Adsorption probability in time t
                 if rng.random() < P:   
                     # Introduce specie in the site
                     update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
+            
+            # Update sites availables, the support to each site and available migrations
+            self.update_sites(update_specie_events,update_supp_av)
 
-                    # Update sites availables, the support to each site and available migrations
-                    self.update_sites(update_specie_events,update_supp_av)
             
 
         # Single particle in a determined place
@@ -402,7 +403,7 @@ class Crystal_Lattice():
 
 
 
-    def plot_lattice_points(self):
+    def plot_lattice_points(self,azim = 60,elev = 45):
         
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
@@ -411,7 +412,7 @@ class Crystal_Lattice():
         
         ax.scatter3D(x, y, z, c='blue', marker='o')
         ax.set_aspect('equal', 'box')
-        ax.view_init(azim=60, elev=90)
+        ax.view_init(azim=azim, elev = elev)
 
         ax.set_xlabel('x-axis (nm)')
         ax.set_ylabel('y-axis (nm)')
