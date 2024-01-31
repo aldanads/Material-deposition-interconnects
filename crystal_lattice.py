@@ -424,7 +424,7 @@ class Crystal_Lattice():
         plt.show()
         
         
-    def plot_crystal(self,azim = 60,elev = 45):
+    def plot_crystal(self,azim = 60,elev = 45,path = '',i = 0):
         
         fig = plt.figure(dpi=300)
         ax = fig.add_subplot(111, projection='3d')
@@ -443,6 +443,12 @@ class Crystal_Lattice():
         ax.set_zlim([0, 2*self.crystal_size[2]])
         ax.set_aspect('equal', 'box')
 
+
+        if path == '':
+            plt.show()
+        else:
+            plt.savefig(path+str(i)+'_t(s) = '+str(round(self.time,5))+' .png', dpi = 300)
+            plt.clf()
         plt.show()
         
 # =============================================================================
