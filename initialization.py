@@ -20,10 +20,10 @@ def initialization(n_sim,save_data):
     plt.rcParams["figure.dpi"] = 300 # Default value of dpi = 300
     
     if save_data:
-        files_copy = ['initialization.py', 'crystal_lattice.py','Node.py','main.py','']
+        files_copy = ['initialization.py', 'crystal_lattice.py','Site.py','main.py','KMC.py','balanced_tree.py']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = r'path\\'
+            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Tests\\'
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = r'path/'
             
@@ -75,11 +75,11 @@ def initialization(n_sim,save_data):
 # =============================================================================
     select_dataset = 0    
     Act_E_dataset = ['TaN','Ru25','Ru50','test']   
-    E_dataset = {'TaN':[0.4,0.7,0.33,0.84,0.44,0.76,0.74],
+    E_dataset = {'TaN':[0.7,0.7,0.33,0.84,0.44,0.76,0.74],
               'Ru25':[0.4,0.92,1.58,0.94,0.30,1.21,1.25],
               'Ru50':[0.4,0.62,0.78,1.18,1.08,1.86,1.82],
-              # 'test':[0.5,0.2,0.4,0.4,0.5,0.6,0.7]}
-              'test':[2,2,2,2,2,2,2]}
+               'test':[0.5,0.2,0.4,0.4,0.5,0.6,0.7]}
+             
 # =============================================================================
 #     Böyükata, M., & Belchior, J. C. (2008). 
 #     Structural and Energetic Analysis of Copper Clusters: MD Study of Cu n (n = 2-45). 
@@ -125,7 +125,7 @@ def initialization(n_sim,save_data):
     Co_latt.deposition_specie(1e-5,rng,test[0])
 
 
-    return Co_latt,rng    
+    return Co_latt,rng,paths
     
 def save_simulation(files_copy,dst,n_sim):
     
@@ -135,14 +135,14 @@ def save_simulation(files_copy,dst,n_sim):
         os.makedirs(dst+parent_dir) 
         dst = dst+parent_dir
         program_directory = 'Program\\'
-        data_directoy = 'Copper deposition\\'
+        data_directoy = 'Crystal evolution\\'
         
     elif platform.system() == 'Linux':
         parent_dir = 'Sim_'+str(n_sim)+'/'
         os.makedirs(dst+parent_dir) 
         dst = dst+parent_dir
         program_directory = 'Program/'
-        data_directoy = 'Copper deposition/'
+        data_directoy = 'Crystal evolution/'
 
     os.makedirs(dst + program_directory)
     os.makedirs(dst + data_directoy)
@@ -153,4 +153,31 @@ def save_simulation(files_copy,dst,n_sim):
         shutil.copyfile(files, paths['program']+files)
         
     return paths
+
+def save_variables(paths,variables):
+    
+    
+    if platform.system() == 'Windows': # When running in laptop
+
+        import shelve
+    
+        filename = 'variables'
+        my_shelf = shelve.open(paths+filename,'n') # 'n' for new
+        
+        for key in variables:
+            my_shelf[key] = variables[key]
+    
+        my_shelf.close()
+
+    elif platform.system() == 'Linux': # HPC works on Linux
+    
+        import pickle
+    
+        filename = 'variables.pkl'    
+    
+        # Open a file and use dump()
+        with open(paths+filename, 'wb') as file:
+              
+            # A new file will be created
+            pickle.dump(variables,file)
     

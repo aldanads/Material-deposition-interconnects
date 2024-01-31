@@ -23,6 +23,7 @@ class Crystal_Lattice():
         self.bravais_latt = lattice_properties[2]
         self.latt_orientation = lattice_properties[3]
         self.chemical_specie = experimental_conditions[4]
+        self.temperature = experimental_conditions[3]
         self.activation_energies = E_mig
         self.time = 0
         self.list_time = []
@@ -393,7 +394,7 @@ class Crystal_Lattice():
             # Sites are not available because a particle has migrated there
             for idx in update_specie_events:
                 self.grid_crystal[idx].available_migrations(self.grid_crystal)
-                self.grid_crystal[idx].transition_rates()
+                self.grid_crystal[idx].transition_rates(self.temperature)
 
     def track_time(self,t):
         
