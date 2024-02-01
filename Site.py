@@ -40,7 +40,13 @@ class Site():
                 self.nearest_neighbors_cart.append(tuple(pos))
                 # Migration in the plane
                 if round(pos[2]-self.position[2],3) == 0:
-                    self.migration_paths['Plane'].append([tuple(idx),num_event,self.Act_E_list[0]])
+                    # Migration on the plane - Substrate
+                    if 'Substrate' in self.supp_by:
+                        self.migration_paths['Plane'].append([tuple(idx),num_event,self.Act_E_list[0]])
+                    # Migration on the plane - Film
+                    else:
+                        self.migration_paths['Plane'].append([tuple(idx),num_event,self.Act_E_list[7]])
+
                 # Migration upward
                 elif round(pos[2]-self.position[2],3) > 0:
                     # From substrate to layer 1
@@ -75,7 +81,12 @@ class Site():
                 self.nearest_neighbors_cart.append(tuple(grid_crystal[min_dist_idx].position))
                 # Migration in the plane
                 if round(pos[2]-self.position[2],3) == 0:
-                    self.migration_paths['Plane'].append([tuple(min_dist_idx),num_event,self.Act_E_list[0]])
+                    # Migration on the plane - Substrate
+                    if 'Substrate' in self.supp_by: 
+                        self.migration_paths['Plane'].append([tuple(min_dist_idx),num_event,self.Act_E_list[0]])
+                    # Migration on the plane - Film
+                    else:
+                        self.migration_paths['Plane'].append([tuple(min_dist_idx),num_event,self.Act_E_list[7]])
                 # Migration upward
                 elif round(pos[2]-self.position[2],3) > 0:
                     # From substrate to layer 1

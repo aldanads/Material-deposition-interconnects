@@ -31,7 +31,7 @@ def KMC(Co_latt,rng):
     sumTR = update_data(TR_tree)
     
 
-    if sumTR == None: return Co_latt # Exit if there is not possible event
+    if sumTR == None: return Co_latt,time # Exit if there is not possible event
     # When we only have one node in the tree, it returns a tuple
     if type(sumTR) is tuple: sumTR = sumTR[0]
     # We search in our binary tree the events that happen
@@ -39,7 +39,14 @@ def KMC(Co_latt,rng):
     #Calculate the time step
     time += -np.log(rng.random())/sumTR
 
-    Co_latt.processes(chosen_event)
-    Co_latt.track_time(time)
+    print(time,Co_latt.timestep_limits)
+    if time > Co_latt.timestep_limits:
+        time = Co_latt.timestep_limits
+        if rng.random() < 1-np.exp(-sumTR*time):
+            Co_latt.processes(chosen_event)
+            """Can be inside Co_latt????"""
+    else:
+        Co_latt.processes(chosen_event)
+    Co_latt.track_time(time)  
    
-    return Co_latt
+    return Co_latt,time

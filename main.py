@@ -18,16 +18,17 @@ Co_latt.add_time()
 Co_latt.plot_crystal(45,45)
 
 j = 0
-for i in range(2):
-    Co_latt = KMC(Co_latt,rng)
-    
-    if i%1 == 0:
+for i in range(9):
+    Co_latt,KMC_time_step = KMC(Co_latt,rng)
+    #Co_latt.deposition_specie(KMC_time_step,rng)
+
+    if i%1== 0:
         j+=1
         Co_latt.plot_crystal(45,45,paths['data'],j)      
         Co_latt.add_time()
         print('Total time: ',Co_latt.list_time[-1])
-        Co_latt.deposition_specie(Co_latt.list_time[-1] - Co_latt.list_time[-2],rng)
-
+        # Co_latt.deposition_specie(Co_latt.list_time[-1] - Co_latt.list_time[-2],rng)
+    
     
 Co_latt.plot_crystal(45,45)
 

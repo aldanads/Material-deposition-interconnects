@@ -17,14 +17,14 @@ import numpy as np
 
 class Crystal_Lattice():
     
-    def __init__(self,lattice_properties,experimental_conditions,E_mig):
+    def __init__(self,lattice_properties,experimental_conditions,Act_E_list):
         self.lattice_constants = lattice_properties[0]
         self.crystal_size = lattice_properties[1]
         self.bravais_latt = lattice_properties[2]
         self.latt_orientation = lattice_properties[3]
         self.chemical_specie = experimental_conditions[4]
         self.temperature = experimental_conditions[3]
-        self.activation_energies = E_mig
+        self.activation_energies = Act_E_list
         self.time = 0
         self.list_time = []
         
@@ -118,8 +118,6 @@ class Crystal_Lattice():
                 neighbors_positions = [self.idx_to_cart(idx) for idx in self.latt.get_neighbors(idx)[:,:3]]
                 site.neighbors_analysis(self.grid_crystal,self.latt.get_neighbors(idx)[:,:3],neighbors_positions,self.crystal_size)
         
-            
-            
         
     def available_adsorption_sites(self, update_supp_av = []):
         
@@ -168,6 +166,10 @@ class Crystal_Lattice():
         # Boltzmann constant (m^2 kg s^-2 K^-1)
         self.TR_ad = sticking_coeff * partial_pressure * area_specie / np.sqrt(2 * constants.pi * mass_specie * constants.Boltzmann * T)
     
+    def limit_kmc_timestep(self,P_limits):
+        
+        self.timestep_limits = -np.log(1-P_limits)/self.TR_ad
+        
     
 # =============================================================================
 #             Introduce particle
@@ -310,6 +312,10 @@ class Crystal_Lattice():
             for neighbor in self.grid_crystal[idx].migration_paths['Plane']:
                 update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
                 self.update_sites(update_specie_events,update_supp_av)
+                
+            idx_neighbor_plane = self.grid_crystal[neighbor[0]].migration_paths['Plane'][1][0]
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_plane,update_specie_events,update_supp_av)
+            self.update_sites(update_specie_events,update_supp_av)
         
         # Hexagonal seed - 7 particles in plane, one on top
         elif test == 5:
