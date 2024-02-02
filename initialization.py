@@ -23,7 +23,7 @@ def initialization(n_sim,save_data):
         files_copy = ['initialization.py', 'crystal_lattice.py','Site.py','main.py','KMC.py','balanced_tree.py']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Tests\\'
+            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Cu migration on Cu film\\'
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = r'path/'
             
@@ -37,10 +37,10 @@ def initialization(n_sim,save_data):
 #         
 # =============================================================================
     sticking_coeff = 1
-    partial_pressure = 1 # (Pa = N m^-2 = kg m^-1 s^-2)
+    partial_pressure = 5 # (Pa = N m^-2 = kg m^-1 s^-2)
     mass_specie = 63.546 # (mass of Copper in u) 
     chemical_specie = 'Cu'
-    T = 500 # (K)
+    T = 573 # (K)
     
     experimental_conditions = [sticking_coeff,partial_pressure,mass_specie,T,chemical_specie]
     
@@ -52,7 +52,7 @@ def initialization(n_sim,save_data):
     b = 0.358 # (nm)
     c = 0.358 # (nm)
     lattice_constants = (a,b,c)
-    crystal_size = (3, 3,1) # (nm)
+    crystal_size = (3, 3,0.5) # (nm)
     bravais_latt = ['fcc']
     orientation = ['001','111']
     lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
@@ -111,7 +111,8 @@ def initialization(n_sim,save_data):
 #     COMPARISON OF DIFFUSION PROCESSES OF Cu AND Au ADA TOMS ON THE Cu(1l1) SURFACE BY MOLECULAR DYNAMICS.
 #     
 # =============================================================================
-    E_mig_plane_Cu = 0.15 # (eV)
+    E_mig_plane_Cu = 0.05*(n_sim+1) # (eV)
+    
 
     # Binding energy | Desorption energy: https://doi.org/10.1039/D1SC04708F
     # Surface: [0]-TaN, [1]-Ru25, [2]-Ru50, [3]-Ru100, [4]-1 ML Ru passivation
@@ -121,7 +122,7 @@ def initialization(n_sim,save_data):
                   E_mig_upward_layer1_layer2,E_mig_downward_layer2_layer1,
                   E_mig_upward_subs_layer2,E_mig_downward_layer2_subs,
                   E_mig_plane_Cu,
-                  binding_energy[Act_E_dataset[select_dataset]],E_clustering[Act_E_dataset[select_dataset]]]
+                  binding_energy['test'],E_clustering[Act_E_dataset[select_dataset]]]
 
 # =============================================================================
 #     Initialize the crystal grid structure - nodes with empty spaces
@@ -145,7 +146,7 @@ def initialization(n_sim,save_data):
     test = [0,1,2,3,4,5,6]
 
     # Deposition process of chemical species
-    Co_latt.deposition_specie(1e-5,rng,test[4])
+    Co_latt.deposition_specie(Co_latt.timestep_limits,rng,test[0])
 
 
     return Co_latt,rng,paths

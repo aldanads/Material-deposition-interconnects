@@ -374,6 +374,7 @@ class Crystal_Lattice():
 #         Specie migration
 # =============================================================================
         if chosen_event[2] < site_affected.num_mig_path:
+            
             # print('Support balance: ',len(self.grid_crystal[chosen_event[-1]].supp_by)-len(self.grid_crystal[chosen_event[1]].supp_by))
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(chosen_event[1],update_specie_events,update_supp_av)

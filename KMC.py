@@ -39,7 +39,8 @@ def KMC(Co_latt,rng):
     #Calculate the time step
     time += -np.log(rng.random())/sumTR
 
-    print(time,Co_latt.timestep_limits)
+    # If the time step is big because of the TR, we need to allow the deposition process to occur
+    # We establish a time step limits that the deposition is relevant
     if time > Co_latt.timestep_limits:
         time = Co_latt.timestep_limits
         if rng.random() < 1-np.exp(-sumTR*time):
