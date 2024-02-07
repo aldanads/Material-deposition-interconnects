@@ -23,13 +23,15 @@ def initialization(n_sim,save_data):
         files_copy = ['initialization.py', 'crystal_lattice.py','Site.py','main.py','KMC.py','balanced_tree.py']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Cu migration on Cu film\\'
+            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Different substrate energy binding\\'
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = r'path/'
             
-        paths = save_simulation(files_copy,dst,n_sim) # Create folders and python files
+        paths,Results = save_simulation(files_copy,dst,n_sim) # Create folders and python files
+        
     else:
         paths = {'data': ''}
+        Results = []
         
         
 # =============================================================================
@@ -52,7 +54,7 @@ def initialization(n_sim,save_data):
     b = 0.358 # (nm)
     c = 0.358 # (nm)
     lattice_constants = (a,b,c)
-    crystal_size = (3, 3,0.5) # (nm)
+    crystal_size = (3, 3,1) # (nm)
     bravais_latt = ['fcc']
     orientation = ['001','111']
     lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
@@ -92,11 +94,21 @@ def initialization(n_sim,save_data):
 #     Structural and Energetic Analysis of Copper Clusters: MD Study of Cu n (n = 2-45). 
 #     In J. Braz. Chem. Soc (Vol. 19, Issue 5).
 #      - Clustering energy
+# 
+#     Kondati Natarajan, S., Nies, C. L., & Nolan, M. (2020). 
+#     The role of Ru passivation and doping on the barrier and seed layer properties of Ru-modified TaN for copper interconnects. 
+#     Journal of Chemical Physics, 152(14). https://doi.org/10.1063/5.0003852
+#       
+#       They have calculated for 2-4 atoms, the rest is extrapolation
+#       It is in (eV/Cu)
+#       'TaN': [0,0,-1,-1.2,-1.34,-1.46,-1.58,-1.7,-1.82,-1.94,-2.06,-2.18,-2.3,-2.42]
+#       'Ru25':[0,0,-0.55,-0.4,-1.30,-1.42,-1.54,-1.66,-1.78,-1.9,-2.02,-2.14,-2.26,-2.38]
+#       'Ru50':[0,0,-1,-1.22,-1.34,-1.46,-1.58,-1.7,-1.82,-1.94,-2.06,-2.18,-2.3,-2.42]}
 # =============================================================================    
     E_clustering = {'Void': [0,0,-0.577,-1.732,-3.465,-5.281,-7.566,-9.676,-11.902,-14.228,-16.848,-19.643,-22.818,-26.710],
-                    'TaN': [0,0,-1,-1.2,-1.34,-1.46,-1.58,-1.7,-1.82,-1.94,-2.06,-2.18,-2.3,-2.42],
-                    'Ru25':[0,0,-0.55,-0.4,-1.30,-1.42,-1.54,-1.66,-1.78,-1.9,-2.02,-2.14,-2.26,-2.38],
-                    'Ru50':[0,0,-1,-1.22,-1.34,-1.46,-1.58,-1.7,-1.82,-1.94,-2.06,-2.18,-2.3,-2.42]} 
+                    'TaN': [0,0,-1 * 2,-1.2 * 3,-1.34 * 4,-1.46 * 5,-1.58 * 6,-1.7 * 7,-1.82 * 8,-1.94 * 9,-2.06 * 10,-2.18 * 11,-2.3 * 12,-2.42 * 13],
+                    'Ru25':[0,0,-0.55 * 2,-0.4 * 3,-1.30 * 4,-1.42 * 5,-1.54 * 6,-1.66 * 7,-1.78 * 8,-1.9 * 9,-2.02 * 10,-2.14 * 11,-2.26 * 12,-2.38 * 13],
+                    'Ru50':[0,0,-1 * 2,-1.22 * 3,-1.34 * 4,-1.46 * 5,-1.58 * 6,-1.7 * 7,-1.82 * 8,-1.94 * 9,-2.06 * 10,-2.18 * 11,-2.3 * 12,-2.42 * 13]} 
 
     
     E_mig_plane_sub = E_dataset[Act_E_dataset[select_dataset]][0] # (eV)
@@ -110,19 +122,23 @@ def initialization(n_sim,save_data):
 #     Papanicolaou, N. 1, & Evangelakis, G. A. (n.d.). 
 #     COMPARISON OF DIFFUSION PROCESSES OF Cu AND Au ADA TOMS ON THE Cu(1l1) SURFACE BY MOLECULAR DYNAMICS.
 #     
+#     Mińkowski, Marcin, and Magdalena A. Załuska-Kotur. 
+#     "Diffusion of Cu adatoms and dimers on Cu (111) and Ag (111) surfaces." 
+#     Surface Science 642 (2015): 22-32. 10.1016/j.susc.2015.07.026
 # =============================================================================
-    E_mig_plane_Cu = 0.05*(n_sim+1) # (eV)
-    
+    #E_mig_plane_Cu = 0.05*(n_sim+1) # (eV)
+    E_mig_plane_Cu = 0.15 # (eV)
 
     # Binding energy | Desorption energy: https://doi.org/10.1039/D1SC04708F
     # Surface: [0]-TaN, [1]-Ru25, [2]-Ru50, [3]-Ru100, [4]-1 ML Ru passivation
-    binding_energy = {'TaN':-3.49, 'Ru25':-3.58, 'Ru50':-3.59, 'Ru100':-3.64, '1 ML Ru':-4.12, 'test':0}
+    binding_energy = {'TaN':-3.49, 'Ru25':-3.58, 'Ru50':-3.59, 'Ru100':-3.64, '1 ML Ru':-4.12, 'test':-0.5 * n_sim}
     Act_E_list = [E_mig_plane_sub,
                   E_mig_upward_subs_layer1,E_mig_downward_layer1_subs,
                   E_mig_upward_layer1_layer2,E_mig_downward_layer2_layer1,
                   E_mig_upward_subs_layer2,E_mig_downward_layer2_subs,
                   E_mig_plane_Cu,
                   binding_energy['test'],E_clustering[Act_E_dataset[select_dataset]]]
+                  #binding_energy[Act_E_dataset[select_dataset]],E_clustering[Act_E_dataset[select_dataset]]]
 
 # =============================================================================
 #     Initialize the crystal grid structure - nodes with empty spaces
@@ -149,7 +165,7 @@ def initialization(n_sim,save_data):
     Co_latt.deposition_specie(Co_latt.timestep_limits,rng,test[0])
 
 
-    return Co_latt,rng,paths
+    return Co_latt,rng,paths,Results
     
 def save_simulation(files_copy,dst,n_sim):
     
@@ -171,12 +187,15 @@ def save_simulation(files_copy,dst,n_sim):
     os.makedirs(dst + program_directory)
     os.makedirs(dst + data_directoy)
     
-    paths = {'data': dst + data_directoy, 'program': dst + program_directory}
+    paths = {'data': dst + data_directoy, 'program': dst + program_directory,'results': dst}
 
     for files in files_copy:
         shutil.copyfile(files, paths['program']+files)
         
-    return paths
+    excel_filename = dst + 'Results.csv'
+    Results = SimulationResults(excel_filename)
+        
+    return paths,Results
 
 def save_variables(paths,variables):
     
@@ -204,4 +223,15 @@ def save_variables(paths,variables):
               
             # A new file will be created
             pickle.dump(variables,file)
+            
+class SimulationResults:
+    def __init__(self, excel_filename):
+        self.excel_filename = excel_filename
+        # Initialize a CSV file with headers
+        with open(excel_filename, 'w') as f:
+            f.write('Time,Mass,Sites Occupation,Average Thickness,Terrace Area,RMS Roughness,Performance time\n')
     
+    def measurements_crystal(self, time, mass_gained, sites_occupation, thickness, avg_terrace, surf_roughness_RMS,performance_time):
+            # Append measurements to the CSV file
+            with open(self.excel_filename, 'a') as f:
+                f.write(f'{time},{mass_gained},{sites_occupation},{thickness},{avg_terrace},{surf_roughness_RMS},{performance_time}\n')

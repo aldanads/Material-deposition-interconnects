@@ -6,9 +6,11 @@ Created on Wed Jan 10 15:19:06 2024
 """
 import lattpy as lp # https://lattpy.readthedocs.io/en/latest/tutorial/finite.html#position-and-neighbor-data
 import matplotlib.pyplot as plt
-from Site import Site
+from Site import Site,Island
 from scipy import constants
 import numpy as np
+from matplotlib import cm
+
 
 # Rotation of a vector - Is copper growing in [111] direction?
 # The basis vector is in [001]
@@ -24,6 +26,7 @@ class Crystal_Lattice():
         self.latt_orientation = lattice_properties[3]
         self.chemical_specie = experimental_conditions[4]
         self.temperature = experimental_conditions[3]
+        self.mass_specie = experimental_conditions[2]
         self.activation_energies = Act_E_list
         self.time = 0
         self.list_time = []
@@ -474,6 +477,129 @@ class Crystal_Lattice():
             plt.clf()
         plt.show()
         
+    def plot_crystal_surface(self):
+        
+        x,y,z = self.obtain_surface_coord()
+                
+        
+        # Create a 3D plot
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        
+        # Plot the surface
+        surf = ax.plot_trisurf(x, y, z, cmap=cm.coolwarm)
+        
+        # Set labels
+        ax.set_xlabel('X Axis')
+        ax.set_ylabel('Y Axis')
+        ax.set_zlabel('Z Axis')
+        ax.set_zlim([0, self.crystal_size[2]])
+        
+        ax.view_init(azim=45, elev = 45)
+        
+        # Add color bar
+        fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10)
+        
+        # Show the plot
+        plt.show()
+        
+# =============================================================================
+# --------------------------- MEASUREMENTS ------------------------------------
+#         
+# =============================================================================
+
+    def measurements_crystal(self):
+        
+        self.calculate_mass()
+        self.sites_occupation()
+        self.average_thickness()
+        self.terrace_area()
+        self.RMS_roughness()
+        
+    def calculate_mass(self):
+        
+        x_size, y_size = self.crystal_size[:2]
+        density = len(self.sites_occupied) * self.mass_specie / (x_size * y_size)
+        g_to_ng = 1e9
+        nm_to_cm = 1e7
+        
+        self.mass_gained = nm_to_cm**2 * g_to_ng * density / constants.Avogadro # (ng/cm2)
+
+# =============================================================================
+# We calculate % occupy per layer
+# Average the contribution of each layer to the thickness acording to the z step
+# =============================================================================
+    def average_thickness(self):
+        
+        grid_crystal = self.grid_crystal
+        z_step = self.basis_vectors[0][2]
+        z_steps = int(self.crystal_size[2]/z_step + 1)
+        layers = [0] * z_steps  # Initialize each layer separately
+        
+        for site in grid_crystal.values():
+            z_idx = int(round(site.position[2] / z_step))
+            layers[z_idx] += 1 if site.chemical_specie != 'Empty' else 0
+            
+        sites_per_layer = len(grid_crystal)/z_steps
+        normalized_layers = [count / sites_per_layer for count in layers]
+        # Number of sites occupied and percentage of occupation for each layer
+        self.layers = [layers, normalized_layers]
+        
+        # Layer 0 is z = 0, so it doesn't contribute
+        self.thickness = sum(normalized_layers[1:]) * z_step # (nm)    
+        
+    def sites_occupation(self):
+        
+        self.fraction_sites_occupied = len(self.sites_occupied) / len(self.grid_crystal) 
+        
+    def terrace_area(self):
+        
+        layers = self.layers[0]
+        grid_crystal = self.grid_crystal
+        z_step = self.basis_vectors[0][2]
+        z_steps = int(self.crystal_size[2]/z_step + 1)
+        sites_per_layer = len(grid_crystal)/z_steps
+
+        area_per_site = self.crystal_size[0] * self.crystal_size[1] / sites_per_layer
+        
+        terraces = [(layers[i-1] - layers[i]) * area_per_site for i in range(1,len(layers))]
+        terraces.append(layers[-1] * area_per_site) # (nm2)
+        
+        self.terraces = terraces
+        
+    def RMS_roughness(self):
+        
+        x,y,z = self.obtain_surface_coord()
+        z_mean = np.mean(z)
+        self.surf_roughness_RMS = np.sqrt(np.mean((np.array(z)-z_mean)**2))
+    
+    def islands_analysis(self):
+
+        visited = set()
+        normalized_layers = self.layers[1]
+        count_islands = [0] * len(normalized_layers)
+        layers_no_complete = np.where(np.array(normalized_layers) != 1.0)
+        count_islands[normalized_layers == 1] = 1
+        z_step = self.basis_vectors[0][2]
+
+        islands_list = []
+
+        for z_idx in layers_no_complete[0]:    
+            z_layer = round(z_idx * z_step,3)
+            for idx_site in self.sites_occupied:     
+                if self.grid_crystal[idx_site].position[2] == z_layer: 
+                    island_slice = set()
+                    visited,island_slice = self.detect_islands(idx_site,visited,island_slice,self.chemical_specie)
+
+                    if len(island_slice):
+                        island_sites = island_slice.copy()
+                        visited,island_sites = self.build_island(visited,island_sites,island_slice,self.chemical_specie)
+                        islands_list.append(Island(z_idx,z_layer,island_sites))
+                        count_islands[z_idx] += 1
+                        
+        self.islands_list = islands_list
+
+        
 # =============================================================================
 #     Auxiliary functions
 #     
@@ -548,3 +674,56 @@ class Crystal_Lattice():
     
     def idx_to_cart(self,idx):
         return tuple(round(element,3) for element in np.sum(idx * np.transpose(self.basis_vectors), axis=1))
+    
+    
+# =============================================================================
+#     Function to detect island and the coordinates of the base
+# =============================================================================
+    def detect_islands(self,idx_site,visited,island_slice,chemical_specie):
+
+        site = self.grid_crystal[idx_site] 
+        
+        if idx_site not in visited and site.chemical_specie == chemical_specie:
+            visited.add(idx_site)
+            island_slice.add(idx_site)
+            # dfs_recursive
+            for idx in site.migration_paths['Plane']:
+                visited,island_slice = self.detect_islands(self,idx[0],visited,island_slice,chemical_specie)
+                                       
+        return visited,island_slice
+
+# =============================================================================
+#     Function to build the full island starting from the base obtained in detect_islands()
+# =============================================================================
+    def build_island(self,visited,island_sites,island_slice,chemical_specie):
+        
+        for site in island_slice:
+            
+            for element in self.grid_crystal[site].migration_paths['Up']:
+
+                if element[0] not in visited and self.grid_crystal[element[0]].chemical_specie == chemical_specie:
+                    visited.add(element[0])
+                    island_sites.add(element[0])
+                    visited,island_sites = self.build_island(self,visited,island_sites,island_slice,chemical_specie)
+                    
+        return visited,island_sites
+    
+    def obtain_surface_coord(self):
+        
+        grid_crystal = self.grid_crystal
+        
+        x = []
+        y = []
+        z = []
+        
+        for site in grid_crystal.values():
+            top_layer_empty_sites = 0
+            for jump in site.migration_paths['Up']:
+                if grid_crystal[jump[0]].chemical_specie == 'Empty': top_layer_empty_sites +=1
+                     
+            if (site.chemical_specie != 'Empty') and top_layer_empty_sites >= 2:
+                x.append(site.position[0])
+                y.append(site.position[1])
+                z.append(site.position[2])
+                
+        return x,y,z

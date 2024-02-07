@@ -235,3 +235,8 @@ class Site():
                 event[0] = tr_value
                 
         
+class Island():
+    def __init__(self,z_starting_position,z_starting_pos_cart,island_sites):
+        self.z_starting_position = z_starting_position
+        self.z_starting_pos_cart = z_starting_pos_cart
+        self.island_sites = island_sites
