@@ -407,7 +407,7 @@ class Crystal_Lattice():
         if update_specie_events: 
             # Sites are not available because a particle has migrated there
             for idx in update_specie_events:
-                self.grid_crystal[idx].available_migrations(self.grid_crystal)
+                self.grid_crystal[idx].available_migrations(self.grid_crystal,idx)
                 self.grid_crystal[idx].transition_rates(self.temperature)
 
     def track_time(self,t):
@@ -696,7 +696,7 @@ class Crystal_Lattice():
             island_slice.add(idx_site)
             # dfs_recursive
             for idx in site.migration_paths['Plane']:
-                visited,island_slice = self.detect_islands(self,idx[0],visited,island_slice,chemical_specie)
+                visited,island_slice = self.detect_islands(idx[0],visited,island_slice,chemical_specie)
                                        
         return visited,island_slice
 

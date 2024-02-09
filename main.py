@@ -22,10 +22,10 @@ for n_sim in range(1):
     j = 0
     n_part = len(Co_latt.sites_occupied)
     nothing_happen = 0
+    # total_steps = int(1e2)
+    # snapshoots_steps = int(5e1)
     total_steps = int(5e5)
     snapshoots_steps = int(5e3)
-    # total_steps = int(1e2)
-    # snapshoots_steps = int(1)
 
     starting_time = time.time()
 
@@ -47,15 +47,17 @@ for n_sim in range(1):
                 Results.measurements_crystal(Co_latt.list_time[-1],Co_latt.mass_gained,Co_latt.fraction_sites_occupied,
                                               Co_latt.thickness,np.mean(Co_latt.terraces),Co_latt.surf_roughness_RMS,end_time-starting_time)
                 
-            # # If there is only migration for many kMC steps, we increase once the timestep 
-            # # for the deposition 
-            # if len(Co_latt.sites_occupied) == n_part:
-            #     nothing_happen +=1
-            #     if nothing_happen == 4:
-            #         Co_latt.deposition_specie(Co_latt.timestep_limits,rng)
-            # else: 
-            #     n_part = len(Co_latt.sites_occupied)
-            #     nothing_happen = 0
+            # If there is only migration for many kMC steps, we increase once the timestep 
+            # for the deposition 
+            if len(Co_latt.sites_occupied) == n_part:
+                nothing_happen +=1
+                if nothing_happen == 4:
+                    Co_latt.deposition_specie(Co_latt.timestep_limits,rng)
+                    Co_latt.track_time(Co_latt.timestep_limits)
+                    Co_latt.add_time()
+            else: 
+                n_part = len(Co_latt.sites_occupied)
+                nothing_happen = 0
                     
         
     Co_latt.plot_crystal(45,45)
