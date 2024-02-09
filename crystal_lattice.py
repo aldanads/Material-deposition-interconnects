@@ -38,7 +38,9 @@ class Crystal_Lattice():
         self.adsorption_sites = [] # Sites availables for deposition or migration
         # Obtain all the positions in the grid that are supported by the
         # substrate or other deposited chemical species
-        self.available_adsorption_sites() 
+        update_supp_av = [idx for idx in self.grid_crystal.keys()]
+        update_specie_events = []
+        self.update_sites(update_specie_events,update_supp_av)
         
         #Transition rate for adsortion of chemical species
         self.transition_rate_adsorption(experimental_conditions[0:4])
@@ -136,6 +138,8 @@ class Crystal_Lattice():
                     
                 elif (idx not in self.adsorption_sites) and ('Substrate' in self.grid_crystal[idx].supp_by or len(self.grid_crystal[idx].supp_by) > 2) and self.grid_crystal[idx].chemical_specie == 'Empty':
                     self.adsorption_sites.append(idx)
+                    
+        
                     
     def transition_rate_adsorption(self,experimental_conditions):
 # =============================================================================
@@ -414,6 +418,10 @@ class Crystal_Lattice():
         
         self.list_time.append(self.time)
 
+# =============================================================================
+# --------------------------- PLOTTING FUNCTIONS ------------------------------
+#         
+# =============================================================================
 
 
     def plot_lattice_points(self,azim = 60,elev = 45):

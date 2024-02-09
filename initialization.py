@@ -137,8 +137,8 @@ def initialization(n_sim,save_data):
                   E_mig_upward_layer1_layer2,E_mig_downward_layer2_layer1,
                   E_mig_upward_subs_layer2,E_mig_downward_layer2_subs,
                   E_mig_plane_Cu,
-                  binding_energy['test'],E_clustering[Act_E_dataset[select_dataset]]]
-                  #binding_energy[Act_E_dataset[select_dataset]],E_clustering[Act_E_dataset[select_dataset]]]
+                  #binding_energy['test'],E_clustering[Act_E_dataset[select_dataset]]]
+                  binding_energy[Act_E_dataset[select_dataset]],E_clustering[Act_E_dataset[select_dataset]]]
 
 # =============================================================================
 #     Initialize the crystal grid structure - nodes with empty spaces
@@ -163,7 +163,8 @@ def initialization(n_sim,save_data):
 
     # Deposition process of chemical species
     Co_latt.deposition_specie(Co_latt.timestep_limits,rng,test[0])
-
+    Co_latt.track_time(Co_latt.timestep_limits) 
+    Co_latt.add_time()
 
     return Co_latt,rng,paths,Results
     

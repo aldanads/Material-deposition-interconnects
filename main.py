@@ -9,14 +9,13 @@ from KMC import KMC
 import numpy as np
 import time
 
-save_data = True
+save_data = False
 
-for n_sim in range(8):
+for n_sim in range(1):
     
 
     Co_latt,rng,paths,Results = initialization(n_sim,save_data)
     
-    print(Co_latt.time)
     Co_latt.add_time()
     Co_latt.plot_crystal(45,45)
     
@@ -25,6 +24,8 @@ for n_sim in range(8):
     nothing_happen = 0
     total_steps = int(5e5)
     snapshoots_steps = int(5e3)
+    # total_steps = int(1e2)
+    # snapshoots_steps = int(1)
 
     starting_time = time.time()
 
@@ -42,18 +43,19 @@ for n_sim in range(8):
             Co_latt.measurements_crystal()
             print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',Co_latt.list_time[-1])
             end_time = time.time()
-            Results.measurements_crystal(Co_latt.list_time[-1],Co_latt.mass_gained,Co_latt.fraction_sites_occupied,
-                                          Co_latt.thickness,np.mean(Co_latt.terraces),Co_latt.surf_roughness_RMS,end_time-starting_time)
-            
-            # If there is only migration for many kMC steps, we increase once the timestep 
-            # for the deposition 
-            if len(Co_latt.sites_occupied) == n_part:
-                nothing_happen +=1
-                if nothing_happen == 4:
-                    Co_latt.deposition_specie(Co_latt.timestep_limits,rng)
-            else: 
-                n_part = len(Co_latt.sites_occupied)
-                nothing_happen = 0
+            if save_data:
+                Results.measurements_crystal(Co_latt.list_time[-1],Co_latt.mass_gained,Co_latt.fraction_sites_occupied,
+                                              Co_latt.thickness,np.mean(Co_latt.terraces),Co_latt.surf_roughness_RMS,end_time-starting_time)
+                
+            # # If there is only migration for many kMC steps, we increase once the timestep 
+            # # for the deposition 
+            # if len(Co_latt.sites_occupied) == n_part:
+            #     nothing_happen +=1
+            #     if nothing_happen == 4:
+            #         Co_latt.deposition_specie(Co_latt.timestep_limits,rng)
+            # else: 
+            #     n_part = len(Co_latt.sites_occupied)
+            #     nothing_happen = 0
                     
         
     Co_latt.plot_crystal(45,45)
