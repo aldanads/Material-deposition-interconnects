@@ -9,9 +9,9 @@ from KMC import KMC
 import numpy as np
 import time
 
-save_data = False
+save_data = True
 
-for n_sim in range(1):
+for n_sim in range(7,10):
     
 
     Co_latt,rng,paths,Results = initialization(n_sim,save_data)
@@ -35,18 +35,7 @@ for n_sim in range(1):
         Co_latt.deposition_specie(KMC_time_step,rng)
     
         if i%snapshoots_steps== 0:
-            j+=1
 
-            Co_latt.plot_crystal(45,45,paths['data'],j) 
-
-            Co_latt.add_time()
-            Co_latt.measurements_crystal()
-            print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',Co_latt.list_time[-1])
-            end_time = time.time()
-            if save_data:
-                Results.measurements_crystal(Co_latt.list_time[-1],Co_latt.mass_gained,Co_latt.fraction_sites_occupied,
-                                              Co_latt.thickness,np.mean(Co_latt.terraces),Co_latt.surf_roughness_RMS,end_time-starting_time)
-                
             # If there is only migration for many kMC steps, we increase once the timestep 
             # for the deposition 
             if len(Co_latt.sites_occupied) == n_part:
@@ -58,8 +47,18 @@ for n_sim in range(1):
             else: 
                 n_part = len(Co_latt.sites_occupied)
                 nothing_happen = 0
-                    
-        
+                Co_latt.add_time()
+            
+            j+=1
+            Co_latt.measurements_crystal()
+            print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',Co_latt.list_time[-1])
+            end_time = time.time()
+            if save_data:
+                Results.measurements_crystal(Co_latt.list_time[-1],Co_latt.mass_gained,Co_latt.fraction_sites_occupied,
+                                             Co_latt.thickness,np.mean(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) != 0]),Co_latt.surf_roughness_RMS,end_time-starting_time)
+
+            Co_latt.plot_crystal(45,45,paths['data'],j) 
+
     Co_latt.plot_crystal(45,45)
     
     # Variables to save

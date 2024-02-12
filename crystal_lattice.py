@@ -601,7 +601,7 @@ class Crystal_Lattice():
 
                     if len(island_slice):
                         island_sites = island_slice.copy()
-                        visited,island_sites = self.build_island(visited,island_sites,island_slice,self.chemical_specie)
+                        visited,island_sites = self.build_island(visited,island_sites,list(island_slice)[0],self.chemical_specie)
                         islands_list.append(Island(z_idx,z_layer,island_sites))
                         count_islands[z_idx] += 1
                         
@@ -703,17 +703,17 @@ class Crystal_Lattice():
 # =============================================================================
 #     Function to build the full island starting from the base obtained in detect_islands()
 # =============================================================================
-    def build_island(self,visited,island_sites,island_slice,chemical_specie):
-        
-        for site in island_slice:
+    def build_island(self,visited,island_sites,idx,chemical_specie):
+          
+        site = self.grid_crystal[idx]
             
-            for element in self.grid_crystal[site].migration_paths['Up']:
-
-                if element[0] not in visited and self.grid_crystal[element[0]].chemical_specie == chemical_specie:
-                    visited.add(element[0])
-                    island_sites.add(element[0])
-                    visited,island_sites = self.build_island(self,visited,island_sites,island_slice,chemical_specie)
-                    
+        for element in site.migration_paths['Up'] + site.migration_paths['Plane']:
+    
+            if element[0] not in visited and self.grid_crystal[element[0]].chemical_specie == chemical_specie:
+                visited.add(element[0])
+                island_sites.add(element[0])
+                visited,island_sites = self.build_island(visited,island_sites,element[0],chemical_specie)
+                
         return visited,island_sites
     
     def obtain_surface_coord(self):

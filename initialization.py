@@ -20,10 +20,10 @@ def initialization(n_sim,save_data):
     plt.rcParams["figure.dpi"] = 300 # Default value of dpi = 300
     
     if save_data:
-        files_copy = ['initialization.py', 'crystal_lattice.py','Site.py','main.py','KMC.py','balanced_tree.py']
+        files_copy = ['initialization.py', 'crystal_lattice.py','Site.py','main.py','KMC.py','balanced_tree.py','analysis.py']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Different substrate energy binding\\'
+            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Substrate energy\\'
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = r'path/'
             
@@ -138,7 +138,7 @@ def initialization(n_sim,save_data):
                   E_mig_upward_subs_layer2,E_mig_downward_layer2_subs,
                   E_mig_plane_Cu,
                   #binding_energy['test'],E_clustering[Act_E_dataset[select_dataset]]]
-                  binding_energy[Act_E_dataset[select_dataset]],E_clustering[Act_E_dataset[select_dataset]]]
+                  binding_energy['test'],E_clustering[Act_E_dataset[select_dataset]]]
 
 # =============================================================================
 #     Initialize the crystal grid structure - nodes with empty spaces
