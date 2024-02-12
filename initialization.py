@@ -159,10 +159,10 @@ def initialization(n_sim,save_data):
 #     - test[5] - Hexagonal seed - 7 particles in plane and 1 on the top of the layer
 #     - test[6] - 2 hexagonal seeds - 2 layers and one particle on the top 
 # =============================================================================
-    test = [0,1,2,3,4,5,6]
+    test = [0,1,2,3,4,5,6,7]
 
     # Deposition process of chemical species
-    Co_latt.deposition_specie(Co_latt.timestep_limits,rng,test[0])
+    Co_latt.deposition_specie(Co_latt.timestep_limits,rng,test[7])
     Co_latt.track_time(Co_latt.timestep_limits) 
     Co_latt.add_time()
 

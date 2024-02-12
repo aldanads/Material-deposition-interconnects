@@ -344,9 +344,7 @@ class Crystal_Lattice():
             
         # 2 hexagonal seeds - 2 layers and one particle on the top 
         elif test == 6:
-            """
-            Need to debug
-            """
+
             update_supp_av = set()
             update_specie_events = []
             idx = self.adsorption_sites[46]
@@ -368,6 +366,33 @@ class Crystal_Lattice():
             idx_neighbor_top = self.grid_crystal[neighbor[0]].migration_paths['Up'][0][0]
             update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_top,update_specie_events,update_supp_av)
             self.update_sites(update_specie_events,update_supp_av)
+            
+        elif test == 7:
+            
+            update_supp_av = set()
+            update_specie_events = []
+            idx = self.adsorption_sites[46]
+            # Introduce specie in the site
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
+            self.update_sites(update_specie_events,update_supp_av)
+
+            # Cluster in contact with the substrate
+            for neighbor in self.grid_crystal[idx].migration_paths['Plane']:
+                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
+                self.update_sites(update_specie_events,update_supp_av)
+                
+            # Particle next to the cluster
+            idx_neighbor_plane = self.grid_crystal[neighbor[0]].migration_paths['Plane'][1][0]
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_plane,update_specie_events,update_supp_av)
+            self.update_sites(update_specie_events,update_supp_av)
+                
+            # Cluster over the copper
+            for neighbor in self.grid_crystal[idx].migration_paths['Up']:
+                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
+                self.update_sites(update_specie_events,update_supp_av)
+            
+            
+            
 
             
     def processes(self,chosen_event):
