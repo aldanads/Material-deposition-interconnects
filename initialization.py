@@ -23,9 +23,9 @@ def initialization(n_sim,save_data):
         files_copy = ['initialization.py', 'crystal_lattice.py','Site.py','main.py','KMC.py','balanced_tree.py','analysis.py']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Substrate energy\\'
+            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Ru25 activation energies - Varying substrate\\'
         elif platform.system() == 'Linux': # HPC works on Linux
-            dst = r'path/'
+            dst = r'/sfiwork/samuel.delgado/Copper_deposition/test/'
             
         paths,Results = save_simulation(files_copy,dst,n_sim) # Create folders and python files
         
@@ -81,7 +81,7 @@ def initialization(n_sim,save_data):
 #           - 2ML Ru - Activation energy for Cu migration - [0.46, 0.44] (ev)
 #           - Information about clustering two Cu atoms on TaN and Ru surfaces
 # =============================================================================
-    select_dataset = 0    
+    select_dataset = 1    
     Act_E_dataset = ['TaN','Ru25','Ru50','test']  
 
     E_dataset = {'TaN':[0.85,0.7,0.33,0.84,0.44,0.76,0.74],
@@ -137,7 +137,6 @@ def initialization(n_sim,save_data):
                   E_mig_upward_layer1_layer2,E_mig_downward_layer2_layer1,
                   E_mig_upward_subs_layer2,E_mig_downward_layer2_subs,
                   E_mig_plane_Cu,
-                  #binding_energy['test'],E_clustering[Act_E_dataset[select_dataset]]]
                   binding_energy['test'],E_clustering[Act_E_dataset[select_dataset]]]
 
 # =============================================================================
@@ -162,7 +161,7 @@ def initialization(n_sim,save_data):
     test = [0,1,2,3,4,5,6,7]
 
     # Deposition process of chemical species
-    Co_latt.deposition_specie(Co_latt.timestep_limits,rng,test[7])
+    Co_latt.deposition_specie(Co_latt.timestep_limits,rng,test[0])
     Co_latt.track_time(Co_latt.timestep_limits) 
     Co_latt.add_time()
 
@@ -184,14 +183,17 @@ def save_simulation(files_copy,dst,n_sim):
         dst = dst+parent_dir
         program_directory = 'Program/'
         data_directoy = 'Crystal evolution/'
+        current_directory = os.path.dirname(__file__)
 
     os.makedirs(dst + program_directory)
     os.makedirs(dst + data_directoy)
     
     paths = {'data': dst + data_directoy, 'program': dst + program_directory,'results': dst}
 
-    for files in files_copy:
-        shutil.copyfile(files, paths['program']+files)
+    for file in files_copy:
+        source_file = os.path.join(current_directory, file)
+        destination_file = os.path.join(paths['program'], file)
+        shutil.copyfile(source_file, destination_file)
         
     excel_filename = dst + 'Results.csv'
     Results = SimulationResults(excel_filename)

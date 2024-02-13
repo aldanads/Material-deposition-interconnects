@@ -34,7 +34,7 @@ def KMC(Co_latt,rng):
     if sumTR == None: return Co_latt,time # Exit if there is not possible event
     # When we only have one node in the tree, it returns a tuple
     if type(sumTR) is tuple: sumTR = sumTR[0]
-    # We search in our binary tree the events that happen
+    # We search in our binary tree the event that happen
     chosen_event = search_value(TR_tree,sumTR*rng.random())
     #Calculate the time step
     time += -np.log(rng.random())/sumTR
