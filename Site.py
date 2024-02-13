@@ -216,20 +216,18 @@ class Site():
             """
             Same activation energy and num_event than normal upward migrations
             """
-            # Supported by at least 2 particles (excluding this site)
-            # The pathway is not obstructed by a particle and is supported
-            if site_idx not in self.supp_by and len(grid_crystal[site_idx].supp_by) > 2:
-                # Second nearest neighbors: 1 jump upward + 1 jump in plane --> Facilitate migration between layers without crossing the edge (only two neighbors supporting)
-                for next_neighbor in grid_crystal[site_idx].migration_paths['Plane']:
-                    # Supported by at least 2 particles (this site is far)
-                    if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and len(grid_crystal[next_neighbor[0]].supp_by) > 1:
-                        energy_site_destiny = self.calculate_clustering_energy(grid_crystal[next_neighbor[0]].supp_by,idx_origin)
-                        energy_change = max(energy_site_destiny - self.energy_site, 0)
-                        new_site_events.append([next_neighbor[0], num_event, act_energy + energy_change])
+
+            # Second nearest neighbors: 1 jump upward + 1 jump in plane --> Facilitate migration between layers without crossing the edge (only two neighbors supporting)
+            for next_neighbor in grid_crystal[site_idx].migration_paths['Plane']:
+                # Supported by at least 2 particles (this site is far)
+                if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and len(grid_crystal[next_neighbor[0]].supp_by) > 1:
+                    energy_site_destiny = self.calculate_clustering_energy(grid_crystal[next_neighbor[0]].supp_by,idx_origin)
+                    energy_change = max(energy_site_destiny - self.energy_site, 0)
+                    new_site_events.append([next_neighbor[0], num_event, act_energy + energy_change])
 
                 # First nearest neighbors: 1 jump upward
                 # Supported by at least 2 particles (excluding this site)
-            #if site_idx not in self.supp_by and len(grid_crystal[site_idx].supp_by) > 2:
+            if site_idx not in self.supp_by and len(grid_crystal[site_idx].supp_by) > 2:
                 energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                 energy_change = max(energy_site_destiny - self.energy_site, 0)
                 new_site_events.append([site_idx, num_event, act_energy + energy_change])
@@ -249,20 +247,18 @@ class Site():
             """
             Same activation energy and num_event than normal downward migrations
             """
-            # Supported by at least 2 particles (excluding this site)
-            # The pathway is not obstructed by a particle and is supported
-            if site_idx not in self.supp_by and ('Substrate' in grid_crystal[site_idx].supp_by or len(grid_crystal[site_idx].supp_by) > 2):
-                # Second nearest neighbors: 1 jump downward + 1 jump in plane --> Facilitate migration between layers without crossing the edge (only two neighbors supporting)
-                for next_neighbor in grid_crystal[site_idx].migration_paths['Plane']:
-                    # Supported by at least 2 particles (this site is too far)
-                    if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and (('Substrate' in grid_crystal[next_neighbor[0]].supp_by) or len(grid_crystal[next_neighbor[0]].supp_by) > 1):
-                        energy_site_destiny = self.calculate_clustering_energy(grid_crystal[next_neighbor[0]].supp_by,idx_origin)
-                        energy_change = max(energy_site_destiny - self.energy_site, 0)
-                        new_site_events.append([next_neighbor[0], num_event, act_energy + energy_change])
+           
+            # Second nearest neighbors: 1 jump downward + 1 jump in plane --> Facilitate migration between layers without crossing the edge (only two neighbors supporting)
+            for next_neighbor in grid_crystal[site_idx].migration_paths['Plane']:
+                # Supported by at least 2 particles (this site is too far)
+                if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and (('Substrate' in grid_crystal[next_neighbor[0]].supp_by) or len(grid_crystal[next_neighbor[0]].supp_by) > 1):
+                    energy_site_destiny = self.calculate_clustering_energy(grid_crystal[next_neighbor[0]].supp_by,idx_origin)
+                    energy_change = max(energy_site_destiny - self.energy_site, 0)
+                    new_site_events.append([next_neighbor[0], num_event, act_energy + energy_change])
 
                 # First nearest neighbors: 1 jump downward
                 # Supported by at least 2 particles (excluding this site)
-            # if site_idx not in self.supp_by and ('Substrate' in grid_crystal[site_idx].supp_by or len(grid_crystal[site_idx].supp_by) > 2):
+            if site_idx not in self.supp_by and ('Substrate' in grid_crystal[site_idx].supp_by or len(grid_crystal[site_idx].supp_by) > 2):
                 energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                 energy_change = max(energy_site_destiny - self.energy_site, 0)
                 new_site_events.append([site_idx, num_event, act_energy + energy_change])
