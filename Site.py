@@ -297,6 +297,7 @@ class Site():
     def detect_planes(self,grid_crystal,crystallographic_planes):
         
         atom_coordinates = np.array([grid_crystal[idx].position for idx in self.supp_by if idx != 'Substrate'])
+
         if 'Substrate' in self.supp_by:
             self.crystallographic_direction = (111)
         elif len(atom_coordinates) > 2:
@@ -315,12 +316,17 @@ class Site():
             # Define the plane by the two principal components with the largest eigenvalues
             plane_normal = np.cross(principal_components[0], principal_components[1])
             
+            aux_min = 2
             for plane in crystallographic_planes:
                 cross_product = np.cross(plane[1],plane_normal)
-                if np.allclose(cross_product, np.zeros_like(cross_product), atol=1e-2):
+                norm_cross_product = np.linalg.norm(cross_product)
+                # if np.allclose(cross_product, np.zeros_like(cross_product), atol=1e-2):
+                if norm_cross_product < aux_min:
+                    aux_min = norm_cross_product
                     self.crystallographic_direction = plane[0]
-                    break
-        
+                    
+        else:
+            self.crystallographic_direction = (111)
 
 # =============================================================================
 #         Calculate transition rates    

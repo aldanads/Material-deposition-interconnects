@@ -149,15 +149,15 @@ class Crystal_Lattice():
         
         # Crystallographic planes with (111) orentation
         crystallographic_planes.append(((111),np.array([0,0,1])))
-        
-        # Crystallographic planes with (100) orentation ((001) is equivalent)
+                
+        # Select the first element far from the boundaries
         for idx,site in self.grid_crystal.items():
-            
             if ((self.lattice_constants[0] < site.position[0] < self.crystal_size[0] - self.lattice_constants[0]) and
                 (self.lattice_constants[1] < site.position[1] < self.crystal_size[1] - self.lattice_constants[1])):
                     site_idx = idx
                     break
         
+        # Crystallographic planes with (100) orentation - (001) is equivalent
         for v in self.basis_vectors:
         
             for neighbor in self.grid_crystal[site_idx].migration_paths['Plane']:
