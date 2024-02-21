@@ -17,13 +17,13 @@ def initialization(n_sim,save_data):
     rng = np.random.default_rng() # Random Number Generator (RNG) object
 
     # Default resolution for figures
-    plt.rcParams["figure.dpi"] = 300 # Default value of dpi = 300
+    plt.rcParams["figure.dpi"] = 100 # Default value of dpi = 300
     
     if save_data:
         files_copy = ['initialization.py', 'crystal_lattice.py','Site.py','main.py','KMC.py','balanced_tree.py','analysis.py']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Ru25 activation energies - Varying substrate\\'
+            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Test_cluster\1st nearest neighbors_2\\'
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = r'/sfiwork/samuel.delgado/Copper_deposition/test/'
             
@@ -60,7 +60,9 @@ def initialization(n_sim,save_data):
     lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
     
 # =============================================================================
-#     Activation energies
+#       Different surface Structures- fcc Metals
+#       https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Surface_Science_(Nix)/01%3A_Structure_of_Solid_Surfaces/1.03%3A_Surface_Structures-_fcc_Metals
+#       Activation energies
 #       Nies, C. L., Natarajan, S. K., & Nolan, M. (2022). 
 #       Control of the Cu morphology on Ru-passivated and Ru-doped TaN surfaces-promoting growth of 2D conducting copper for CMOS interconnects. 
 #       Chemical Science, 13(3), 713–725. https://doi.org/10.1039/d1sc04708f
@@ -81,13 +83,13 @@ def initialization(n_sim,save_data):
 #           - 2ML Ru - Activation energy for Cu migration - [0.46, 0.44] (ev)
 #           - Information about clustering two Cu atoms on TaN and Ru surfaces
 # =============================================================================
-    select_dataset = 1    
+    select_dataset = 3   
     Act_E_dataset = ['TaN','Ru25','Ru50','test']  
 
     E_dataset = {'TaN':[0.85,0.7,0.33,0.84,0.44,0.76,0.74],
               'Ru25':[0.4,0.92,1.58,0.94,0.30,1.21,1.25],
               'Ru50':[0.4,0.62,0.78,1.18,1.08,1.86,1.82],
-               'test':[0.6,0.7,0.33,0.84,0.44,0.76,0.74]}
+               'test':[0.85,0.21,0.322,0.322,0.322,0.76,0.74]}
              
 # =============================================================================
 #     Böyükata, M., & Belchior, J. C. (2008). 
@@ -108,7 +110,8 @@ def initialization(n_sim,save_data):
     E_clustering = {'Void': [0,0,-0.577,-1.732,-3.465,-5.281,-7.566,-9.676,-11.902,-14.228,-16.848,-19.643,-22.818,-26.710],
                     'TaN': [0,0,-1 * 2,-1.2 * 3,-1.34 * 4,-1.46 * 5,-1.58 * 6,-1.7 * 7,-1.82 * 8,-1.94 * 9,-2.06 * 10,-2.18 * 11,-2.3 * 12,-2.42 * 13],
                     'Ru25':[0,0,-0.55 * 2,-0.4 * 3,-1.30 * 4,-1.42 * 5,-1.54 * 6,-1.66 * 7,-1.78 * 8,-1.9 * 9,-2.02 * 10,-2.14 * 11,-2.26 * 12,-2.38 * 13],
-                    'Ru50':[0,0,-1 * 2,-1.22 * 3,-1.34 * 4,-1.46 * 5,-1.58 * 6,-1.7 * 7,-1.82 * 8,-1.94 * 9,-2.06 * 10,-2.18 * 11,-2.3 * 12,-2.42 * 13]} 
+                    'Ru50':[0,0,-1 * 2,-1.22 * 3,-1.34 * 4,-1.46 * 5,-1.58 * 6,-1.7 * 7,-1.82 * 8,-1.94 * 9,-2.06 * 10,-2.18 * 11,-2.3 * 12,-2.42 * 13],
+                    'test':[0,0,-0.252 * 2,-0.252 * 3,-0.252 * 4,-0.252 * 5,-0.252 * 6,-0.252 * 7,-0.252 * 8,-0.252 * 9,-0.252 * 10,-0.252 * 11,-0.252 * 12,-0.252 * 13]} 
 
     
     E_mig_plane_sub = E_dataset[Act_E_dataset[select_dataset]][0] # (eV)
@@ -127,11 +130,11 @@ def initialization(n_sim,save_data):
 #     Surface Science 642 (2015): 22-32. 10.1016/j.susc.2015.07.026
 # =============================================================================
     #E_mig_plane_Cu = 0.05*(n_sim+1) # (eV)
-    E_mig_plane_Cu = 0.15 # (eV)
+    E_mig_plane_Cu = 0.081 # (eV)
 
     # Binding energy | Desorption energy: https://doi.org/10.1039/D1SC04708F
     # Surface: [0]-TaN, [1]-Ru25, [2]-Ru50, [3]-Ru100, [4]-1 ML Ru passivation
-    binding_energy = {'TaN':-3.49, 'Ru25':-3.58, 'Ru50':-3.59, 'Ru100':-3.64, '1 ML Ru':-4.12, 'test':-0.5 * n_sim}
+    binding_energy = {'TaN':-3.49, 'Ru25':-3.58, 'Ru50':-3.59, 'Ru100':-3.64, '1 ML Ru':-4.12, 'test':-0.1 * n_sim}
     Act_E_list = [E_mig_plane_sub,
                   E_mig_upward_subs_layer1,E_mig_downward_layer1_subs,
                   E_mig_upward_layer1_layer2,E_mig_downward_layer2_layer1,
@@ -158,10 +161,10 @@ def initialization(n_sim,save_data):
 #     - test[5] - Hexagonal seed - 7 particles in plane and 1 on the top of the layer
 #     - test[6] - 2 hexagonal seeds - 2 layers and one particle on the top 
 # =============================================================================
-    test = [0,1,2,3,4,5,6,7]
+    test = [0,1,2,3,4,5,6,7,8]
 
     # Deposition process of chemical species
-    Co_latt.deposition_specie(Co_latt.timestep_limits,rng,test[0])
+    Co_latt.deposition_specie(Co_latt.timestep_limits,rng,test[8])
     Co_latt.track_time(Co_latt.timestep_limits) 
     Co_latt.add_time()
 
@@ -176,6 +179,8 @@ def save_simulation(files_copy,dst,n_sim):
         dst = dst+parent_dir
         program_directory = 'Program\\'
         data_directoy = 'Crystal evolution\\'
+        current_directory = os.path.dirname(__file__)
+
         
     elif platform.system() == 'Linux':
         parent_dir = 'Sim_'+str(n_sim)+'/'
@@ -191,6 +196,8 @@ def save_simulation(files_copy,dst,n_sim):
     paths = {'data': dst + data_directoy, 'program': dst + program_directory,'results': dst}
 
     for file in files_copy:
+        # Utilizing os.path.join is the best option, because it works in Windows and Unix
+        # and put the correct separators
         source_file = os.path.join(current_directory, file)
         destination_file = os.path.join(paths['program'], file)
         shutil.copyfile(source_file, destination_file)

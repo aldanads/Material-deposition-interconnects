@@ -6,6 +6,8 @@ Created on Mon Jan 15 11:46:12 2024
 """
 from scipy import constants
 import numpy as np
+from sklearn.decomposition import PCA
+
 
 class Site():
     
@@ -111,7 +113,7 @@ class Site():
 # =============================================================================
 #         Occupied sites supporting this node
 # =============================================================================    
-    def supported_by(self,grid_crystal):
+    def supported_by(self,grid_crystal,crystallographic_planes):
                  
         # Go over the nearest neighbors
         for idx in self.nearest_neighbors_idx:
@@ -127,6 +129,7 @@ class Site():
                 self.supp_by.remove(idx)
                 
         self.calculate_clustering_energy()
+        self.detect_planes(grid_crystal,crystallographic_planes)
                 
     def calculate_clustering_energy(self,supp_by_destiny = 0,idx_origin = 0):
         
@@ -213,17 +216,21 @@ class Site():
         # Upward migrations
         for site_idx, num_event, act_energy in self.migration_paths['Up']:
         
-            """
-            Same activation energy and num_event than normal upward migrations
-            """
-
-            # Second nearest neighbors: 1 jump upward + 1 jump in plane --> Facilitate migration between layers without crossing the edge (only two neighbors supporting)
-            for next_neighbor in grid_crystal[site_idx].migration_paths['Plane']:
-                # Supported by at least 2 particles (this site is far)
-                if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and len(grid_crystal[next_neighbor[0]].supp_by) > 1:
-                    energy_site_destiny = self.calculate_clustering_energy(grid_crystal[next_neighbor[0]].supp_by,idx_origin)
-                    energy_change = max(energy_site_destiny - self.energy_site, 0)
-                    new_site_events.append([next_neighbor[0], num_event, act_energy + energy_change])
+# =============================================================================
+#             """
+#             Same activation energy and num_event than normal upward migrations
+#             """
+#             VERY EXPENSIVE to include 2nd nearest neighbors in the migration
+# 
+#             # Second nearest neighbors: 1 jump upward + 1 jump in plane --> Facilitate migration between layers without crossing the edge (only two neighbors supporting)
+#             for next_neighbor in grid_crystal[site_idx].migration_paths['Plane']:
+#                 # Supported by at least 2 particles (this site is far)
+#                 if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and len(grid_crystal[next_neighbor[0]].supp_by) > 1:
+#                     energy_site_destiny = self.calculate_clustering_energy(grid_crystal[next_neighbor[0]].supp_by,idx_origin)
+#                     energy_change = max(energy_site_destiny - self.energy_site, 0)
+#                     new_site_events.append([next_neighbor[0], num_event, act_energy + energy_change])
+# 
+# =============================================================================
 
                 # First nearest neighbors: 1 jump upward
                 # Supported by at least 2 particles (excluding this site)
@@ -232,29 +239,35 @@ class Site():
                 energy_change = max(energy_site_destiny - self.energy_site, 0)
                 new_site_events.append([site_idx, num_event, act_energy + energy_change])
                 
-                # Second nearest neighbors: 2 layers jump upward
-                for next_neighbor in grid_crystal[site_idx].migration_paths['Up']:
-                    # Supported by at least 2 particles (this site is far)
-                    if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and len(grid_crystal[next_neighbor[0]].supp_by) > 1:
-                        energy_site_destiny = self.calculate_clustering_energy(grid_crystal[next_neighbor[0]].supp_by,idx_origin)
-                        energy_change = max(energy_site_destiny - self.energy_site, 0)
-                        new_site_events.append([next_neighbor[0], self.num_event + 1, self.Act_E_list[5] + energy_change])
-                
+# =============================================================================
+#             VERY EXPENSIVE to include 2nd nearest neighbors in the migration
+#                 # Second nearest neighbors: 2 layers jump upward
+#                 for next_neighbor in grid_crystal[site_idx].migration_paths['Up']:
+#                     # Supported by at least 2 particles (this site is far)
+#                     if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and len(grid_crystal[next_neighbor[0]].supp_by) > 1:
+#                         energy_site_destiny = self.calculate_clustering_energy(grid_crystal[next_neighbor[0]].supp_by,idx_origin)
+#                         energy_change = max(energy_site_destiny - self.energy_site, 0)
+#                         new_site_events.append([next_neighbor[0], self.num_event + 1, self.Act_E_list[5] + energy_change])
+#                 
+# =============================================================================
                 
         # Downward migrations
         for site_idx, num_event, act_energy in self.migration_paths['Down']:
             
-            """
-            Same activation energy and num_event than normal downward migrations
-            """
-           
-            # Second nearest neighbors: 1 jump downward + 1 jump in plane --> Facilitate migration between layers without crossing the edge (only two neighbors supporting)
-            for next_neighbor in grid_crystal[site_idx].migration_paths['Plane']:
-                # Supported by at least 2 particles (this site is too far)
-                if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and (('Substrate' in grid_crystal[next_neighbor[0]].supp_by) or len(grid_crystal[next_neighbor[0]].supp_by) > 1):
-                    energy_site_destiny = self.calculate_clustering_energy(grid_crystal[next_neighbor[0]].supp_by,idx_origin)
-                    energy_change = max(energy_site_destiny - self.energy_site, 0)
-                    new_site_events.append([next_neighbor[0], num_event, act_energy + energy_change])
+# =============================================================================
+#             """
+#             Same activation energy and num_event than normal downward migrations
+#             """
+#            VERY EXPENSIVE to include 2nd nearest neighbors in the migration
+
+#             # Second nearest neighbors: 1 jump downward + 1 jump in plane --> Facilitate migration between layers without crossing the edge (only two neighbors supporting)
+#             for next_neighbor in grid_crystal[site_idx].migration_paths['Plane']:
+#                 # Supported by at least 2 particles (this site is too far)
+#                 if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and (('Substrate' in grid_crystal[next_neighbor[0]].supp_by) or len(grid_crystal[next_neighbor[0]].supp_by) > 1):
+#                     energy_site_destiny = self.calculate_clustering_energy(grid_crystal[next_neighbor[0]].supp_by,idx_origin)
+#                     energy_change = max(energy_site_destiny - self.energy_site, 0)
+#                     new_site_events.append([next_neighbor[0], num_event, act_energy + energy_change])
+# =============================================================================
 
                 # First nearest neighbors: 1 jump downward
                 # Supported by at least 2 particles (excluding this site)
@@ -263,17 +276,51 @@ class Site():
                 energy_change = max(energy_site_destiny - self.energy_site, 0)
                 new_site_events.append([site_idx, num_event, act_energy + energy_change])
                 
-                # Second nearest neighbors: 2 layers jump downward
-                for next_neighbor in grid_crystal[site_idx].migration_paths['Down']:
-                    # Supported by at least 2 particles (this site is too far)
-                    if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and (('Substrate' in grid_crystal[next_neighbor[0]].supp_by) or len(grid_crystal[next_neighbor[0]].supp_by) > 1):
-                        energy_site_destiny = self.calculate_clustering_energy(grid_crystal[next_neighbor[0]].supp_by,idx_origin)
-                        energy_change = max(energy_site_destiny - self.energy_site, 0)
-                        new_site_events.append([next_neighbor[0], self.num_event + 2, self.Act_E_list[6] + energy_change])
-
+# =============================================================================
+#             VERY EXPENSIVE to include 2nd nearest neighbors in the migration
+#                 # Second nearest neighbors: 2 layers jump downward
+#                 for next_neighbor in grid_crystal[site_idx].migration_paths['Down']:
+#                     # Supported by at least 2 particles (this site is too far)
+#                     if grid_crystal[next_neighbor[0]].chemical_specie == 'Empty' and (('Substrate' in grid_crystal[next_neighbor[0]].supp_by) or len(grid_crystal[next_neighbor[0]].supp_by) > 1):
+#                         energy_site_destiny = self.calculate_clustering_energy(grid_crystal[next_neighbor[0]].supp_by,idx_origin)
+#                         energy_change = max(energy_site_destiny - self.energy_site, 0)
+#                         new_site_events.append([next_neighbor[0], self.num_event + 2, self.Act_E_list[6] + energy_change])
+# 
+# =============================================================================
             
         self.site_events = new_site_events
       
+# =============================================================================
+#     Detect planes using PCA - We search the plane that contains most of the points
+#     in supp_by  to know the surface where this site is attached 
+# =============================================================================
+    def detect_planes(self,grid_crystal,crystallographic_planes):
+        
+        atom_coordinates = np.array([grid_crystal[idx].position for idx in self.supp_by if idx != 'Substrate'])
+        if 'Substrate' in self.supp_by:
+            self.crystallographic_direction = (111)
+        elif len(atom_coordinates) > 2:
+            # Perform PCA
+            pca = PCA(n_components=3)
+            pca.fit(atom_coordinates)
+            
+            # Get the eigenvectors and eigenvalues
+            eigenvectors = pca.components_
+            eigenvalues = pca.explained_variance_
+            
+            # Sort eigenvectors based on eigenvalues
+            sorted_indices = np.argsort(eigenvalues)[::-1]
+            principal_components = eigenvectors[sorted_indices]
+            
+            # Define the plane by the two principal components with the largest eigenvalues
+            plane_normal = np.cross(principal_components[0], principal_components[1])
+            
+            for plane in crystallographic_planes:
+                cross_product = np.cross(plane[1],plane_normal)
+                if np.allclose(cross_product, np.zeros_like(cross_product), atol=1e-2):
+                    self.crystallographic_direction = plane[0]
+                    break
+        
 
 # =============================================================================
 #         Calculate transition rates    

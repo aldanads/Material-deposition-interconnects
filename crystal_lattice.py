@@ -33,7 +33,8 @@ class Crystal_Lattice():
         
         self.lattice_model()
         self.crystal_grid()
-        
+        self.calculate_crystallographic_planes()
+
         self.sites_occupied = [] # Sites occupy be a chemical specie
         self.adsorption_sites = [] # Sites availables for deposition or migration
         # Obtain all the positions in the grid that are supported by the
@@ -44,7 +45,6 @@ class Crystal_Lattice():
         
         #Transition rate for adsortion of chemical species
         self.transition_rate_adsorption(experimental_conditions[0:4])
-        
         
         
         
@@ -123,6 +123,53 @@ class Crystal_Lattice():
                 neighbors_positions = [self.idx_to_cart(idx) for idx in self.latt.get_neighbors(idx)[:,:3]]
                 site.neighbors_analysis(self.grid_crystal,self.latt.get_neighbors(idx)[:,:3],neighbors_positions,self.crystal_size)
         
+    def calculate_crystallographic_planes(self):
+        
+# =============================================================================
+#         Han, Yong, Feng Liu, Shao-Chun Li, Jin-Feng Jia, Qi-Kun Xue, and Byeong-Joo Lee. 
+#         "Kinetics of mesa overlayer growth: Climbing of adatoms onto the mesa top." 
+#         Applied Physics Letters 92, no. 2 (2008).
+# 
+#         Good figure for the crystallographic planes
+# 
+#         Good link:
+#         https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Surface_Science_(Nix)/01%3A_Structure_of_Solid_Surfaces/1.03%3A_Surface_Structures-_fcc_Metals
+# =============================================================================
+        # Crystallographic planes with (111) orentation
+        n_plane = np.cross(self.basis_vectors[0],self.basis_vectors[1])
+        crystallographic_planes = [((111),n_plane/np.linalg.norm(n_plane))]
+        
+        # Crystallographic planes with (111) orentation
+        n_plane = np.cross(self.basis_vectors[0],self.basis_vectors[2])
+        crystallographic_planes.append(((111),n_plane/np.linalg.norm(n_plane)))
+        
+        # Crystallographic planes with (111) orentation
+        n_plane = np.cross(self.basis_vectors[1],self.basis_vectors[2])
+        crystallographic_planes.append(((111),n_plane/np.linalg.norm(n_plane)))
+        
+        # Crystallographic planes with (111) orentation
+        crystallographic_planes.append(((111),np.array([0,0,1])))
+        
+        # Crystallographic planes with (100) orentation ((001) is equivalent)
+        for idx,site in self.grid_crystal.items():
+            
+            if ((self.lattice_constants[0] < site.position[0] < self.crystal_size[0] - self.lattice_constants[0]) and
+                (self.lattice_constants[1] < site.position[1] < self.crystal_size[1] - self.lattice_constants[1])):
+                    site_idx = idx
+                    break
+        
+        for v in self.basis_vectors:
+        
+            for neighbor in self.grid_crystal[site_idx].migration_paths['Plane']:
+                v_aux = np.array(self.idx_to_cart(neighbor[0])) - np.array(self.grid_crystal[site_idx].position)
+                if round(self.angle_between(v,v_aux) - np.pi /2,2) == 0.0:
+                    v2 = np.array(self.idx_to_cart(neighbor[0])) - np.array(self.grid_crystal[site_idx].position)
+                    
+            n_plane = np.cross(v,v2)
+            crystallographic_planes.append(((100),n_plane/np.linalg.norm(n_plane)))
+            
+        self.crystallographic_planes = crystallographic_planes
+            
         
     def available_adsorption_sites(self, update_supp_av = []):
         
@@ -189,6 +236,8 @@ class Crystal_Lattice():
         self.sites_occupied.append(idx) 
         # Track sites available
         update_specie_events.append(idx)
+        
+        # CAREFUL! We don't update 2nd nearest neighbors
         # Nodes we need to update
         update_supp_av.update(self.grid_crystal[idx].nearest_neighbors_idx)
         update_supp_av.add(idx) # Update the new specie to calculate its supp_by
@@ -206,7 +255,8 @@ class Crystal_Lattice():
         self.sites_occupied.remove(idx) 
         # Track sites available
         update_specie_events.remove(idx)
-
+        
+        # CAREFUL! We don't update 2nd nearest neighbors
         # Nodes we need to update
         update_supp_av.update(self.grid_crystal[idx].nearest_neighbors_idx)
         update_supp_av.add(idx) # Update the new empty space to calculate its supp_by
@@ -390,8 +440,17 @@ class Crystal_Lattice():
             for neighbor in self.grid_crystal[idx].migration_paths['Up']:
                 update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
                 self.update_sites(update_specie_events,update_supp_av)
+                
+        elif test == 8:
+            from collections import deque
+
+            # Create a deque object for the queue
+            queue = deque()
+            queue.append(self.adsorption_sites[52])
+            visited = set()
+            cluster_size = 29
             
-            
+            self.bfs_cluster(queue,visited,cluster_size)
             
 
             
@@ -423,7 +482,7 @@ class Crystal_Lattice():
             # There are new sites supported by the deposited chemical species
             # For loop over neighbors
             for idx in update_supp_av:
-                self.grid_crystal[idx].supported_by(self.grid_crystal)
+                self.grid_crystal[idx].supported_by(self.grid_crystal,self.crystallographic_planes)
                 self.available_adsorption_sites(update_supp_av)
                 if self.grid_crystal[idx].chemical_specie != 'Empty':
                     update_specie_events.append(idx)
@@ -637,6 +696,16 @@ class Crystal_Lattice():
 #     Auxiliary functions
 #     
 # =============================================================================
+    def unit_vector(self,vector):
+        """ Returns the unit vector of the vector."""
+        return vector / np.linalg.norm(vector)
+
+    def angle_between(self,v1, v2):
+        """Finds angle between two vectors"""
+        v1_u = self.unit_vector(v1)
+        v2_u = self.unit_vector(v2)
+        return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+
     # Function to rotate a vector
     def rotate_vector(self,vector, axis, theta):
         """
@@ -704,7 +773,33 @@ class Crystal_Lattice():
     
                 # Push neighbors onto the stack
                 stack.extend(tuple(neighbor[:3]) for neighbor in self.latt.get_neighbors(current_idx_site))
-    
+    # Breadth-First Search (Recursive) - Traverse a network or a graph -> grid_crystal
+    # to build a cluster of a certain size
+    def bfs_cluster(self,queue,visited,cluster_size):
+        
+        if not queue or len(visited) >= cluster_size:
+            return
+        
+        # Dequeue a site from the front of the queue
+        #Starting point
+        current_idx_site = queue.popleft()
+        
+        if current_idx_site not in visited:
+            visited.add(current_idx_site)
+            update_supp_av = set()
+            update_specie_events = []
+            
+            update_specie_events,update_supp_av = self.introduce_specie_site(current_idx_site,update_specie_events,update_supp_av)
+            self.update_sites(update_specie_events,update_supp_av)
+            
+            # Enqueue all unvisited neighbors of the current site
+            for neighbor in self.grid_crystal[current_idx_site].migration_paths['Plane']:
+                if neighbor[0] not in visited:
+                    queue.append(neighbor[0])
+                
+        # Recur to process the next site in the queue
+        self.bfs_cluster(queue, visited, cluster_size)
+        
     def idx_to_cart(self,idx):
         return tuple(round(element,3) for element in np.sum(idx * np.transpose(self.basis_vectors), axis=1))
     
