@@ -86,10 +86,22 @@ def initialization(n_sim,save_data):
     select_dataset = 3   
     Act_E_dataset = ['TaN','Ru25','Ru50','test']  
 
-    E_dataset = {'TaN':[0.85,0.7,0.33,0.84,0.44,0.76,0.74],
-              'Ru25':[0.4,0.92,1.58,0.94,0.30,1.21,1.25],
-              'Ru50':[0.4,0.62,0.78,1.18,1.08,1.86,1.82],
-               'test':[0.85,0.21,0.322,0.322,0.322,0.76,0.74]}
+    #E_mig_plane_Cu = 0.05*(n_sim+1) # (eV)
+    E_dataset = {'TaN':[0.85,0.7,0.33,0.84,0.44,0.76,0.74,0.081,0.452],
+              'Ru25':[0.4,0.92,1.58,0.94,0.30,1.21,1.25,0.081,0.452],
+              'Ru50':[0.4,0.62,0.78,1.18,1.08,1.86,1.82,0.081,0.452],
+               'test':[0.85,0.21,0.322,0.322,0.322,0.76,0.74,0.081,0.452]}
+    
+    E_mig_plane_sub = E_dataset[Act_E_dataset[select_dataset]][0] # (eV)
+    E_mig_upward_subs_layer1 = E_dataset[Act_E_dataset[select_dataset]][1]
+    E_mig_downward_layer1_subs = E_dataset[Act_E_dataset[select_dataset]][2]
+    E_mig_upward_layer1_layer2 = E_dataset[Act_E_dataset[select_dataset]][3]
+    E_mig_downward_layer2_layer1 = E_dataset[Act_E_dataset[select_dataset]][4]
+    E_mig_upward_subs_layer2 = E_dataset[Act_E_dataset[select_dataset]][5]
+    E_mig_downward_layer2_subs = E_dataset[Act_E_dataset[select_dataset]][6]
+    E_mig_111_terrace_Cu = E_dataset[Act_E_dataset[select_dataset]][7]
+    E_mig_100_terrace_Cu = E_dataset[Act_E_dataset[select_dataset]][8]
+
              
 # =============================================================================
 #     Böyükata, M., & Belchior, J. C. (2008). 
@@ -114,13 +126,7 @@ def initialization(n_sim,save_data):
                     'test':[0,0,-0.252 * 2,-0.252 * 3,-0.252 * 4,-0.252 * 5,-0.252 * 6,-0.252 * 7,-0.252 * 8,-0.252 * 9,-0.252 * 10,-0.252 * 11,-0.252 * 12,-0.252 * 13]} 
 
     
-    E_mig_plane_sub = E_dataset[Act_E_dataset[select_dataset]][0] # (eV)
-    E_mig_upward_subs_layer1 = E_dataset[Act_E_dataset[select_dataset]][1]
-    E_mig_downward_layer1_subs = E_dataset[Act_E_dataset[select_dataset]][2]
-    E_mig_upward_layer1_layer2 = E_dataset[Act_E_dataset[select_dataset]][3]
-    E_mig_downward_layer2_layer1 = E_dataset[Act_E_dataset[select_dataset]][4]
-    E_mig_upward_subs_layer2 = E_dataset[Act_E_dataset[select_dataset]][5]
-    E_mig_downward_layer2_subs = E_dataset[Act_E_dataset[select_dataset]][6]
+
 # =============================================================================
 #     Papanicolaou, N. 1, & Evangelakis, G. A. (n.d.). 
 #     COMPARISON OF DIFFUSION PROCESSES OF Cu AND Au ADA TOMS ON THE Cu(1l1) SURFACE BY MOLECULAR DYNAMICS.
@@ -129,8 +135,6 @@ def initialization(n_sim,save_data):
 #     "Diffusion of Cu adatoms and dimers on Cu (111) and Ag (111) surfaces." 
 #     Surface Science 642 (2015): 22-32. 10.1016/j.susc.2015.07.026
 # =============================================================================
-    #E_mig_plane_Cu = 0.05*(n_sim+1) # (eV)
-    E_mig_plane_Cu = 0.081 # (eV)
 
     # Binding energy | Desorption energy: https://doi.org/10.1039/D1SC04708F
     # Surface: [0]-TaN, [1]-Ru25, [2]-Ru50, [3]-Ru100, [4]-1 ML Ru passivation
@@ -139,7 +143,7 @@ def initialization(n_sim,save_data):
                   E_mig_upward_subs_layer1,E_mig_downward_layer1_subs,
                   E_mig_upward_layer1_layer2,E_mig_downward_layer2_layer1,
                   E_mig_upward_subs_layer2,E_mig_downward_layer2_subs,
-                  E_mig_plane_Cu,
+                  E_mig_111_terrace_Cu,E_mig_100_terrace_Cu,
                   binding_energy['test'],E_clustering[Act_E_dataset[select_dataset]]]
 
 # =============================================================================
