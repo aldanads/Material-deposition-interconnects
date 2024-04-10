@@ -47,7 +47,6 @@ class Crystal_Lattice():
         self.transition_rate_adsorption(experimental_conditions[0:4])
         
         
-        
     # Model with all the possible lattice points
     def lattice_model(self):
         

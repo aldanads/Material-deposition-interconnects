@@ -23,8 +23,8 @@ for n_sim in range(1):
     j = 0
     n_part = len(Co_latt.sites_occupied)
     nothing_happen = 0
-    total_steps = int(1e3)
-    snapshoots_steps = int(1e1)
+    total_steps = int(5e0)
+    snapshoots_steps = int(1e0)
     # total_steps = int(5e5)
     # snapshoots_steps = int(5e3)
 

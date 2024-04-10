@@ -42,29 +42,33 @@ class Site():
                 self.nearest_neighbors_cart.append(tuple(pos))
                 # Migration in the plane
                 if round(pos[2]-self.position[2],3) == 0:
-                    # Migration on the plane - Substrate
-                    if 'Substrate' in self.supp_by:
-                        self.migration_paths['Plane'].append([tuple(idx),num_event,self.Act_E_list[0]])
-                    # Migration on the plane - Film
-                    else:
-                        self.migration_paths['Plane'].append([tuple(idx),num_event,self.Act_E_list[7]])
+                    # # Migration on the plane - Substrate
+                    # if 'Substrate' in self.supp_by:
+                    #     self.migration_paths['Plane'].append([tuple(idx),num_event,self.Act_E_list[0]])
+                    # # Migration on the plane - Film
+                    # else:
+                    #     self.migration_paths['Plane'].append([tuple(idx),num_event,self.Act_E_list[7]])
+                    self.migration_paths['Plane'].append([tuple(idx),num_event])
 
                 # Migration upward
                 elif round(pos[2]-self.position[2],3) > 0:
-                    # From substrate to layer 1
-                    if 'Substrate' in self.supp_by:
-                        self.migration_paths['Up'].append([tuple(idx),num_event,self.Act_E_list[1]])
-                    # From layer_n to layer_n+1
-                    else:
-                        self.migration_paths['Up'].append([tuple(idx),num_event,self.Act_E_list[3]])
+                    # # From substrate to layer 1
+                    # if 'Substrate' in self.supp_by:
+                    #     self.migration_paths['Up'].append([tuple(idx),num_event,self.Act_E_list[1]])
+                    # # From layer_n to layer_n+1
+                    # else:
+                    #     self.migration_paths['Up'].append([tuple(idx),num_event,self.Act_E_list[3]])
+                    self.migration_paths['Up'].append([tuple(idx),num_event])
+                    
                 # Migration downward
                 elif round(pos[2]-self.position[2],3) < 0:
-                    # From layer 1 to substrate
-                    if 'Substrate' in grid_crystal[tuple(idx)].supp_by:
-                        self.migration_paths['Down'].append([tuple(idx),num_event,self.Act_E_list[2]])
-                    # From layer_n to layer_n-1
-                    else:
-                        self.migration_paths['Down'].append([tuple(idx),num_event,self.Act_E_list[4]])
+                    # # From layer 1 to substrate
+                    # if 'Substrate' in grid_crystal[tuple(idx)].supp_by:
+                    #     self.migration_paths['Down'].append([tuple(idx),num_event,self.Act_E_list[2]])
+                    # # From layer_n to layer_n-1
+                    # else:
+                    #     self.migration_paths['Down'].append([tuple(idx),num_event,self.Act_E_list[4]])
+                    self.migration_paths['Down'].append([tuple(idx),num_event])
 
                     
             # Establish boundary conditions for neighbors in xy plane
@@ -83,28 +87,33 @@ class Site():
                 self.nearest_neighbors_cart.append(tuple(grid_crystal[min_dist_idx].position))
                 # Migration in the plane
                 if round(pos[2]-self.position[2],3) == 0:
-                    # Migration on the plane - Substrate
-                    if 'Substrate' in self.supp_by: 
-                        self.migration_paths['Plane'].append([tuple(min_dist_idx),num_event,self.Act_E_list[0]])
-                    # Migration on the plane - Film
-                    else:
-                        self.migration_paths['Plane'].append([tuple(min_dist_idx),num_event,self.Act_E_list[7]])
+                    # # Migration on the plane - Substrate
+                    # if 'Substrate' in self.supp_by: 
+                    #     self.migration_paths['Plane'].append([tuple(min_dist_idx),num_event,self.Act_E_list[0]])
+                    # # Migration on the plane - Film
+                    # else:
+                    #     self.migration_paths['Plane'].append([tuple(min_dist_idx),num_event,self.Act_E_list[7]])
+                    self.migration_paths['Plane'].append([tuple(min_dist_idx),num_event])
+                    
                 # Migration upward
                 elif round(pos[2]-self.position[2],3) > 0:
-                    # From substrate to layer 1
-                    if 'Substrate' in self.supp_by:
-                        self.migration_paths['Up'].append([tuple(min_dist_idx),num_event,self.Act_E_list[1]])
-                    # From layer_n to layer_n+1
-                    else:
-                        self.migration_paths['Up'].append([tuple(min_dist_idx),num_event,self.Act_E_list[3]])
+                    # # From substrate to layer 1
+                    # if 'Substrate' in self.supp_by:
+                    #     self.migration_paths['Up'].append([tuple(min_dist_idx),num_event,self.Act_E_list[1]])
+                    # # From layer_n to layer_n+1
+                    # else:
+                    #     self.migration_paths['Up'].append([tuple(min_dist_idx),num_event,self.Act_E_list[3]])
+                    self.migration_paths['Up'].append([tuple(min_dist_idx),num_event])
+                    
                 # Migration downward
                 elif round(pos[2]-self.position[2],3) < 0:
-                    # From layer 1 to substrate
-                    if 'Substrate' in grid_crystal[tuple(min_dist_idx)].supp_by:
-                        self.migration_paths['Down'].append([tuple(min_dist_idx),num_event,self.Act_E_list[2]])
-                    # From layer_n to layer_n-1
-                    else:
-                        self.migration_paths['Down'].append([tuple(min_dist_idx),num_event,self.Act_E_list[4]])
+                    # # From layer 1 to substrate
+                    # if 'Substrate' in grid_crystal[tuple(min_dist_idx)].supp_by:
+                    #     self.migration_paths['Down'].append([tuple(min_dist_idx),num_event,self.Act_E_list[2]])
+                    # # From layer_n to layer_n-1
+                    # else:
+                    #     self.migration_paths['Down'].append([tuple(min_dist_idx),num_event,self.Act_E_list[4]])
+                    self.migration_paths['Down'].append([tuple(min_dist_idx),num_event])
               
                 
             num_event+= 1
@@ -200,11 +209,23 @@ class Site():
         new_site_events = []
 
         # Plane migrations
-        for site_idx, num_event, act_energy in self.migration_paths['Plane']:
+        for site_idx, num_event in self.migration_paths['Plane']:
             if site_idx not in self.supp_by and ('Substrate' in grid_crystal[site_idx].supp_by or len(grid_crystal[site_idx].supp_by) > 2):
                 energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                 energy_change = max(energy_site_destiny - self.energy_site, 0)
-                new_site_events.append([site_idx, num_event, act_energy + energy_change])
+                
+                # Migrating on the substrate
+                if 'Substrate' in self.supp_by:
+                    new_site_events.append([site_idx, num_event, self.Act_E_list[0] + energy_change])
+                    
+                # Migrating on the film (111)
+                elif grid_crystal[site_idx].crystallographic_direction == (111):
+                    new_site_events.append([site_idx, num_event, self.Act_E_list[7] + energy_change])
+                    
+                # Migrating on the film (100)
+                elif grid_crystal[site_idx].crystallographic_direction == (100):
+                    new_site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
+
 
 # =============================================================================
 #         Kondati Natarajan, S., Nies, C. L., & Nolan, M. (2020). 
@@ -214,7 +235,7 @@ class Site():
 #         - Migration upward stable is supported by three particles??  
 # =============================================================================                      
         # Upward migrations
-        for site_idx, num_event, act_energy in self.migration_paths['Up']:
+        for site_idx, num_event in self.migration_paths['Up']:
         
 # =============================================================================
 #             """
@@ -237,8 +258,23 @@ class Site():
             if site_idx not in self.supp_by and len(grid_crystal[site_idx].supp_by) > 2:
                 energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                 energy_change = max(energy_site_destiny - self.energy_site, 0)
-                new_site_events.append([site_idx, num_event, act_energy + energy_change])
                 
+                # Migrating upward from the substrate
+                if 'Substrate' in self.supp_by and grid_crystal[site_idx].crystallographic_direction == (111):
+                    new_site_events.append([site_idx, num_event, self.Act_E_list[1] + energy_change])
+                
+                elif 'Substrate' in self.supp_by and grid_crystal[site_idx].crystallographic_direction == (100):
+                    new_site_events.append([site_idx, num_event, self.Act_E_list[5] + energy_change])
+                    
+                # Migrating upward from the film (111)
+                elif self.crystallographic_direction == (111):
+                    new_site_events.append([site_idx, num_event, self.Act_E_list[3] + energy_change])
+                    
+                # Migrating upward from the film (111)
+                elif self.crystallographic_direction ==  (100):
+                    new_site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
+
+
 # =============================================================================
 #             VERY EXPENSIVE to include 2nd nearest neighbors in the migration
 #                 # Second nearest neighbors: 2 layers jump upward
@@ -252,7 +288,7 @@ class Site():
 # =============================================================================
                 
         # Downward migrations
-        for site_idx, num_event, act_energy in self.migration_paths['Down']:
+        for site_idx, num_event in self.migration_paths['Down']:
             
 # =============================================================================
 #             """
@@ -274,7 +310,21 @@ class Site():
             if site_idx not in self.supp_by and ('Substrate' in grid_crystal[site_idx].supp_by or len(grid_crystal[site_idx].supp_by) > 2):
                 energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                 energy_change = max(energy_site_destiny - self.energy_site, 0)
-                new_site_events.append([site_idx, num_event, act_energy + energy_change])
+                
+                # From layer 1 to substrate
+                if self.crystallographic_direction == (111) and 'Substrate' in grid_crystal[site_idx].supp_by:
+                    new_site_events.append([site_idx, num_event, self.Act_E_list[2] + energy_change])
+                
+                elif self.crystallographic_direction == (100) and 'Substrate' in grid_crystal[site_idx].supp_by:
+                    new_site_events.append([site_idx, num_event, self.Act_E_list[6] + energy_change])
+                
+                # Migrating downward from the film (111)
+                elif self.crystallographic_direction == (111):
+                    new_site_events.append([site_idx, num_event, self.Act_E_list[4] + energy_change])
+                    
+                # Migrating downward from the film (100)
+                elif self.crystallographic_direction == (100):
+                    new_site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
                 
 # =============================================================================
 #             VERY EXPENSIVE to include 2nd nearest neighbors in the migration
