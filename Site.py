@@ -42,32 +42,14 @@ class Site():
                 self.nearest_neighbors_cart.append(tuple(pos))
                 # Migration in the plane
                 if round(pos[2]-self.position[2],3) == 0:
-                    # # Migration on the plane - Substrate
-                    # if 'Substrate' in self.supp_by:
-                    #     self.migration_paths['Plane'].append([tuple(idx),num_event,self.Act_E_list[0]])
-                    # # Migration on the plane - Film
-                    # else:
-                    #     self.migration_paths['Plane'].append([tuple(idx),num_event,self.Act_E_list[7]])
                     self.migration_paths['Plane'].append([tuple(idx),num_event])
 
                 # Migration upward
                 elif round(pos[2]-self.position[2],3) > 0:
-                    # # From substrate to layer 1
-                    # if 'Substrate' in self.supp_by:
-                    #     self.migration_paths['Up'].append([tuple(idx),num_event,self.Act_E_list[1]])
-                    # # From layer_n to layer_n+1
-                    # else:
-                    #     self.migration_paths['Up'].append([tuple(idx),num_event,self.Act_E_list[3]])
                     self.migration_paths['Up'].append([tuple(idx),num_event])
                     
                 # Migration downward
                 elif round(pos[2]-self.position[2],3) < 0:
-                    # # From layer 1 to substrate
-                    # if 'Substrate' in grid_crystal[tuple(idx)].supp_by:
-                    #     self.migration_paths['Down'].append([tuple(idx),num_event,self.Act_E_list[2]])
-                    # # From layer_n to layer_n-1
-                    # else:
-                    #     self.migration_paths['Down'].append([tuple(idx),num_event,self.Act_E_list[4]])
                     self.migration_paths['Down'].append([tuple(idx),num_event])
 
                     
@@ -87,32 +69,14 @@ class Site():
                 self.nearest_neighbors_cart.append(tuple(grid_crystal[min_dist_idx].position))
                 # Migration in the plane
                 if round(pos[2]-self.position[2],3) == 0:
-                    # # Migration on the plane - Substrate
-                    # if 'Substrate' in self.supp_by: 
-                    #     self.migration_paths['Plane'].append([tuple(min_dist_idx),num_event,self.Act_E_list[0]])
-                    # # Migration on the plane - Film
-                    # else:
-                    #     self.migration_paths['Plane'].append([tuple(min_dist_idx),num_event,self.Act_E_list[7]])
                     self.migration_paths['Plane'].append([tuple(min_dist_idx),num_event])
                     
                 # Migration upward
                 elif round(pos[2]-self.position[2],3) > 0:
-                    # # From substrate to layer 1
-                    # if 'Substrate' in self.supp_by:
-                    #     self.migration_paths['Up'].append([tuple(min_dist_idx),num_event,self.Act_E_list[1]])
-                    # # From layer_n to layer_n+1
-                    # else:
-                    #     self.migration_paths['Up'].append([tuple(min_dist_idx),num_event,self.Act_E_list[3]])
                     self.migration_paths['Up'].append([tuple(min_dist_idx),num_event])
                     
                 # Migration downward
                 elif round(pos[2]-self.position[2],3) < 0:
-                    # # From layer 1 to substrate
-                    # if 'Substrate' in grid_crystal[tuple(min_dist_idx)].supp_by:
-                    #     self.migration_paths['Down'].append([tuple(min_dist_idx),num_event,self.Act_E_list[2]])
-                    # # From layer_n to layer_n-1
-                    # else:
-                    #     self.migration_paths['Down'].append([tuple(min_dist_idx),num_event,self.Act_E_list[4]])
                     self.migration_paths['Down'].append([tuple(min_dist_idx),num_event])
               
                 
@@ -137,6 +101,8 @@ class Site():
             elif (grid_crystal[idx].chemical_specie == "Empty") and (idx in self.supp_by):
                 self.supp_by.remove(idx)
                 
+
+        self.detect_edges(grid_crystal)               
         self.calculate_clustering_energy()
         self.detect_planes(grid_crystal,crystallographic_planes)
                 
@@ -146,19 +112,6 @@ class Site():
         # We reduce 1 if it is supported by the substrate
         # We add 1 because if the site is occupied
         
-        """
-        We have to consider that always there is a particle in that site,
-        because we are calculating the energy differences in case the particle is there
-        
-        if 'Substrate' in self.supp_by and self.chemical_specie != 'Empty':
-            self.energy_site = self.Act_E_list[-1][len(self.supp_by)] + self.Act_E_list[-2]
-        elif 'Substrate' in self.supp_by and self.chemical_specie == 'Empty':
-            self.energy_site = self.Act_E_list[-1][len(self.supp_by)-1] + self.Act_E_list[-2]
-        elif 'Substrate' not in self.supp_by and self.chemical_specie != 'Empty':
-            self.energy_site = self.Act_E_list[-1][len(self.supp_by)+1]
-        elif 'Substrate' not in self.supp_by and self.chemical_specie == 'Empty':
-            self.energy_site = self.Act_E_list[-1][len(self.supp_by)]
-        """
         if supp_by_destiny == 0:
             if 'Substrate' in self.supp_by:
                 self.energy_site = self.Act_E_list[-1][len(self.supp_by)] + self.Act_E_list[-2]
@@ -220,8 +173,14 @@ class Site():
                     
                 # Migrating on the film (111)
                 elif grid_crystal[site_idx].crystallographic_direction == (111):
-                    new_site_events.append([site_idx, num_event, self.Act_E_list[7] + energy_change])
                     
+                    if self.edges_v[num_event] == None: 
+                        new_site_events.append([site_idx, num_event, self.Act_E_list[7] + energy_change])
+                    elif self.edges_v[num_event] == 111:
+                        new_site_events.append([site_idx, num_event, self.Act_E_list[10] + energy_change])
+                    elif self.edges_v[num_event] == 100:
+                        new_site_events.append([site_idx, num_event, self.Act_E_list[9] + energy_change])
+                        
                 # Migrating on the film (100)
                 elif grid_crystal[site_idx].crystallographic_direction == (100):
                     new_site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
@@ -270,7 +229,7 @@ class Site():
                 elif self.crystallographic_direction == (111):
                     new_site_events.append([site_idx, num_event, self.Act_E_list[3] + energy_change])
                     
-                # Migrating upward from the film (111)
+                # Migrating upward from the film (100)
                 elif self.crystallographic_direction ==  (100):
                     new_site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
 
@@ -370,13 +329,55 @@ class Site():
             for plane in crystallographic_planes:
                 cross_product = np.cross(plane[1],plane_normal)
                 norm_cross_product = np.linalg.norm(cross_product)
-                # if np.allclose(cross_product, np.zeros_like(cross_product), atol=1e-2):
                 if norm_cross_product < aux_min:
                     aux_min = norm_cross_product
                     self.crystallographic_direction = plane[0]
                     
         else:
             self.crystallographic_direction = (111)
+            
+    def detect_edges(self,grid_crystal):
+        
+        
+        mig_paths = self.migration_paths['Plane']
+        edges_v = {2:None, 3:None, 4:None, 6:None, 10:None, 11:None}
+        
+        for site_idx, num_event in self.migration_paths['Plane']:
+            
+            if num_event == 2 or num_event == 4:
+                if (grid_crystal[mig_paths[3][0]].chemical_specie == self.chemical_specie 
+                    and grid_crystal[mig_paths[4][0]].chemical_specie == self.chemical_specie):
+                    edges_v[num_event] = 100
+                    
+                if (grid_crystal[mig_paths[1][0]].chemical_specie == self.chemical_specie 
+                    and grid_crystal[mig_paths[5][0]].chemical_specie == self.chemical_specie):
+                    edges_v[num_event] = 111
+                
+            elif num_event == 3 or num_event == 6:
+                if (grid_crystal[mig_paths[0][0]].chemical_specie == self.chemical_specie 
+                    and grid_crystal[mig_paths[4][0]].chemical_specie == self.chemical_specie):
+                    edges_v[num_event] = 111
+                    
+                if (grid_crystal[mig_paths[2][0]].chemical_specie == self.chemical_specie 
+                    and grid_crystal[mig_paths[5][0]].chemical_specie == self.chemical_specie):
+                    edges_v[num_event] = 100 
+
+            elif num_event == 10 or num_event == 11:
+                if (grid_crystal[mig_paths[0][0]].chemical_specie == self.chemical_specie 
+                    and grid_crystal[mig_paths[1][0]].chemical_specie == self.chemical_specie):
+                    edges_v[num_event] = 100 
+                    
+                if (grid_crystal[mig_paths[2][0]].chemical_specie == self.chemical_specie 
+                    and grid_crystal[mig_paths[3][0]].chemical_specie == self.chemical_specie):
+                    edges_v[num_event] = 111
+                    
+        self.edges_v = edges_v
+
+                
+            
+
+            
+            
 
 # =============================================================================
 #         Calculate transition rates    

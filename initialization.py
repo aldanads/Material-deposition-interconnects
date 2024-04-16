@@ -23,7 +23,7 @@ def initialization(n_sim,save_data):
         files_copy = ['initialization.py', 'crystal_lattice.py','Site.py','main.py','KMC.py','balanced_tree.py','analysis.py']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Range_weak_substrate\0.3 eV\\'
+            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Refactored energy\Range weak substrates_3\0 eV\\'
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = r'/sfiwork/samuel.delgado/Copper_deposition/test/'
             
@@ -98,10 +98,10 @@ def initialization(n_sim,save_data):
     Act_E_dataset = ['TaN','Ru25','Ru50','test']  
 
     #E_mig_plane_Cu = 0.05*(n_sim+1) # (eV)
-    E_dataset = {'TaN':[0.85,0.13,0.13,0.15,0.15,0.922,0.559,0.043,0.477],
-              'Ru25':[0.4,0.13,0.13,0.19,0.19,0.922,0.559,0.043,0.477],
-              'Ru50':[0.4,0.13,0.13,0.72,0.72,0.922,0.559,0.043,0.477],
-               'test':[0.85,0.13,0.13,0.15,0.15,0.922,0.559,0.043,0.477]}
+    E_dataset = {'TaN':[0.85,0.13,0.13,0.13,0.095,0.348,0.318,0.043,0.477,0.245,0.309],
+              'Ru25':[0.4,0.13,0.13,0.19,0.19,0.309,0.318,0.043,0.348,0.245,0.309],
+              'Ru50':[0.4,0.13,0.13,0.72,0.72,0.309,0.318,0.043,0.348,0.245,0.309],
+               'test':[0.85,0.13,0.13,0.043,0.095,0.309,0.318,0.043,0.148,0.245,0.309]}
     
     E_mig_sub = E_dataset[Act_E_dataset[select_dataset]][0] # (eV)
     E_mig_upward_subs_layer111 = E_dataset[Act_E_dataset[select_dataset]][1]
@@ -112,6 +112,8 @@ def initialization(n_sim,save_data):
     E_mig_downward_layer100_subs = E_dataset[Act_E_dataset[select_dataset]][6]
     E_mig_111_terrace_Cu = E_dataset[Act_E_dataset[select_dataset]][7]
     E_mig_100_terrace_Cu = E_dataset[Act_E_dataset[select_dataset]][8]
+    E_mig_edge_100 = E_dataset[Act_E_dataset[select_dataset]][9]
+    E_mig_edge_111 = E_dataset[Act_E_dataset[select_dataset]][10]
 
              
 # =============================================================================
@@ -130,8 +132,8 @@ def initialization(n_sim,save_data):
 #       'Ru25':[0,0,-0.55,-0.4,-1.30,-1.42,-1.54,-1.66,-1.78,-1.9,-2.02,-2.14,-2.26,-2.38]
 #       'Ru50':[0,0,-1,-1.22,-1.34,-1.46,-1.58,-1.7,-1.82,-1.94,-2.06,-2.18,-2.3,-2.42]}
 # =============================================================================    
-    clustering_energy = -0.252
-    #clustering_energy = -0.135
+    # clustering_energy = -0.252
+    clustering_energy = -0.21
     E_clustering = {'Void': [0,0,-0.577,-1.732,-3.465,-5.281,-7.566,-9.676,-11.902,-14.228,-16.848,-19.643,-22.818,-26.710],
                     'TaN': [0,0,-1 * 2,-1.2 * 3,-1.34 * 4,-1.46 * 5,-1.58 * 6,-1.7 * 7,-1.82 * 8,-1.94 * 9,-2.06 * 10,-2.18 * 11,-2.3 * 12,-2.42 * 13],
                     'Ru25':[0,0,-0.55 * 2,-0.4 * 3,-1.30 * 4,-1.42 * 5,-1.54 * 6,-1.66 * 7,-1.78 * 8,-1.9 * 9,-2.02 * 10,-2.14 * 11,-2.26 * 12,-2.38 * 13],
@@ -151,13 +153,14 @@ def initialization(n_sim,save_data):
 
     # Binding energy | Desorption energy: https://doi.org/10.1039/D1SC04708F
     # Surface: [0]-TaN, [1]-Ru25, [2]-Ru50, [3]-Ru100, [4]-1 ML Ru passivation
-    binding_energy = {'TaN':-0.45, 'Ru25':-0.79, 'Ru50':-0.49, 'Ru100':-3.64, '1 ML Ru':-4.12, 'test':-0.3}
+    binding_energy = {'TaN':-0.45, 'Ru25':-0.79, 'Ru50':-0.49, 'Ru100':-3.64, '1 ML Ru':-4.12, 'test':0}
     Act_E_list = [E_mig_sub,
                   E_mig_upward_subs_layer111,E_mig_downward_layer111_subs,
                   E_mig_upward_layer1_layer2_111,E_mig_downward_layer2_layer1_111,
                   E_mig_upward_subs_layer100,E_mig_downward_layer100_subs,
                   E_mig_111_terrace_Cu,E_mig_100_terrace_Cu,
-                  binding_energy[Act_E_dataset[select_dataset]],E_clustering['test']]
+                  E_mig_edge_100,E_mig_edge_111,
+                  binding_energy['test'],E_clustering['test']]
                   # binding_energy[Act_E_dataset[select_dataset]],E_clustering[Act_E_dataset[select_dataset]]]
 
 # =============================================================================
@@ -167,7 +170,7 @@ def initialization(n_sim,save_data):
  
     # Maximum probability per site for deposition to establish a timestep limits
     # The maximum timestep is that one that occupy 10% of the site during the deposition process
-    P_limits = 0.99999
+    P_limits = 1
     Co_latt.limit_kmc_timestep(P_limits)
     
 # =============================================================================
@@ -181,12 +184,19 @@ def initialization(n_sim,save_data):
 #     - test[7] - 2 hexagonal seeds - 2 layers and one particle attach to the lateral
 #     - test[8] - cluster
 # =============================================================================
+    test_selected = 8
     test = [0,1,2,3,4,5,6,7,8]
 
     # Deposition process of chemical species
-    Co_latt.deposition_specie(Co_latt.timestep_limits,rng,test[7])
-    Co_latt.track_time(Co_latt.timestep_limits) 
-    Co_latt.add_time()
+    if Co_latt.timestep_limits < float('inf'):
+        Co_latt.deposition_specie(Co_latt.timestep_limits,rng,test[test_selected])
+        Co_latt.track_time(Co_latt.timestep_limits) 
+        Co_latt.add_time()
+    else:
+        Co_latt.deposition_specie(0,rng,test[test_selected])
+        Co_latt.track_time(0) 
+        Co_latt.add_time()
+        
 
     return Co_latt,rng,paths,Results
     

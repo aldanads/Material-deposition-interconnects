@@ -9,9 +9,9 @@ from KMC import KMC
 import numpy as np
 import time
 
-save_data = False
+save_data = True
 
-for n_sim in range(1):
+for n_sim in range(3):
     
 
     Co_latt,rng,paths,Results = initialization(n_sim,save_data)
@@ -23,8 +23,8 @@ for n_sim in range(1):
     j = 0
     n_part = len(Co_latt.sites_occupied)
     nothing_happen = 0
-    total_steps = int(5e0)
-    snapshoots_steps = int(1e0)
+    total_steps = int(1e5)
+    snapshoots_steps = int(1e3)
     # total_steps = int(5e5)
     # snapshoots_steps = int(5e3)
 
@@ -43,11 +43,16 @@ for n_sim in range(1):
                 nothing_happen +=1
                 if nothing_happen == 4:
                     #Co_latt.deposition_specie(Co_latt.timestep_limits,rng)
-                    Co_latt.track_time(Co_latt.timestep_limits)
-                    Co_latt.add_time()
+                    if Co_latt.timestep_limits < float('Inf'):
+                        Co_latt.track_time(Co_latt.timestep_limits)
+                        Co_latt.add_time()
+                    else:
+                        Co_latt.add_time()
+
             else: 
                 n_part = len(Co_latt.sites_occupied)
                 nothing_happen = 0
+                print(Co_latt.time)
                 Co_latt.add_time()
             
             j+=1
