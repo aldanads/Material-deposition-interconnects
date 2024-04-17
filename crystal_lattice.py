@@ -532,9 +532,13 @@ class Crystal_Lattice():
         subfigs = fig.subfigures(nr, nc, wspace=0.1, hspace=7, width_ratios=[1,1])
         
         axa = subfigs[0].add_subplot(111, projection='3d')
+        axb = subfigs[1].add_subplot(111, projection='3d')
+
         positions = np.array([self.grid_crystal[idx].position for idx in self.sites_occupied])
-        x, y, z = positions[:, 0], positions[:, 1], positions[:, 2]
-        axa.scatter3D(x, y, z, c='blue', marker='o')
+        if positions.size != 0:
+            x, y, z = positions[:, 0], positions[:, 1], positions[:, 2]
+            axa.scatter3D(x, y, z, c='blue', marker='o')
+            axb.scatter3D(x, y, z, c='blue', marker='o')
         
         axa.set_xlabel('x-axis (nm)')
         axa.set_ylabel('y-axis (nm)')
@@ -546,8 +550,6 @@ class Crystal_Lattice():
         axa.set_zlim([0, 2*self.crystal_size[2]])
         axa.set_aspect('equal', 'box')
         
-        axb = subfigs[1].add_subplot(111, projection='3d')
-        axb.scatter3D(x, y, z, c='blue', marker='o')
         
         axb.set_xlabel('x-axis (nm)')
         axb.set_ylabel('y-axis (nm)')

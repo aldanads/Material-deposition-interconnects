@@ -23,7 +23,7 @@ def initialization(n_sim,save_data):
         files_copy = ['initialization.py', 'crystal_lattice.py','Site.py','main.py','KMC.py','balanced_tree.py','analysis.py']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Refactored energy\Range weak substrates_3\0 eV\\'
+            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Refactored energy\Range weak substrate_4\0.15 eV\\'
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = r'/sfiwork/samuel.delgado/Copper_deposition/test/'
             
@@ -40,6 +40,7 @@ def initialization(n_sim,save_data):
 # =============================================================================
     sticking_coeff = 1
     partial_pressure = 5 # (Pa = N m^-2 = kg m^-1 s^-2)
+    # p = 0.1 - 10 typical values 
     mass_specie = 63.546 # (mass of Copper in u) 
     chemical_specie = 'Cu'
     # T = 573 + n_sim * 100 # (K)
@@ -56,7 +57,7 @@ def initialization(n_sim,save_data):
     b = 0.358 # (nm)
     c = 0.358 # (nm)
     lattice_constants = (a,b,c)
-    crystal_size = (3, 3,1) # (nm)
+    crystal_size = (10, 10,3) # (nm)
     bravais_latt = ['fcc']
     orientation = ['001','111']
     lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
@@ -153,7 +154,7 @@ def initialization(n_sim,save_data):
 
     # Binding energy | Desorption energy: https://doi.org/10.1039/D1SC04708F
     # Surface: [0]-TaN, [1]-Ru25, [2]-Ru50, [3]-Ru100, [4]-1 ML Ru passivation
-    binding_energy = {'TaN':-0.45, 'Ru25':-0.79, 'Ru50':-0.49, 'Ru100':-3.64, '1 ML Ru':-4.12, 'test':0}
+    binding_energy = {'TaN':-0.45, 'Ru25':-0.79, 'Ru50':-0.49, 'Ru100':-3.64, '1 ML Ru':-4.12, 'test':-0.15}
     Act_E_list = [E_mig_sub,
                   E_mig_upward_subs_layer111,E_mig_downward_layer111_subs,
                   E_mig_upward_layer1_layer2_111,E_mig_downward_layer2_layer1_111,
@@ -170,7 +171,7 @@ def initialization(n_sim,save_data):
  
     # Maximum probability per site for deposition to establish a timestep limits
     # The maximum timestep is that one that occupy 10% of the site during the deposition process
-    P_limits = 1
+    P_limits = 0.05
     Co_latt.limit_kmc_timestep(P_limits)
     
 # =============================================================================
@@ -184,7 +185,7 @@ def initialization(n_sim,save_data):
 #     - test[7] - 2 hexagonal seeds - 2 layers and one particle attach to the lateral
 #     - test[8] - cluster
 # =============================================================================
-    test_selected = 8
+    test_selected = 0
     test = [0,1,2,3,4,5,6,7,8]
 
     # Deposition process of chemical species

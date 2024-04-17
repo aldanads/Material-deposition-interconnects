@@ -342,34 +342,39 @@ class Site():
         mig_paths = self.migration_paths['Plane']
         edges_v = {2:None, 3:None, 4:None, 6:None, 10:None, 11:None}
         
-        for site_idx, num_event in self.migration_paths['Plane']:
+        bottom_support = all(site_idx in self.supp_by for site_idx, num_event in self.migration_paths['Down'])
             
-            if num_event == 2 or num_event == 4:
-                if (grid_crystal[mig_paths[3][0]].chemical_specie == self.chemical_specie 
-                    and grid_crystal[mig_paths[4][0]].chemical_specie == self.chemical_specie):
-                    edges_v[num_event] = 100
-                    
-                if (grid_crystal[mig_paths[1][0]].chemical_specie == self.chemical_specie 
-                    and grid_crystal[mig_paths[5][0]].chemical_specie == self.chemical_specie):
-                    edges_v[num_event] = 111
+        
+        if 'Substrate' in self.supp_by or bottom_support:
+        
+            for site_idx, num_event in self.migration_paths['Plane']:
                 
-            elif num_event == 3 or num_event == 6:
-                if (grid_crystal[mig_paths[0][0]].chemical_specie == self.chemical_specie 
-                    and grid_crystal[mig_paths[4][0]].chemical_specie == self.chemical_specie):
-                    edges_v[num_event] = 111
+                if num_event == 2 or num_event == 4:
+                    if (grid_crystal[mig_paths[3][0]].chemical_specie == self.chemical_specie 
+                        and grid_crystal[mig_paths[4][0]].chemical_specie == self.chemical_specie):
+                        edges_v[num_event] = 100
+                        
+                    if (grid_crystal[mig_paths[1][0]].chemical_specie == self.chemical_specie 
+                        and grid_crystal[mig_paths[5][0]].chemical_specie == self.chemical_specie):
+                        edges_v[num_event] = 111
                     
-                if (grid_crystal[mig_paths[2][0]].chemical_specie == self.chemical_specie 
-                    and grid_crystal[mig_paths[5][0]].chemical_specie == self.chemical_specie):
-                    edges_v[num_event] = 100 
-
-            elif num_event == 10 or num_event == 11:
-                if (grid_crystal[mig_paths[0][0]].chemical_specie == self.chemical_specie 
-                    and grid_crystal[mig_paths[1][0]].chemical_specie == self.chemical_specie):
-                    edges_v[num_event] = 100 
-                    
-                if (grid_crystal[mig_paths[2][0]].chemical_specie == self.chemical_specie 
-                    and grid_crystal[mig_paths[3][0]].chemical_specie == self.chemical_specie):
-                    edges_v[num_event] = 111
+                elif num_event == 3 or num_event == 6:
+                    if (grid_crystal[mig_paths[0][0]].chemical_specie == self.chemical_specie 
+                        and grid_crystal[mig_paths[4][0]].chemical_specie == self.chemical_specie):
+                        edges_v[num_event] = 111
+                        
+                    if (grid_crystal[mig_paths[2][0]].chemical_specie == self.chemical_specie 
+                        and grid_crystal[mig_paths[5][0]].chemical_specie == self.chemical_specie):
+                        edges_v[num_event] = 100 
+    
+                elif num_event == 10 or num_event == 11:
+                    if (grid_crystal[mig_paths[0][0]].chemical_specie == self.chemical_specie 
+                        and grid_crystal[mig_paths[1][0]].chemical_specie == self.chemical_specie):
+                        edges_v[num_event] = 100 
+                        
+                    if (grid_crystal[mig_paths[2][0]].chemical_specie == self.chemical_specie 
+                        and grid_crystal[mig_paths[3][0]].chemical_specie == self.chemical_specie):
+                        edges_v[num_event] = 111
                     
         self.edges_v = edges_v
 

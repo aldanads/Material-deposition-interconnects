@@ -9,7 +9,7 @@ from KMC import KMC
 import numpy as np
 import time
 
-save_data = True
+save_data = False
 
 for n_sim in range(3):
     
@@ -23,17 +23,21 @@ for n_sim in range(3):
     j = 0
     n_part = len(Co_latt.sites_occupied)
     nothing_happen = 0
-    total_steps = int(1e5)
-    snapshoots_steps = int(1e3)
-    # total_steps = int(5e5)
-    # snapshoots_steps = int(5e3)
+    # total_steps = int(1e5)
+    # snapshoots_steps = int(1e3)
+    total_steps = int(5e5)
+    time_limit = 0.01 # s
+    i = 0
+    snapshoots_steps = int(5e3)
 
     starting_time = time.time()
 
-    for i in range(total_steps):
+    while Co_latt.list_time[-1] < time_limit:
+        i+=1
+    #for i in range(total_steps):
 
         Co_latt,KMC_time_step = KMC(Co_latt,rng)
-        #Co_latt.deposition_specie(KMC_time_step,rng)
+        Co_latt.deposition_specie(KMC_time_step,rng)
     
         if i%snapshoots_steps== 0:
 
@@ -42,7 +46,7 @@ for n_sim in range(3):
             if len(Co_latt.sites_occupied) == n_part:
                 nothing_happen +=1
                 if nothing_happen == 4:
-                    #Co_latt.deposition_specie(Co_latt.timestep_limits,rng)
+                    Co_latt.deposition_specie(Co_latt.timestep_limits,rng)
                     if Co_latt.timestep_limits < float('Inf'):
                         Co_latt.track_time(Co_latt.timestep_limits)
                         Co_latt.add_time()
@@ -52,12 +56,12 @@ for n_sim in range(3):
             else: 
                 n_part = len(Co_latt.sites_occupied)
                 nothing_happen = 0
-                print(Co_latt.time)
                 Co_latt.add_time()
             
             j+=1
             Co_latt.measurements_crystal()
-            print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',Co_latt.list_time[-1])
+            # print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',Co_latt.list_time[-1])
+            print(str(Co_latt.list_time[-1]/time_limit * 100) + ' %','| Total time: ',Co_latt.list_time[-1])
             end_time = time.time()
             if save_data:
                 Results.measurements_crystal(Co_latt.list_time[-1],Co_latt.mass_gained,Co_latt.fraction_sites_occupied,
