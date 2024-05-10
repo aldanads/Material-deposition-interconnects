@@ -32,25 +32,27 @@ class Site():
 # =============================================================================
 #     We only consider the neighbors within the lattice domain            
 # =============================================================================
-    def neighbors_analysis(self,grid_crystal,neigh_idx,neigh_cart,crystal_size):
+    def neighbors_analysis(self,grid_crystal,neigh_idx,neigh_cart,crystal_size,event_labels,idx_origin):
        
         self.num_mig_path = len(neigh_idx) + 2 # We consider two layers jumps: +1 upward, +1 downward
-        num_event = 0
+        #num_event = 0
         for idx,pos in zip(neigh_idx,neigh_cart):
             if tuple(idx) in grid_crystal:
                 self.nearest_neighbors_idx.append(tuple(idx))             
                 self.nearest_neighbors_cart.append(tuple(pos))
+                
+
                 # Migration in the plane
                 if round(pos[2]-self.position[2],3) == 0:
-                    self.migration_paths['Plane'].append([tuple(idx),num_event])
-
+                    self.migration_paths['Plane'].append([tuple(idx),event_labels[tuple(idx - np.array(idx_origin))]])
+                
                 # Migration upward
                 elif round(pos[2]-self.position[2],3) > 0:
-                    self.migration_paths['Up'].append([tuple(idx),num_event])
+                    self.migration_paths['Up'].append([tuple(idx),event_labels[tuple(idx - np.array(idx_origin))]])
                     
                 # Migration downward
                 elif round(pos[2]-self.position[2],3) < 0:
-                    self.migration_paths['Down'].append([tuple(idx),num_event])
+                    self.migration_paths['Down'].append([tuple(idx),event_labels[tuple(idx - np.array(idx_origin))]])
 
                     
             # Establish boundary conditions for neighbors in xy plane
@@ -67,21 +69,19 @@ class Site():
     
                 self.nearest_neighbors_idx.append(tuple(min_dist_idx))
                 self.nearest_neighbors_cart.append(tuple(grid_crystal[min_dist_idx].position))
+
                 # Migration in the plane
                 if round(pos[2]-self.position[2],3) == 0:
-                    self.migration_paths['Plane'].append([tuple(min_dist_idx),num_event])
-                    
+                    self.migration_paths['Plane'].append([tuple(min_dist_idx),event_labels[tuple(idx - np.array(idx_origin))]])
+                            
                 # Migration upward
                 elif round(pos[2]-self.position[2],3) > 0:
-                    self.migration_paths['Up'].append([tuple(min_dist_idx),num_event])
-                    
+                    self.migration_paths['Up'].append([tuple(min_dist_idx),event_labels[tuple(idx - np.array(idx_origin))]])
+                        
                 # Migration downward
                 elif round(pos[2]-self.position[2],3) < 0:
-                    self.migration_paths['Down'].append([tuple(min_dist_idx),num_event])
+                    self.migration_paths['Down'].append([tuple(min_dist_idx),event_labels[tuple(idx - np.array(idx_origin))]])
               
-                
-            num_event+= 1
-        self.num_event = num_event
             
 # =============================================================================
 #         Occupied sites supporting this node
@@ -378,8 +378,16 @@ class Site():
                     
         self.edges_v = edges_v
 
+
+    def unit_vector(self,vector):
+        """ Returns the unit vector of the vector."""
+        return vector / np.linalg.norm(vector)
                 
-            
+    def angle_between(self,v1, v2):
+        """Finds angle between two vectors"""
+        v1_u = self.unit_vector(v1)
+        v2_u = self.unit_vector(v2)
+        return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))    
 
             
             

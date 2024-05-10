@@ -116,11 +116,15 @@ class Crystal_Lattice():
             
             self.positions_idx = list(self.grid_crystal.keys())
             self.positions_cartesian = [site.position for site in self.grid_crystal.values()]
-                
+            
+
+            event_labels = {(0,-1,0): 0, (0,0,-1):1, (1,0,-1):2, (1,-1,0):3, (-1,0,1):4, (0,0,1):5, 
+                            (-1,1,0):6, (1,0,0):7, (0,1,0):8, (-1,0,0):9, (0,1,-1):10, (0,-1,1):11}
+            
             for idx,site in self.grid_crystal.items():
                 # Neighbors for each idx in grid_crystal
                 neighbors_positions = [self.idx_to_cart(idx) for idx in self.latt.get_neighbors(idx)[:,:3]]
-                site.neighbors_analysis(self.grid_crystal,self.latt.get_neighbors(idx)[:,:3],neighbors_positions,self.crystal_size)
+                site.neighbors_analysis(self.grid_crystal,self.latt.get_neighbors(idx)[:,:3],neighbors_positions,self.crystal_size,event_labels,idx)
         
     def calculate_crystallographic_planes(self):
         
