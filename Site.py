@@ -412,8 +412,39 @@ class Site():
                 event[0] = tr_value
                 
         
-class Island():
+class Island:
     def __init__(self,z_starting_position,z_starting_pos_cart,island_sites):
         self.z_starting_position = z_starting_position
         self.z_starting_pos_cart = z_starting_pos_cart
         self.island_sites = island_sites
+        
+    def layers_calculation(self,Co_latt):
+        
+        grid_crystal = Co_latt.grid_crystal
+        z_step = Co_latt.basis_vectors[0][2]
+        z_steps = int(Co_latt.crystal_size[2]/z_step + 1)
+        layers = [0] * z_steps  # Initialize each layer separately
+        
+        for idx in self.island_sites:
+            site = grid_crystal[idx]
+            z_idx = int(round(site.position[2] / z_step))
+            layers[z_idx] += 1 if site.chemical_specie != 'Empty' else 0
+        
+        self.layers = layers
+        
+        self.island_terrace(Co_latt)
+    
+    def island_terrace(self,Co_latt):
+        
+        grid_crystal = Co_latt.grid_crystal
+        z_step = Co_latt.basis_vectors[0][2]
+        z_steps = int(Co_latt.crystal_size[2]/z_step + 1)
+        sites_per_layer = len(grid_crystal)/z_steps
+
+        area_per_site = Co_latt.crystal_size[0] * Co_latt.crystal_size[1] / sites_per_layer
+        
+        terraces = [(self.layers[i-1] - self.layers[i]) * area_per_site for i in range(1,len(self.layers))
+                    if (self.layers[i-1] - self.layers[i]) * area_per_site > 0]
+        terraces.append(self.layers[-1] * area_per_site) # (nm2)
+        
+        self.terraces = terraces  

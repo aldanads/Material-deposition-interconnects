@@ -266,13 +266,9 @@ class Crystal_Lattice():
         
         return update_specie_events,update_supp_av
 
-    def deposition_specie(self,t,rng,test = 0):
-        
+    def deposition_specie(self,t,rng,test = 0):  
 
         update_supp_av = set()
-        # We need to do a copy if we don't want to modify self.sites_occupied when
-        # we modify update_specie_events
-        # update_specie_events = (self.sites_occupied).copy()
         update_specie_events = []
         
         if test == 0:
@@ -642,7 +638,7 @@ class Crystal_Lattice():
         self.layers = [layers, normalized_layers]
         
         # Layer 0 is z = 0, so it doesn't contribute
-        self.thickness = sum(normalized_layers[1:]) * z_step # (nm)    
+        self.thickness = sum(normalized_layers) * z_step # (nm)    
         
     def sites_occupation(self):
         
@@ -671,7 +667,10 @@ class Crystal_Lattice():
     
     def islands_analysis(self):
 
-        visited = set()
+        # visited = set()
+        island_visited = set()
+        total_visited = set()
+
         normalized_layers = self.layers[1]
         count_islands = [0] * len(normalized_layers)
         layers_no_complete = np.where(np.array(normalized_layers) != 1.0)
@@ -685,16 +684,19 @@ class Crystal_Lattice():
             for idx_site in self.sites_occupied:     
                 if self.grid_crystal[idx_site].position[2] == z_layer: 
                     island_slice = set()
-                    visited,island_slice = self.detect_islands(idx_site,visited,island_slice,self.chemical_specie)
+                    total_visited,island_slice = self.detect_islands(idx_site,total_visited,island_slice,self.chemical_specie)
 
                     if len(island_slice):
+                        island_visited = set()
                         island_sites = island_slice.copy()
-                        visited,island_sites = self.build_island(visited,island_sites,list(island_slice)[0],self.chemical_specie)
+                        island_visited,island_sites = self.build_island(island_visited,island_sites,list(island_slice)[0],self.chemical_specie)
                         islands_list.append(Island(z_idx,z_layer,island_sites))
                         count_islands[z_idx] += 1
+                        total_visited.update(island_visited)
+
                         
         self.islands_list = islands_list
-
+        
         
 # =============================================================================
 #     Auxiliary functions

@@ -27,12 +27,15 @@ for n_sim in range(3):
     # snapshoots_steps = int(1e3)
     total_steps = int(5e5)
     time_limit = 0.01 # s
+    thickness_limit = 1 # (1 nm)
+    Co_latt.measurements_crystal()
     i = 0
     snapshoots_steps = int(5e3)
 
     starting_time = time.time()
 
-    while Co_latt.list_time[-1] < time_limit:
+    #while Co_latt.list_time[-1] < time_limit:
+    while Co_latt.thickness < thickness_limit:
         i+=1
     #for i in range(total_steps):
 
@@ -61,7 +64,8 @@ for n_sim in range(3):
             j+=1
             Co_latt.measurements_crystal()
             # print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',Co_latt.list_time[-1])
-            print(str(Co_latt.list_time[-1]/time_limit * 100) + ' %','| Total time: ',Co_latt.list_time[-1])
+            # print(str(Co_latt.list_time[-1]/time_limit * 100) + ' %','| Total time: ',Co_latt.list_time[-1])
+            print(str(Co_latt.thickness/thickness_limit * 100) + ' %','| Thickness: ', Co_latt.thickness, '| Total time: ',Co_latt.list_time[-1])
             end_time = time.time()
             if save_data:
                 Results.measurements_crystal(Co_latt.list_time[-1],Co_latt.mass_gained,Co_latt.fraction_sites_occupied,
