@@ -9,9 +9,9 @@ from KMC import KMC
 import numpy as np
 import time
 
-save_data = False
+save_data = True
 
-for n_sim in range(3):
+for n_sim in range(0,3):
     
 
     Co_latt,rng,paths,Results = initialization(n_sim,save_data)

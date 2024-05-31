@@ -25,7 +25,7 @@ def initialization(n_sim,save_data):
         if platform.system() == 'Windows': # When running in laptop
             dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Refactored energy\Range weak substrate_4\0.15 eV\\'
         elif platform.system() == 'Linux': # HPC works on Linux
-            dst = r'/sfiwork/samuel.delgado/Copper_deposition/test/'
+            dst = r'/sfiwork/samuel.delgado/Copper_deposition/Varying_substrate/step_ascent/TaN/P=0.1/'
             
         paths,Results = save_simulation(files_copy,dst,n_sim) # Create folders and python files
         
@@ -39,7 +39,7 @@ def initialization(n_sim,save_data):
 #         
 # =============================================================================
     sticking_coeff = 1
-    partial_pressure = 5 # (Pa = N m^-2 = kg m^-1 s^-2)
+    partial_pressure = 1 # (Pa = N m^-2 = kg m^-1 s^-2)
     # p = 0.1 - 10 typical values 
     mass_specie = 63.546 # (mass of Copper in u) 
     chemical_specie = 'Cu'
@@ -57,7 +57,7 @@ def initialization(n_sim,save_data):
     b = 0.358 # (nm)
     c = 0.358 # (nm)
     lattice_constants = (a,b,c)
-    crystal_size = (3, 3,0.5) # (nm)
+    crystal_size = (10, 10,2) # (nm)
     bravais_latt = ['fcc']
     orientation = ['001','111']
     lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
@@ -96,13 +96,14 @@ def initialization(n_sim,save_data):
 #       Physical Review B 76, no. 24 (2007): 245408.
 # =============================================================================
     select_dataset = 0   
-    Act_E_dataset = ['TaN','Ru25','Ru50','test']  
+    Act_E_dataset = ['TaN','Ru25','Ru50','test','homoepitaxial']  
 
     #E_mig_plane_Cu = 0.05*(n_sim+1) # (eV)
-    E_dataset = {'TaN':[0.85,0.13,0.13,0.13,0.095,0.348,0.318,0.043,0.477,0.245,0.309],
-              'Ru25':[0.4,0.13,0.13,0.19,0.19,0.309,0.318,0.043,0.348,0.245,0.309],
-              'Ru50':[0.4,0.13,0.13,0.72,0.72,0.309,0.318,0.043,0.348,0.245,0.309],
-               'test':[0.85,0.13,0.13,0.043,0.095,0.309,0.318,0.043,0.148,0.245,0.309]}
+    E_dataset = {'TaN':[0.85,0.13,0.13,0.13,0.095,0.19,0.318,0.043,0.477,0.245,0.309],
+              'Ru25':[0.6,0.13,0.13,0.20,0.095,0.23,0.318,0.043,0.477,0.245,0.309],
+              'Ru50':[0.4,0.13,0.13,0.28,0.095,0.38,0.318,0.043,0.477,0.245,0.309],
+               'test':[0.85,0.13,0.13,0.13,0.095,0.2,0.318,0.043,0.477,0.245,0.309],
+               'homoepitaxial':[0.85,0.13,0.13,0.313,0.095,0.528,0.318,0.043,0.4777,0.245,0.309]}
     
     E_mig_sub = E_dataset[Act_E_dataset[select_dataset]][0] # (eV)
     E_mig_upward_subs_layer111 = E_dataset[Act_E_dataset[select_dataset]][1]
@@ -126,20 +127,11 @@ def initialization(n_sim,save_data):
 #     Kondati Natarajan, S., Nies, C. L., & Nolan, M. (2020). 
 #     The role of Ru passivation and doping on the barrier and seed layer properties of Ru-modified TaN for copper interconnects. 
 #     Journal of Chemical Physics, 152(14). https://doi.org/10.1063/5.0003852
-#       
-#       They have calculated for 2-4 atoms, the rest is extrapolation
-#       It is in (eV/Cu)
-#       'TaN': [0,0,-1,-1.2,-1.34,-1.46,-1.58,-1.7,-1.82,-1.94,-2.06,-2.18,-2.3,-2.42]
-#       'Ru25':[0,0,-0.55,-0.4,-1.30,-1.42,-1.54,-1.66,-1.78,-1.9,-2.02,-2.14,-2.26,-2.38]
-#       'Ru50':[0,0,-1,-1.22,-1.34,-1.46,-1.58,-1.7,-1.82,-1.94,-2.06,-2.18,-2.3,-2.42]}
 # =============================================================================    
     # clustering_energy = -0.252
-    clustering_energy = -0.21
-    E_clustering = {'Void': [0,0,-0.577,-1.732,-3.465,-5.281,-7.566,-9.676,-11.902,-14.228,-16.848,-19.643,-22.818,-26.710],
-                    'TaN': [0,0,-1 * 2,-1.2 * 3,-1.34 * 4,-1.46 * 5,-1.58 * 6,-1.7 * 7,-1.82 * 8,-1.94 * 9,-2.06 * 10,-2.18 * 11,-2.3 * 12,-2.42 * 13],
-                    'Ru25':[0,0,-0.55 * 2,-0.4 * 3,-1.30 * 4,-1.42 * 5,-1.54 * 6,-1.66 * 7,-1.78 * 8,-1.9 * 9,-2.02 * 10,-2.14 * 11,-2.26 * 12,-2.38 * 13],
-                    'Ru50':[0,0,-1 * 2,-1.22 * 3,-1.34 * 4,-1.46 * 5,-1.58 * 6,-1.7 * 7,-1.82 * 8,-1.94 * 9,-2.06 * 10,-2.18 * 11,-2.3 * 12,-2.42 * 13],
-                    'test':[0,0,clustering_energy * 2,clustering_energy * 3,clustering_energy * 4,clustering_energy * 5,clustering_energy * 6,clustering_energy * 7,clustering_energy * 8,clustering_energy * 9,clustering_energy * 10,clustering_energy * 11,clustering_energy * 12,clustering_energy * 13]} 
+    #clustering_energy = -0.21
+    clustering_energy = -0.15
+    E_clustering = [0,0,clustering_energy * 2,clustering_energy * 3,clustering_energy * 4,clustering_energy * 5,clustering_energy * 6,clustering_energy * 7,clustering_energy * 8,clustering_energy * 9,clustering_energy * 10,clustering_energy * 11,clustering_energy * 12,clustering_energy * 13] 
 
     
 
@@ -154,15 +146,14 @@ def initialization(n_sim,save_data):
 
     # Binding energy | Desorption energy: https://doi.org/10.1039/D1SC04708F
     # Surface: [0]-TaN, [1]-Ru25, [2]-Ru50, [3]-Ru100, [4]-1 ML Ru passivation
-    binding_energy = {'TaN':-0.45, 'Ru25':-0.79, 'Ru50':-0.49, 'Ru100':-3.64, '1 ML Ru':-4.12, 'test':-0.15}
+    binding_energy = {'TaN':0, 'Ru25':-0.05, 'Ru50':-0.15, 'test':-0.00}
     Act_E_list = [E_mig_sub,
                   E_mig_upward_subs_layer111,E_mig_downward_layer111_subs,
                   E_mig_upward_layer1_layer2_111,E_mig_downward_layer2_layer1_111,
                   E_mig_upward_subs_layer100,E_mig_downward_layer100_subs,
                   E_mig_111_terrace_Cu,E_mig_100_terrace_Cu,
                   E_mig_edge_100,E_mig_edge_111,
-                  binding_energy['test'],E_clustering['test']]
-                  # binding_energy[Act_E_dataset[select_dataset]],E_clustering[Act_E_dataset[select_dataset]]]
+                  binding_energy[Act_E_dataset[select_dataset]],E_clustering]
 
 # =============================================================================
 #     Initialize the crystal grid structure - nodes with empty spaces
@@ -170,7 +161,7 @@ def initialization(n_sim,save_data):
     Co_latt = Crystal_Lattice(lattice_properties,experimental_conditions,Act_E_list)
  
     # Maximum probability per site for deposition to establish a timestep limits
-    # The maximum timestep is that one that occupy 10% of the site during the deposition process
+    # The maximum timestep is that one that occupy X% of the site during the deposition process
     P_limits = 0.05
     Co_latt.limit_kmc_timestep(P_limits)
     

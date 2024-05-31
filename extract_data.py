@@ -17,7 +17,7 @@ class SimulationResults:
         self.excel_filename = excel_filename
         # Initialize a CSV file with headers
         with open(excel_filename, 'w') as f:
-            f.write('Substrate,Partial_pressure,Temperature,Thickness, RMS_roughness, n_islands, mean_size_islands,std_size_islands,max_size_island,mean_island_terraces,std_island_terraces,max_island_terrace,general_terrace\n')
+            f.write('Substrate,Partial_pressure,Temperature,Thickness,RMS_roughness,n_islands,mean_size_islands,std_size_islands,max_size_island,mean_island_terraces,std_island_terraces,max_island_terrace,general_terrace\n')
     
     def measurements_crystal(self, Substrate, folder_P,temperature,thickness,roughness,n_islands,mean_size_islands,std_size_islands,max_size_island,mean_island_terraces,std_island_terraces,max_island_terrace,general_terrace):
             # Append measurements to the CSV file
@@ -28,9 +28,9 @@ class SimulationResults:
 
 
 # Path to the variables files, for every folder and Sim_i
-path = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Batch simulations\Thickness bug\\'
+path = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Batch simulations\Thickness limit\\'
 folder_P = '\P=0.1'
-folder_subs = ['TaN', 'Ru25', 'Ru50']
+folder_subs = os.listdir(path)
 path_2 = r'\Program\\'
 
 # Data saved in a OS
