@@ -662,8 +662,11 @@ class Crystal_Lattice():
     def RMS_roughness(self):
         
         x,y,z = self.obtain_surface_coord()
+        z = np.array(z)
         z_mean = np.mean(z)
-        self.surf_roughness_RMS = np.sqrt(np.mean((np.array(z)-z_mean)**2))
+        self.Ra_roughness = sum(abs(z-z_mean))/len(z)
+        self.z_mean = z_mean
+        self.surf_roughness_RMS = np.sqrt(np.mean((z-z_mean)**2))
     
     def islands_analysis(self):
 
@@ -687,16 +690,73 @@ class Crystal_Lattice():
                     total_visited,island_slice = self.detect_islands(idx_site,total_visited,island_slice,self.chemical_specie)
 
                     if len(island_slice):
-                        island_visited = set()
+                        island_visited = island_slice.copy()
                         island_sites = island_slice.copy()
                         island_visited,island_sites = self.build_island(island_visited,island_sites,list(island_slice)[0],self.chemical_specie)
                         islands_list.append(Island(z_idx,z_layer,island_sites))
                         count_islands[z_idx] += 1
                         total_visited.update(island_visited)
 
+
                         
         self.islands_list = islands_list
         
+# =============================================================================
+#     Function to detect island and the coordinates of the base
+# =============================================================================
+    def detect_islands(self,idx_site,visited,island_slice,chemical_specie):
+
+        site = self.grid_crystal[idx_site] 
+        
+        if idx_site not in visited and site.chemical_specie == chemical_specie:
+            visited.add(idx_site)
+            island_slice.add(idx_site)
+            # dfs_recursive
+            for idx in site.migration_paths['Plane']:
+                if idx[0] not in visited:
+                    visited,island_slice = self.detect_islands(idx[0],visited,island_slice,chemical_specie)
+                                       
+        return visited,island_slice
+
+# =============================================================================
+#     Function to build the full island starting from the base obtained in detect_islands()
+# =============================================================================
+    def build_island_2(self,visited,island_sites,idx,chemical_specie):
+          
+        site = self.grid_crystal[idx]
+            
+        for element in site.migration_paths['Up'] + site.migration_paths['Plane']+site.migration_paths['Down']:
+    
+            if element[0] not in visited and self.grid_crystal[element[0]].chemical_specie == chemical_specie:
+                visited.add(element[0])
+                island_sites.add(element[0])
+                visited,island_sites = self.build_island(visited,island_sites,element[0],chemical_specie)
+                
+        return visited,island_sites
+    
+    def build_island(self,visited,island_sites,start_idx,chemical_specie):
+          
+        stack = [start_idx]
+
+        while stack:
+            idx = stack.pop()
+            site = self.grid_crystal[idx]
+            
+            for element in site.migration_paths['Up'] + site.migration_paths['Plane'] + site.migration_paths['Down']:
+        
+                if element[0] not in visited and self.grid_crystal[element[0]].chemical_specie == chemical_specie:
+                    visited.add(element[0])
+                    island_sites.add(element[0])
+                    stack.append(element[0])
+
+        return visited,island_sites
+    
+    
+
+
+
+
+
         
 # =============================================================================
 #     Auxiliary functions
@@ -809,43 +869,13 @@ class Crystal_Lattice():
     def idx_to_cart(self,idx):
         return tuple(round(element,3) for element in np.sum(idx * np.transpose(self.basis_vectors), axis=1))
     
-    
-# =============================================================================
-#     Function to detect island and the coordinates of the base
-# =============================================================================
-    def detect_islands(self,idx_site,visited,island_slice,chemical_specie):
 
-        site = self.grid_crystal[idx_site] 
-        
-        if idx_site not in visited and site.chemical_specie == chemical_specie:
-            visited.add(idx_site)
-            island_slice.add(idx_site)
-            # dfs_recursive
-            for idx in site.migration_paths['Plane']:
-                visited,island_slice = self.detect_islands(idx[0],visited,island_slice,chemical_specie)
-                                       
-        return visited,island_slice
-
-# =============================================================================
-#     Function to build the full island starting from the base obtained in detect_islands()
-# =============================================================================
-    def build_island(self,visited,island_sites,idx,chemical_specie):
-          
-        site = self.grid_crystal[idx]
-            
-        for element in site.migration_paths['Up'] + site.migration_paths['Plane']:
-    
-            if element[0] not in visited and self.grid_crystal[element[0]].chemical_specie == chemical_specie:
-                visited.add(element[0])
-                island_sites.add(element[0])
-                visited,island_sites = self.build_island(visited,island_sites,element[0],chemical_specie)
-                
-        return visited,island_sites
     
     def obtain_surface_coord(self):
         
         grid_crystal = self.grid_crystal
-        
+        z_step = self.basis_vectors[0][2]
+
         x = []
         y = []
         z = []
@@ -856,6 +886,11 @@ class Crystal_Lattice():
                 if grid_crystal[jump[0]].chemical_specie == 'Empty': top_layer_empty_sites +=1
                      
             if (site.chemical_specie != 'Empty') and top_layer_empty_sites >= 2:
+                x.append(site.position[0])
+                y.append(site.position[1])
+                z.append(site.position[2]+z_step)
+                
+            elif (site.chemical_specie == 'Empty') and ('Substrate' in site.supp_by) and top_layer_empty_sites >= 2:
                 x.append(site.position[0])
                 y.append(site.position[1])
                 z.append(site.position[2])
