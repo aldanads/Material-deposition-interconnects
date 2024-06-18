@@ -17,12 +17,12 @@ class SimulationResults:
         self.excel_filename = excel_filename
         # Initialize a CSV file with headers
         with open(excel_filename, 'w') as f:
-            f.write('Substrate,Partial_pressure,Temperature,Thickness,Ra_roughness,z_mean,RMS_roughness,n_islands,mean_size_islands,std_size_islands,max_size_island,mean_island_terraces,std_island_terraces,max_island_terrace,general_terrace\n')
+            f.write('Substrate,Partial_pressure,Temperature,Thickness,Ra_roughness,z_mean,RMS_roughness,n_islands,mean_size_islands,std_size_islands,max_size_island,mean_island_terraces,std_island_terraces,max_island_terrace,general_terrace,std_terrace,max_terrace\n')
     
-    def measurements_crystal(self, Substrate, folder_P,temperature,thickness,Ra_roughness,z_mean,roughness,n_islands,mean_size_islands,std_size_islands,max_size_island,mean_island_terraces,std_island_terraces,max_island_terrace,general_terrace):
+    def measurements_crystal(self, Substrate, folder_P,temperature,thickness,Ra_roughness,z_mean,roughness,n_islands,mean_size_islands,std_size_islands,max_size_island,mean_island_terraces,std_island_terraces,max_island_terrace,general_terrace,std_terrace,max_terrace):
             # Append measurements to the CSV file
             with open(self.excel_filename, 'a') as f:
-                f.write(f'{Substrate},{folder_P},{temperature},{thickness},{Ra_roughness},{z_mean},{roughness},{n_islands},{mean_size_islands},{std_size_islands},{max_size_island},{mean_island_terraces},{std_island_terraces},{max_island_terrace},{general_terrace}\n')
+                f.write(f'{Substrate},{folder_P},{temperature},{thickness},{Ra_roughness},{z_mean},{roughness},{n_islands},{mean_size_islands},{std_size_islands},{max_size_island},{mean_island_terraces},{std_island_terraces},{max_island_terrace},{general_terrace},{std_terrace},{max_terrace}\n')
 
 
 
@@ -97,7 +97,7 @@ for subs in folder_subs:
                 # Results: thickness, roughness, islands, terraces
                 Results.measurements_crystal(subs,folder_P[2:],temperature[folder],Co_latt.thickness,Co_latt.Ra_roughness,Co_latt.z_mean,Co_latt.surf_roughness_RMS,
                                              len(Co_latt.islands_list),np.mean(island_size),np.std(island_size),max(island_size)
-                                             ,np.mean(islands_terraces),np.std(islands_terraces),max(islands_terraces),np.mean(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) != 0]))
+                                             ,np.mean(islands_terraces),np.std(islands_terraces),max(islands_terraces),np.mean(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),np.std(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),max(Co_latt.terraces))
                 
                 # Size of islands in a list
                 df_histogram = pd.DataFrame({subs + '_' + folder_P + '_' + str(temperature[folder]) + '_island_size': island_size})   

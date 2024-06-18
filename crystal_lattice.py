@@ -654,7 +654,9 @@ class Crystal_Lattice():
 
         area_per_site = self.crystal_size[0] * self.crystal_size[1] / sites_per_layer
         
-        terraces = [(layers[i-1] - layers[i]) * area_per_site for i in range(1,len(layers))]
+        terraces = [area_per_site - layers[0]]
+        terraces.extend((layers[i-1] - layers[i]) * area_per_site for i in range(1,len(layers)))
+        #terraces = [(layers[i-1] - layers[i]) * area_per_site for i in range(1,len(layers))]
         terraces.append(layers[-1] * area_per_site) # (nm2)
         
         self.terraces = terraces

@@ -25,7 +25,7 @@ def initialization(n_sim,save_data):
         if platform.system() == 'Windows': # When running in laptop
             dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Refactored energy\Range weak substrate_4\0.15 eV\\'
         elif platform.system() == 'Linux': # HPC works on Linux
-            dst = r'/sfiwork/samuel.delgado/Copper_deposition/Varying_substrate/step_ascent/TaN/P=0.1/'
+            dst = r'/sfiwork/samuel.delgado/Copper_deposition/Varying_substrate/batch_simulation/TaN/P=0.1/T300/'
             
         paths,Results = save_simulation(files_copy,dst,n_sim) # Create folders and python files
         
@@ -39,13 +39,13 @@ def initialization(n_sim,save_data):
 #         
 # =============================================================================
     sticking_coeff = 1
-    partial_pressure = 1 # (Pa = N m^-2 = kg m^-1 s^-2)
+    partial_pressure = 0.1 # (Pa = N m^-2 = kg m^-1 s^-2)
     # p = 0.1 - 10 typical values 
     mass_specie = 63.546 # (mass of Copper in u) 
     chemical_specie = 'Cu'
     # T = 573 + n_sim * 100 # (K)
     temp = [300,500,800]
-    T = temp[n_sim] # (K)
+    T = temp[0] # (K)
     
     experimental_conditions = [sticking_coeff,partial_pressure,mass_specie,T,chemical_specie]
     
@@ -261,9 +261,9 @@ class SimulationResults:
         self.excel_filename = excel_filename
         # Initialize a CSV file with headers
         with open(excel_filename, 'w') as f:
-            f.write('Time,Mass,Sites Occupation,Average Thickness,Terrace Area,RMS Roughness,Performance time\n')
+            f.write('Time,Mass,Sites Occupation,Average Thickness,Terrace Area,std_terrace,max_terrace,RMS Roughness,Performance time\n')
     
-    def measurements_crystal(self, time, mass_gained, sites_occupation, thickness, avg_terrace, surf_roughness_RMS,performance_time):
+    def measurements_crystal(self, time, mass_gained, sites_occupation, thickness, avg_terrace,std_terrace,max_terrace, surf_roughness_RMS,performance_time):
             # Append measurements to the CSV file
             with open(self.excel_filename, 'a') as f:
-                f.write(f'{time},{mass_gained},{sites_occupation},{thickness},{avg_terrace},{surf_roughness_RMS},{performance_time}\n')
+                f.write(f'{time},{mass_gained},{sites_occupation},{thickness},{avg_terrace},{std_terrace},{max_terrace},{surf_roughness_RMS},{performance_time}\n')

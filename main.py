@@ -11,7 +11,7 @@ import time
 
 save_data = True
 
-for n_sim in range(0,3):
+for n_sim in range(0,10):
     
 
     Co_latt,rng,paths,Results = initialization(n_sim,save_data)
@@ -69,7 +69,8 @@ for n_sim in range(0,3):
             end_time = time.time()
             if save_data:
                 Results.measurements_crystal(Co_latt.list_time[-1],Co_latt.mass_gained,Co_latt.fraction_sites_occupied,
-                                              Co_latt.thickness,np.mean(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) != 0]),Co_latt.surf_roughness_RMS,end_time-starting_time)
+                                              Co_latt.thickness,np.mean(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),np.std(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),max(Co_latt.terraces),
+                                              Co_latt.surf_roughness_RMS,end_time-starting_time)
 
             Co_latt.plot_crystal(45,45,paths['data'],j) 
 
