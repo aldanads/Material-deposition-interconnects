@@ -90,6 +90,7 @@ for subs in folder_subs:
                 island_mean_size = np.mean(island_size)
                 island_std_size = np.std(island_size)
                 islands_terraces = []
+                Co_latt.terrace_area()
                 for island in Co_latt.islands_list:
                     island.layers_calculation(Co_latt)
                     islands_terraces.append(np.mean(np.array(island.terraces)[np.array(island.terraces) != 0]))
@@ -100,7 +101,7 @@ for subs in folder_subs:
                                              ,np.mean(islands_terraces),np.std(islands_terraces),max(islands_terraces),np.mean(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),np.std(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),max(Co_latt.terraces))
                 
                 # Size of islands in a list
-                df_histogram = pd.DataFrame({subs + '_' + folder_P + '_' + str(temperature[folder]) + '_island_size': island_size})   
+                df_histogram = pd.DataFrame({subs + '_' + folder_P + '_' + str(temperature[folder]) + '_terrace_area': Co_latt.terraces})   
                 dfs_histogram.append(df_histogram)
                 
                 # Ocuppation rate per layer

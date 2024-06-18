@@ -11,7 +11,7 @@ import time
 
 save_data = True
 
-for n_sim in range(0,10):
+for n_sim in range(0,3):
     
 
     Co_latt,rng,paths,Results = initialization(n_sim,save_data)

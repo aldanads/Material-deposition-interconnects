@@ -45,7 +45,7 @@ def initialization(n_sim,save_data):
     chemical_specie = 'Cu'
     # T = 573 + n_sim * 100 # (K)
     temp = [300,500,800]
-    T = temp[0] # (K)
+    T = temp[n_sim] # (K)
     
     experimental_conditions = [sticking_coeff,partial_pressure,mass_specie,T,chemical_specie]
     
