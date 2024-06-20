@@ -38,6 +38,7 @@ def KMC(Co_latt,rng):
     chosen_event = search_value(TR_tree,sumTR*rng.random())
     #Calculate the time step
     time += -np.log(rng.random())/sumTR
+ 
     # If the time step is big because of the TR, we need to allow the deposition process to occur
     # We establish a time step limits that the deposition is relevant
     if time > Co_latt.timestep_limits:

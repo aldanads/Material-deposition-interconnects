@@ -27,6 +27,7 @@ class Crystal_Lattice():
         self.chemical_specie = experimental_conditions[4]
         self.temperature = experimental_conditions[3]
         self.mass_specie = experimental_conditions[2]
+        self.experiment = experimental_conditions[5]
         self.activation_energies = Act_E_list
         self.time = 0
         self.list_time = []

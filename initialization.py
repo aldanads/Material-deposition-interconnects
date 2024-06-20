@@ -25,7 +25,7 @@ def initialization(n_sim,save_data):
         if platform.system() == 'Windows': # When running in laptop
             dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Refactored energy\Range weak substrate_4\0.15 eV\\'
         elif platform.system() == 'Linux': # HPC works on Linux
-            dst = r'/sfiwork/samuel.delgado/Copper_deposition/Varying_substrate/batch_simulation/TaN/P=0.1/T300/'
+            dst = r'/sfiwork/samuel.delgado/Copper_deposition/Varying_substrate/batch_simulation/annealing/TaN/T300/'
             
         paths,Results = save_simulation(files_copy,dst,n_sim) # Create folders and python files
         
@@ -33,34 +33,38 @@ def initialization(n_sim,save_data):
         paths = {'data': ''}
         Results = []
         
-        
+
+    experiments = ['deposition','annealing']
+    experiment = experiments[1]
+
+    if experiment == 'deposition':         
 # =============================================================================
 #         Experimental conditions
 #         
 # =============================================================================
-    sticking_coeff = 1
-    partial_pressure = 0.1 # (Pa = N m^-2 = kg m^-1 s^-2)
-    # p = 0.1 - 10 typical values 
-    mass_specie = 63.546 # (mass of Copper in u) 
-    chemical_specie = 'Cu'
-    # T = 573 + n_sim * 100 # (K)
-    temp = [300,500,800]
-    T = temp[n_sim] # (K)
-    
-    experimental_conditions = [sticking_coeff,partial_pressure,mass_specie,T,chemical_specie]
+        sticking_coeff = 1
+        partial_pressure = 0.1 # (Pa = N m^-2 = kg m^-1 s^-2)
+        # p = 0.1 - 10 typical values 
+        mass_specie = 63.546 # (mass of Copper in u) 
+        chemical_specie = 'Cu'
+        # T = 573 + n_sim * 100 # (K)
+        temp = [300,500,800]
+        T = temp[n_sim] # (K)
+        
+        experimental_conditions = [sticking_coeff,partial_pressure,mass_specie,T,chemical_specie,experiment]
     
 # =============================================================================
 #         Crystal structure
 #         
 # =============================================================================
-    a = 0.358 # (nm)
-    b = 0.358 # (nm)
-    c = 0.358 # (nm)
-    lattice_constants = (a,b,c)
-    crystal_size = (10, 10,2) # (nm)
-    bravais_latt = ['fcc']
-    orientation = ['001','111']
-    lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
+        a = 0.358 # (nm)
+        b = 0.358 # (nm)
+        c = 0.358 # (nm)
+        lattice_constants = (a,b,c)
+        crystal_size = (10, 10,2) # (nm)
+        bravais_latt = ['fcc']
+        orientation = ['001','111']
+        lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
     
 # =============================================================================
 #       Different surface Structures- fcc Metals
@@ -95,27 +99,27 @@ def initialization(n_sim,save_data):
 #       "Transition-pathway models of atomic diffusion on fcc metal surfaces. II. Stepped surfaces." 
 #       Physical Review B 76, no. 24 (2007): 245408.
 # =============================================================================
-    select_dataset = 0   
-    Act_E_dataset = ['TaN','Ru25','Ru50','test','homoepitaxial']  
-
-    #E_mig_plane_Cu = 0.05*(n_sim+1) # (eV)
-    E_dataset = {'TaN':[0.85,0.13,0.13,0.13,0.095,0.19,0.318,0.043,0.477,0.245,0.309],
-              'Ru25':[0.6,0.13,0.13,0.20,0.095,0.23,0.318,0.043,0.477,0.245,0.309],
-              'Ru50':[0.4,0.13,0.13,0.28,0.095,0.38,0.318,0.043,0.477,0.245,0.309],
-               'test':[0.85,0.13,0.13,0.13,0.095,0.2,0.318,0.043,0.477,0.245,0.309],
-               'homoepitaxial':[0.85,0.13,0.13,0.313,0.095,0.528,0.318,0.043,0.477,0.245,0.309]}
+        select_dataset = 0   
+        Act_E_dataset = ['TaN','Ru25','Ru50','test','homoepitaxial']  
     
-    E_mig_sub = E_dataset[Act_E_dataset[select_dataset]][0] # (eV)
-    E_mig_upward_subs_layer111 = E_dataset[Act_E_dataset[select_dataset]][1]
-    E_mig_downward_layer111_subs = E_dataset[Act_E_dataset[select_dataset]][2]
-    E_mig_upward_layer1_layer2_111 = E_dataset[Act_E_dataset[select_dataset]][3]
-    E_mig_downward_layer2_layer1_111 = E_dataset[Act_E_dataset[select_dataset]][4]
-    E_mig_upward_subs_layer100 = E_dataset[Act_E_dataset[select_dataset]][5]
-    E_mig_downward_layer100_subs = E_dataset[Act_E_dataset[select_dataset]][6]
-    E_mig_111_terrace_Cu = E_dataset[Act_E_dataset[select_dataset]][7]
-    E_mig_100_terrace_Cu = E_dataset[Act_E_dataset[select_dataset]][8]
-    E_mig_edge_100 = E_dataset[Act_E_dataset[select_dataset]][9]
-    E_mig_edge_111 = E_dataset[Act_E_dataset[select_dataset]][10]
+        #E_mig_plane_Cu = 0.05*(n_sim+1) # (eV)
+        E_dataset = {'TaN':[0.85,0.13,0.13,0.13,0.095,0.19,0.318,0.043,0.477,0.245,0.309],
+                  'Ru25':[0.6,0.13,0.13,0.20,0.095,0.23,0.318,0.043,0.477,0.245,0.309],
+                  'Ru50':[0.4,0.13,0.13,0.28,0.095,0.38,0.318,0.043,0.477,0.245,0.309],
+                   'test':[0.85,0.13,0.13,0.13,0.095,0.2,0.318,0.043,0.477,0.245,0.309],
+                   'homoepitaxial':[0.85,0.13,0.13,0.313,0.095,0.528,0.318,0.043,0.477,0.245,0.309]}
+        
+        E_mig_sub = E_dataset[Act_E_dataset[select_dataset]][0] # (eV)
+        E_mig_upward_subs_layer111 = E_dataset[Act_E_dataset[select_dataset]][1]
+        E_mig_downward_layer111_subs = E_dataset[Act_E_dataset[select_dataset]][2]
+        E_mig_upward_layer1_layer2_111 = E_dataset[Act_E_dataset[select_dataset]][3]
+        E_mig_downward_layer2_layer1_111 = E_dataset[Act_E_dataset[select_dataset]][4]
+        E_mig_upward_subs_layer100 = E_dataset[Act_E_dataset[select_dataset]][5]
+        E_mig_downward_layer100_subs = E_dataset[Act_E_dataset[select_dataset]][6]
+        E_mig_111_terrace_Cu = E_dataset[Act_E_dataset[select_dataset]][7]
+        E_mig_100_terrace_Cu = E_dataset[Act_E_dataset[select_dataset]][8]
+        E_mig_edge_100 = E_dataset[Act_E_dataset[select_dataset]][9]
+        E_mig_edge_111 = E_dataset[Act_E_dataset[select_dataset]][10]
 
              
 # =============================================================================
@@ -130,8 +134,8 @@ def initialization(n_sim,save_data):
 # =============================================================================    
     # clustering_energy = -0.252
     #clustering_energy = -0.21
-    clustering_energy = -0.15
-    E_clustering = [0,0,clustering_energy * 2,clustering_energy * 3,clustering_energy * 4,clustering_energy * 5,clustering_energy * 6,clustering_energy * 7,clustering_energy * 8,clustering_energy * 9,clustering_energy * 10,clustering_energy * 11,clustering_energy * 12,clustering_energy * 13] 
+        clustering_energy = -0.15
+        E_clustering = [0,0,clustering_energy * 2,clustering_energy * 3,clustering_energy * 4,clustering_energy * 5,clustering_energy * 6,clustering_energy * 7,clustering_energy * 8,clustering_energy * 9,clustering_energy * 10,clustering_energy * 11,clustering_energy * 12,clustering_energy * 13] 
 
     
 
@@ -146,24 +150,24 @@ def initialization(n_sim,save_data):
 
     # Binding energy | Desorption energy: https://doi.org/10.1039/D1SC04708F
     # Surface: [0]-TaN, [1]-Ru25, [2]-Ru50, [3]-Ru100, [4]-1 ML Ru passivation
-    binding_energy = {'TaN':0, 'Ru25':-0.05, 'Ru50':-0.15, 'test':-0.00}
-    Act_E_list = [E_mig_sub,
-                  E_mig_upward_subs_layer111,E_mig_downward_layer111_subs,
-                  E_mig_upward_layer1_layer2_111,E_mig_downward_layer2_layer1_111,
-                  E_mig_upward_subs_layer100,E_mig_downward_layer100_subs,
-                  E_mig_111_terrace_Cu,E_mig_100_terrace_Cu,
-                  E_mig_edge_100,E_mig_edge_111,
-                  binding_energy[Act_E_dataset[select_dataset]],E_clustering]
+        binding_energy = {'TaN':0, 'Ru25':-0.05, 'Ru50':-0.15, 'test':-0.00}
+        Act_E_list = [E_mig_sub,
+                      E_mig_upward_subs_layer111,E_mig_downward_layer111_subs,
+                      E_mig_upward_layer1_layer2_111,E_mig_downward_layer2_layer1_111,
+                      E_mig_upward_subs_layer100,E_mig_downward_layer100_subs,
+                      E_mig_111_terrace_Cu,E_mig_100_terrace_Cu,
+                      E_mig_edge_100,E_mig_edge_111,
+                      binding_energy[Act_E_dataset[select_dataset]],E_clustering]
 
 # =============================================================================
 #     Initialize the crystal grid structure - nodes with empty spaces
 # =============================================================================
-    Co_latt = Crystal_Lattice(lattice_properties,experimental_conditions,Act_E_list)
- 
-    # Maximum probability per site for deposition to establish a timestep limits
-    # The maximum timestep is that one that occupy X% of the site during the deposition process
-    P_limits = 0.05
-    Co_latt.limit_kmc_timestep(P_limits)
+        Co_latt = Crystal_Lattice(lattice_properties,experimental_conditions,Act_E_list)
+     
+        # Maximum probability per site for deposition to establish a timestep limits
+        # The maximum timestep is that one that occupy X% of the site during the deposition process
+        P_limits = 0.05
+        Co_latt.limit_kmc_timestep(P_limits)
     
 # =============================================================================
 #     - test[0] - Normal deposition
@@ -176,19 +180,40 @@ def initialization(n_sim,save_data):
 #     - test[7] - 2 hexagonal seeds - 2 layers and one particle attach to the lateral
 #     - test[8] - cluster
 # =============================================================================
-    test_selected = 0
-    test = [0,1,2,3,4,5,6,7,8]
+        test_selected = 0
+        test = [0,1,2,3,4,5,6,7,8]
 
-    # Deposition process of chemical species
-    if Co_latt.timestep_limits < float('inf'):
-        Co_latt.deposition_specie(Co_latt.timestep_limits,rng,test[test_selected])
-        Co_latt.track_time(Co_latt.timestep_limits) 
-        Co_latt.add_time()
-    else:
-        Co_latt.deposition_specie(0,rng,test[test_selected])
-        Co_latt.track_time(0) 
-        Co_latt.add_time()
+        # Deposition process of chemical species
+        if Co_latt.timestep_limits < float('inf'):
+            Co_latt.deposition_specie(Co_latt.timestep_limits,rng,test[test_selected])
+            Co_latt.track_time(Co_latt.timestep_limits) 
+            Co_latt.add_time()
+        else:
+            Co_latt.deposition_specie(0,rng,test[test_selected])
+            Co_latt.track_time(0) 
+            Co_latt.add_time()
+            
+    elif experiment == 'annealing':
         
+        import pickle
+        filename = 'variables.pkl'
+        
+        # Open the file in binary mode
+        with open(filename, 'rb') as file:
+          
+            # Call load method to deserialze
+            myvar = pickle.load(file)
+            
+        Co_latt = myvar['Co_latt']
+        
+        temp = [300,500,800] #(K)
+        
+        Co_latt.temperature = temp[n_sim]
+        Co_latt.experiment = experiment
+        P_limits = 1
+        Co_latt.limit_kmc_timestep(P_limits)
+        Co_latt.time = 0
+        Co_latt.list_time = []
 
     return Co_latt,rng,paths,Results
     
