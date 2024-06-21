@@ -196,7 +196,8 @@ def initialization(n_sim,save_data):
     elif experiment == 'annealing':
         
         import pickle
-        filename = 'variables.pkl'
+        path = r'/sfihome/samuel.delgado/Copper_deposition/Varying_substrate/annealing/TaN/T500/'
+        filename = path + 'variables.pkl'
         
         # Open the file in binary mode
         with open(filename, 'rb') as file:

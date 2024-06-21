@@ -21,6 +21,7 @@ for n_sim in range(0,3):
     j = 0
     
     snapshoots_steps = int(5e3)
+    starting_time = time.time()
 
 # =============================================================================
 #     Deposition
@@ -32,9 +33,7 @@ for n_sim in range(0,3):
         thickness_limit = 1 # (1 nm)
         Co_latt.measurements_crystal()
         i = 0
-    
-        starting_time = time.time()
-    
+        
         while Co_latt.thickness < thickness_limit:
             i+=1
             
