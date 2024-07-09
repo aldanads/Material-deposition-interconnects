@@ -669,6 +669,22 @@ class Crystal_Lattice():
         self.Ra_roughness = sum(abs(z-z_mean))/len(z)
         self.z_mean = z_mean
         self.surf_roughness_RMS = np.sqrt(np.mean((z-z_mean)**2))
+        
+    def neighbors_calculation(self):
+        
+        grid_crystal = self.grid_crystal
+        sites_occupied = self.sites_occupied
+        
+        # Size of histogram: number of neighbors that a particle can have, plus particle without neighbors
+        histogram_neighbors = [0] * (len(self.latt.get_neighbors(0,0,0)) + 1)
+        
+        for site in sites_occupied:
+            if 'Substrate' in grid_crystal[site].supp_by: 
+                histogram_neighbors[len(grid_crystal[site].supp_by)-1] += 1
+            else:
+                histogram_neighbors[len(grid_crystal[site].supp_by)] += 1
+                
+        self.histogram_neighbors = histogram_neighbors
     
     def islands_analysis(self):
 
