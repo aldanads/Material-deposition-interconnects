@@ -17,18 +17,18 @@ class SimulationResults:
         self.excel_filename = excel_filename
         # Initialize a CSV file with headers
         with open(excel_filename, 'w') as f:
-            f.write('Substrate,Partial_pressure,Temperature,Thickness,Ra_roughness,z_mean,RMS_roughness,n_islands,mean_size_islands,std_size_islands,max_size_island,mean_island_terraces,std_island_terraces,max_island_terrace,general_terrace,std_terrace,max_terrace\n')
+            f.write('Substrate,Partial_pressure,Temperature,Thickness,Ra_roughness,z_mean,RMS_roughness,n_peaks,mean_size_peak,std_size_peak,max_size_peak,mean_island_terraces,std_island_terraces,max_island_terrace,general_terrace,std_terrace,max_terrace\n')
     
-    def measurements_crystal(self, Substrate, folder_P,temperature,thickness,Ra_roughness,z_mean,roughness,n_islands,mean_size_islands,std_size_islands,max_size_island,mean_island_terraces,std_island_terraces,max_island_terrace,general_terrace,std_terrace,max_terrace):
+    def measurements_crystal(self, Substrate, folder_P,temperature,thickness,Ra_roughness,z_mean,roughness,n_peaks,mean_size_peak,std_size_peak,max_size_peak,mean_island_terraces,std_island_terraces,max_island_terrace,general_terrace,std_terrace,max_terrace):
             # Append measurements to the CSV file
             with open(self.excel_filename, 'a') as f:
-                f.write(f'{Substrate},{folder_P},{temperature},{thickness},{Ra_roughness},{z_mean},{roughness},{n_islands},{mean_size_islands},{std_size_islands},{max_size_island},{mean_island_terraces},{std_island_terraces},{max_island_terrace},{general_terrace},{std_terrace},{max_terrace}\n')
+                f.write(f'{Substrate},{folder_P},{temperature},{thickness},{Ra_roughness},{z_mean},{roughness},{n_peaks},{mean_size_peak},{std_size_peak},{max_size_peak},{mean_island_terraces},{std_island_terraces},{max_island_terrace},{general_terrace},{std_terrace},{max_terrace}\n')
 
 
 
 
 # Path to the variables files, for every folder and Sim_i
-path = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Batch simulations\step_ascent\\'
+path = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Batch simulations\Thickness limit\Time_evolution\\'
 #folder_P = '\P=0.1'
 folder_subs = os.listdir(path)
 path_2 = r'\Program\\'
@@ -44,8 +44,11 @@ temperature = {'Sim_0':300, 'Sim_1':500, 'Sim_2':800}
 name_generated_file = 'Figure.csv'
 Results = SimulationResults(name_generated_file)
 
-name_histogram_size_file = 'Histogram.csv'
-dfs_histogram = []
+name_histogram_size_file_terraces = 'Histogram_terraces.csv'
+dfs_histogram_terraces = []
+
+name_histogram_size_file_neighbors = 'Histogram_neighbors.csv'
+dfs_histogram_neighbors = []
 
 occ_rate_filename = 'Occupation_rate.csv'
 dfs_occ_rate = []
@@ -80,15 +83,18 @@ for subs in folder_subs:
                     myvar = pickle.load(file)
                     
                 Co_latt = myvar['Co_latt']
+                Co_latt.peak_detection()
                 Co_latt.islands_analysis()
+                Co_latt.neighbors_calculation()
                 Co_latt.RMS_roughness()
 
-                island_size = []
-                for island in Co_latt.islands_list:
-                    island_size.append(len(island.island_sites))
-                    
-                island_mean_size = np.mean(island_size)
-                island_std_size = np.std(island_size)
+                peak_size = []
+                for peak in Co_latt.peak_list:
+                    if len(peak.island_sites) > 10:
+                        peak_size.append(len(peak.island_sites))
+                                        
+                peak_mean_size = np.mean(peak_size)
+                peak_std_size = np.std(peak_size)
                 islands_terraces = []
                 Co_latt.terrace_area()
                 for island in Co_latt.islands_list:
@@ -97,20 +103,27 @@ for subs in folder_subs:
                 
                 # Results: thickness, roughness, islands, terraces
                 Results.measurements_crystal(subs,folder_P[2:],temperature[folder],Co_latt.thickness,Co_latt.Ra_roughness,Co_latt.z_mean,Co_latt.surf_roughness_RMS,
-                                             len(Co_latt.islands_list),np.mean(island_size),np.std(island_size),max(island_size)
+                                             len(peak_size),np.mean(peak_size),np.std(peak_size),max(peak_size)
                                              ,np.mean(islands_terraces),np.std(islands_terraces),max(islands_terraces),np.mean(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),np.std(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),max(Co_latt.terraces))
                 
-                # Size of islands in a list
-                df_histogram = pd.DataFrame({subs + '_' + folder_P + '_' + str(temperature[folder]) + '_terrace_area': Co_latt.terraces})   
-                dfs_histogram.append(df_histogram)
+                # Size of terrace per layer
+                df_histogram_terraces = pd.DataFrame({subs + '_' + folder_P + '_' + str(temperature[folder]) + '_terrace_area': Co_latt.terraces})   
+                dfs_histogram_terraces.append(df_histogram_terraces)
+                
+                # Histogram of neighbors
+                df_histogram_neighbors = pd.DataFrame({subs + '_' + folder_P + '_' + str(temperature[folder]) + '_neighbors': Co_latt.histogram_neighbors})   
+                dfs_histogram_neighbors.append(df_histogram_neighbors)
                 
                 # Ocuppation rate per layer
                 df_occ_rate = pd.DataFrame({subs + '_' + folder_P + '_' + str(temperature[folder]) + '_occupation_rate': Co_latt.layers[1]})   
                 dfs_occ_rate.append(df_occ_rate)
                 
 
-df_combined = pd.concat(dfs_histogram, axis=1)    
-df_combined.to_csv(name_histogram_size_file, index=False)
+df_combined = pd.concat(dfs_histogram_terraces, axis=1)    
+df_combined.to_csv(name_histogram_size_file_terraces, index=False)
+
+df_combined = pd.concat( dfs_histogram_neighbors, axis=1)    
+df_combined.to_csv(name_histogram_size_file_neighbors, index=False)
 
 df_combined = pd.concat(dfs_occ_rate, axis=1)    
 df_combined.to_csv(occ_rate_filename, index=False)

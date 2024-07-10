@@ -2,3 +2,7 @@ __pycache__/
 rotating_vectors.py
 video_via_images.py
 images_to_video.py
+Figure.csv
+Histogram_neighbors.csv
+Histogram_terraces.csv
+Occupation_rate.csv

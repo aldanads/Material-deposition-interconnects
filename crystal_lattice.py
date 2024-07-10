@@ -770,12 +770,49 @@ class Crystal_Lattice():
         return visited,island_sites
     
     
-
-
-
-
-
+    def peak_detection(self):
         
+        chemical_specie = self.chemical_specie
+        thickness = self.thickness
+        sites_occupied = self.sites_occupied
+    
+        # Convert occupied sites to Cartesian coordinates and sort by z-coordinate in descending order
+        sites_occupied_cart = sorted(
+            ((self.idx_to_cart(site), site) for site in sites_occupied), 
+            key=lambda coord: coord[0][2], 
+            reverse=True
+        )
+    
+        total_visited = set()
+        peak_list = []
+        
+        for cart_coords, site in sites_occupied_cart:
+            if site not in total_visited and cart_coords[2] > thickness:
+                peak_sites = self.build_peak({site},site,chemical_specie,thickness)
+                peak_list.append(Island(site,cart_coords,peak_sites))
+                total_visited.update(peak_sites)
+                
+        self.peak_list = peak_list
+    
+    def build_peak(self,peak_sites,start_idx,chemical_specie,thickness):
+         
+        grid_crystal = self.grid_crystal
+        stack = [start_idx]
+    
+        while stack:
+            idx = stack.pop()
+            site = grid_crystal[idx]
+            
+            for element in site.migration_paths['Up'] + site.migration_paths['Plane'] + site.migration_paths['Down']:
+    
+                if element[0] not in peak_sites and grid_crystal[element[0]].chemical_specie == chemical_specie:
+                    peak_sites.add(element[0])
+                    
+                    if self.idx_to_cart(element[0])[2] > thickness:
+                        stack.append(element[0])
+    
+        return peak_sites    
+ 
 # =============================================================================
 #     Auxiliary functions
 #     
