@@ -10,6 +10,7 @@ import platform
 import shutil
 import os 
 from crystal_lattice import Crystal_Lattice
+from superbasin import Superbasin
 
 def initialization(n_sim,save_data):
     
@@ -23,7 +24,7 @@ def initialization(n_sim,save_data):
         files_copy = ['initialization.py', 'crystal_lattice.py','Site.py','main.py','KMC.py','balanced_tree.py','analysis.py']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Refactored energy\Range weak substrate_4\0.15 eV\\'
+            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Test\\'
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = r'/sfiwork/samuel.delgado/Copper_deposition/Varying_substrate/batch_simulation/annealing/TaN/T300/'
             
@@ -33,9 +34,10 @@ def initialization(n_sim,save_data):
         paths = {'data': ''}
         Results = []
         
+    ovito_file = False
 
     experiments = ['deposition','annealing']
-    experiment = experiments[1]
+    experiment = experiments[0]
 
     if experiment == 'deposition':         
 # =============================================================================
@@ -61,11 +63,19 @@ def initialization(n_sim,save_data):
         b = 0.358 # (nm)
         c = 0.358 # (nm)
         lattice_constants = (a,b,c)
-        crystal_size = (10, 10,2) # (nm)
+        crystal_size = (2, 2,1) # (nm)
         bravais_latt = ['fcc']
         orientation = ['001','111']
         lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
-    
+        
+# =============================================================================
+#             Superbasin parameters
+#     
+# =============================================================================
+        n_search_superbasin = 3 # If the time step is very small during 10 steps, search for superbasin
+        time_step_limits = 1e-8 # Time needed for efficient evolution of the system
+        E_min = 0.5
+        superbasin_parameters = [n_search_superbasin, time_step_limits,E_min]
 # =============================================================================
 #       Different surface Structures- fcc Metals
 #       https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Surface_Science_(Nix)/01%3A_Structure_of_Solid_Surfaces/1.03%3A_Surface_Structures-_fcc_Metals
@@ -162,11 +172,11 @@ def initialization(n_sim,save_data):
 # =============================================================================
 #     Initialize the crystal grid structure - nodes with empty spaces
 # =============================================================================
-        Co_latt = Crystal_Lattice(lattice_properties,experimental_conditions,Act_E_list)
+        Co_latt = Crystal_Lattice(lattice_properties,experimental_conditions,Act_E_list,ovito_file,superbasin_parameters)
      
         # Maximum probability per site for deposition to establish a timestep limits
         # The maximum timestep is that one that occupy X% of the site during the deposition process
-        P_limits = 0.05
+        P_limits = 0.02
         Co_latt.limit_kmc_timestep(P_limits)
     
 # =============================================================================
@@ -217,6 +227,17 @@ def initialization(n_sim,save_data):
         Co_latt.list_time = []
 
     return Co_latt,rng,paths,Results
+
+def search_superbasin(Co_latt):
+                    
+    sites_occupied = Co_latt.sites_occupied
+    grid_crystal = Co_latt.grid_crystal
+
+    for idx in sites_occupied:
+        for event in grid_crystal[idx].site_events:
+            
+            if (idx not in Co_latt.superbasin_dict) and (event[3] <= Co_latt.E_min):
+                Co_latt.superbasin_dict.update({idx: Superbasin(idx, Co_latt, Co_latt.E_min)})
     
 def save_simulation(files_copy,dst,n_sim):
     
@@ -281,6 +302,7 @@ def save_variables(paths,variables):
               
             # A new file will be created
             pickle.dump(variables,file)
+        
             
 class SimulationResults:
     def __init__(self, excel_filename):

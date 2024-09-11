@@ -11,6 +11,11 @@ from scipy import constants
 import numpy as np
 from matplotlib import cm
 
+from ovito.data import *
+from ovito.pipeline import *
+from ovito.vis import *
+from ovito.io import export_file
+
 
 # Rotation of a vector - Is copper growing in [111] direction?
 # The basis vector is in [001]
@@ -19,7 +24,7 @@ from matplotlib import cm
 
 class Crystal_Lattice():
     
-    def __init__(self,lattice_properties,experimental_conditions,Act_E_list):
+    def __init__(self,lattice_properties,experimental_conditions,Act_E_list,ovito_file,superbasin_parameters):
         self.lattice_constants = lattice_properties[0]
         self.crystal_size = lattice_properties[1]
         self.bravais_latt = lattice_properties[2]
@@ -29,6 +34,12 @@ class Crystal_Lattice():
         self.mass_specie = experimental_conditions[2]
         self.experiment = experimental_conditions[5]
         self.activation_energies = Act_E_list
+        
+        self.n_search_superbasin = superbasin_parameters[0]
+        self.time_step_limits = superbasin_parameters[1]
+        self.E_min = superbasin_parameters[2]
+        self.superbasin_dict = {}
+        
         self.time = 0
         self.list_time = []
         
@@ -46,6 +57,19 @@ class Crystal_Lattice():
         
         #Transition rate for adsortion of chemical species
         self.transition_rate_adsorption(experimental_conditions[0:4])
+        
+        # ovito_file = True - Create LAAMPS files
+        # ovito_file = False - Create PNGs
+        self.ovito_file = ovito_file
+        if ovito_file == True:
+            # Create the simulation box:
+            cell = SimulationCell(pbc = (False, False, False))
+            cell[...] = [[self.crystal_size[0],0,0,0],
+                          [0,self.crystal_size[1],0,0],
+                          [0,0,self.crystal_size[2],0]]
+            cell.vis.line_width = 0.1
+            
+            self.cell = cell
         
         
     # Model with all the possible lattice points
@@ -388,7 +412,7 @@ class Crystal_Lattice():
                 update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
                 self.update_sites(update_specie_events,update_supp_av)
                 
-            idx_neighbor_top = self.grid_crystal[neighbor[0]].migration_paths['Up'][0][0]
+            idx_neighbor_top = self.grid_crystal[neighbor[0]].migration_paths['Up'][1][0]
             update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_top,update_specie_events,update_supp_av)
             self.update_sites(update_specie_events,update_supp_av)
             
@@ -473,7 +497,23 @@ class Crystal_Lattice():
             update_specie_events,update_supp_av = self.remove_specie_site(chosen_event[-1],update_specie_events,update_supp_av)
             # Update sites availables, the support to each site and available migrations
             self.update_sites(update_specie_events,update_supp_av)
-  
+            
+            
+
+# =============================================================================
+# At every kMC step we have to check if we destroy any superbasin                      
+# =============================================================================
+    def update_superbasin(self,chosen_event):
+            
+        # We dismantle the superbasin if the chosen_event affect some of the states
+        # that belong to any of the superbasin
+        keys_to_delete = [idx for idx, sb in self.superbasin_dict.items()
+                          if chosen_event[1] in sb.superbasin_environment and
+                          chosen_event[-1] in sb.superbasin_environment]
+
+        for key in keys_to_delete:
+            del self.superbasin_dict[key]
+                    
     
     def update_sites(self,update_specie_events,update_supp_av):
 
@@ -492,6 +532,7 @@ class Crystal_Lattice():
             for idx in update_specie_events:
                 self.grid_crystal[idx].available_migrations(self.grid_crystal,idx)
                 self.grid_crystal[idx].transition_rates(self.temperature)
+                    
 
     def track_time(self,t):
         
@@ -527,48 +568,66 @@ class Crystal_Lattice():
         
     def plot_crystal(self,azim = 60,elev = 45,path = '',i = 0):
         
-        nr = 1
-        nc = 2
-        fig = plt.figure(constrained_layout=True,figsize=(15, 8),dpi=300)
-        subfigs = fig.subfigures(nr, nc, wspace=0.1, hspace=7, width_ratios=[1,1])
-        
-        axa = subfigs[0].add_subplot(111, projection='3d')
-        axb = subfigs[1].add_subplot(111, projection='3d')
-
-        positions = np.array([self.grid_crystal[idx].position for idx in self.sites_occupied])
-        if positions.size != 0:
-            x, y, z = positions[:, 0], positions[:, 1], positions[:, 2]
-            axa.scatter3D(x, y, z, c='blue', marker='o')
-            axb.scatter3D(x, y, z, c='blue', marker='o')
-        
-        axa.set_xlabel('x-axis (nm)')
-        axa.set_ylabel('y-axis (nm)')
-        axa.set_zlabel('z-axis (nm)')
-        axa.view_init(azim=azim, elev = elev)
-
-        axa.set_xlim([0, self.crystal_size[0]]) 
-        axa.set_ylim([0, self.crystal_size[1]])
-        axa.set_zlim([0, 2*self.crystal_size[2]])
-        axa.set_aspect('equal', 'box')
-        
-        
-        axb.set_xlabel('x-axis (nm)')
-        axb.set_ylabel('y-axis (nm)')
-        axb.set_zlabel('z-axis (nm)')
-        axb.view_init(azim=45, elev = 10)
-
-        axb.set_xlim([0, self.crystal_size[0]]) 
-        axb.set_ylim([0, self.crystal_size[1]])
-        axb.set_zlim([0, 2*self.crystal_size[2]])
-        axb.set_aspect('equal', 'box')
-
-
-        if path == '':
+        if self.ovito_file == False:
+            nr = 1
+            nc = 2
+            fig = plt.figure(constrained_layout=True,figsize=(15, 8),dpi=300)
+            subfigs = fig.subfigures(nr, nc, wspace=0.1, hspace=7, width_ratios=[1,1])
+            
+            axa = subfigs[0].add_subplot(111, projection='3d')
+            axb = subfigs[1].add_subplot(111, projection='3d')
+    
+            positions = np.array([self.grid_crystal[idx].position for idx in self.sites_occupied])
+            if positions.size != 0:
+                x, y, z = positions[:, 0], positions[:, 1], positions[:, 2]
+                axa.scatter3D(x, y, z, c='blue', marker='o')
+                axb.scatter3D(x, y, z, c='blue', marker='o')
+            
+            axa.set_xlabel('x-axis (nm)')
+            axa.set_ylabel('y-axis (nm)')
+            axa.set_zlabel('z-axis (nm)')
+            axa.view_init(azim=azim, elev = elev)
+    
+            axa.set_xlim([0, self.crystal_size[0]]) 
+            axa.set_ylim([0, self.crystal_size[1]])
+            axa.set_zlim([0, 2*self.crystal_size[2]])
+            axa.set_aspect('equal', 'box')
+            
+            
+            axb.set_xlabel('x-axis (nm)')
+            axb.set_ylabel('y-axis (nm)')
+            axb.set_zlabel('z-axis (nm)')
+            axb.view_init(azim=45, elev = 10)
+    
+            axb.set_xlim([0, self.crystal_size[0]]) 
+            axb.set_ylim([0, self.crystal_size[1]])
+            axb.set_zlim([0, 2*self.crystal_size[2]])
+            axb.set_aspect('equal', 'box')
+    
+    
+            if path == '':
+                plt.show()
+            else:
+                plt.savefig(path+str(i)+'_t(s) = '+str(round(self.time,5))+' .png', dpi = 300)
+                plt.clf()
             plt.show()
+            
         else:
-            plt.savefig(path+str(i)+'_t(s) = '+str(round(self.time,5))+' .png', dpi = 300)
-            plt.clf()
-        plt.show()
+            sites_occupied_cart = [(self.idx_to_cart(site)) for site in self.sites_occupied]
+            # Create the data collection containing a Particles object:
+            data = DataCollection()
+            particles = data.create_particles()
+            
+            # Create the particle position property:
+            pos_prop = particles.create_property('Position', data=sites_occupied_cart)
+            
+            data.objects.append(self.cell)
+            
+            # Create a pipeline, set the source and insert it into the scene:
+            pipeline = Pipeline(source = StaticSource(data = data))
+            
+            export_file(pipeline, path+str(i)+".dump", "lammps/dump",
+                columns = ["Position.X", "Position.Y", "Position.Z"])
         
     def plot_crystal_surface(self):
         

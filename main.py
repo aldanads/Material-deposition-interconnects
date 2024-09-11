@@ -4,14 +4,15 @@ Created on Mon Jan 15 15:12:23 2024
 
 @author: samuel.delgado
 """
-from initialization import initialization,save_variables
+from initialization import initialization,save_variables,search_superbasin
 from KMC import KMC
 import numpy as np
 import time
+import sys
 
-save_data = True
+save_data = False
 
-for n_sim in range(0,3):
+for n_sim in range(0,1):
     
 
     Co_latt,rng,paths,Results = initialization(n_sim,save_data)
@@ -20,7 +21,7 @@ for n_sim in range(0,3):
     Co_latt.plot_crystal(45,45)    
     j = 0
     
-    snapshoots_steps = int(5e3)
+    snapshoots_steps = int(1e1)
     starting_time = time.time()
 
 # =============================================================================
@@ -28,8 +29,10 @@ for n_sim in range(0,3):
 # 
 # =============================================================================
     if Co_latt.experiment == 'deposition':   
+        
         n_part = len(Co_latt.sites_occupied)
         nothing_happen = 0
+        list_time_step = []
         thickness_limit = 1 # (1 nm)
         Co_latt.measurements_crystal()
         i = 0
@@ -38,26 +41,40 @@ for n_sim in range(0,3):
             i+=1
             
             Co_latt,KMC_time_step = KMC(Co_latt,rng)
+            list_time_step.append(KMC_time_step)
             Co_latt.deposition_specie(KMC_time_step,rng)
+            if np.mean(list_time_step[-Co_latt.n_search_superbasin:]) <= Co_latt.time_step_limits:
+                nothing_happen +=1    
+            else:
+                nothing_happen = 0
+            
+            if nothing_happen >= Co_latt.n_search_superbasin:
+
+                search_superbasin(Co_latt)
+                print("Create superbasins: ", len(Co_latt.superbasin_dict))
+                print("Sites occupied: ", len(Co_latt.sites_occupied))
+                nothing_happen = 0
+                            
+
         
             if i%snapshoots_steps== 0:
     
                 # If there is only migration for many kMC steps, we increase once the timestep 
                 # for the deposition 
-                if len(Co_latt.sites_occupied) == n_part:
-                    nothing_happen +=1
-                    if nothing_happen == 4:
-                        Co_latt.deposition_specie(Co_latt.timestep_limits,rng)
-                        if Co_latt.timestep_limits < float('Inf'):
-                            Co_latt.track_time(Co_latt.timestep_limits)
-                            Co_latt.add_time()
-                        else:
-                            Co_latt.add_time()
+                # if len(Co_latt.sites_occupied) == n_part:
+                #     nothing_happen +=1
+                #     if nothing_happen == 4:
+                #         Co_latt.deposition_specie(Co_latt.timestep_limits,rng)
+                #         if Co_latt.timestep_limits < float('Inf'):
+                #             Co_latt.track_time(Co_latt.timestep_limits)
+                #             Co_latt.add_time()
+                #         else:
+                #             Co_latt.add_time()
     
-                else: 
-                    n_part = len(Co_latt.sites_occupied)
-                    nothing_happen = 0
-                    Co_latt.add_time()
+                # else: 
+                #     n_part = len(Co_latt.sites_occupied)
+                #     nothing_happen = 0
+                Co_latt.add_time()
                 
                 j+=1
                 Co_latt.measurements_crystal()
@@ -71,14 +88,15 @@ for n_sim in range(0,3):
                                                   Co_latt.surf_roughness_RMS,end_time-starting_time)
     
                 Co_latt.plot_crystal(45,45,paths['data'],j)
-           
+
 # =============================================================================
 #     Annealing  
 #            
 # =============================================================================
     elif Co_latt.experiment == 'annealing':
         i = 0
-        total_steps = int(2.5e6)
+        #otal_steps = int(2.5e6)
+        total_steps = int(100)
         Co_latt.measurements_crystal()
         
         while j*snapshoots_steps < total_steps:

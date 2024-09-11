@@ -41,16 +41,16 @@ choose_system = system[1]
 dfs = []
 temperature = {'Sim_0':300, 'Sim_1':500, 'Sim_2':800}
 
-name_generated_file = 'Figure.csv'
+name_generated_file = 'Figure_postAnn.csv'
 Results = SimulationResults(name_generated_file)
 
-name_histogram_size_file_terraces = 'Histogram_terraces.csv'
+name_histogram_size_file_terraces = 'Histogram_terraces_postAnn.csv'
 dfs_histogram_terraces = []
 
-name_histogram_size_file_neighbors = 'Histogram_neighbors.csv'
+name_histogram_size_file_neighbors = 'Histogram_neighbors_postAnn.csv'
 dfs_histogram_neighbors = []
 
-occ_rate_filename = 'Occupation_rate.csv'
+occ_rate_filename = 'Occupation_rate_postAnn.csv'
 dfs_occ_rate = []
 
 for subs in folder_subs:
@@ -64,7 +64,7 @@ for subs in folder_subs:
             if choose_system == 'Windows':
                 import shelve
                 
-                filename = path + subs + r'\\' + folder_P + r'\\' + folder + path_2 + 'variables'
+                filename = path + subs + r'\\' + folder_P + r'\\' + folder + path_2 + 'variables2'
     
                 my_shelf = shelve.open(filename)
                 for key in my_shelf:
@@ -102,8 +102,9 @@ for subs in folder_subs:
                     islands_terraces.append(np.mean(np.array(island.terraces)[np.array(island.terraces) != 0]))
                 
                 # Results: thickness, roughness, islands, terraces
-                Results.measurements_crystal(subs,folder_P[2:],temperature[folder],Co_latt.thickness,Co_latt.Ra_roughness,Co_latt.z_mean,Co_latt.surf_roughness_RMS,
-                                             len(peak_size),np.mean(peak_size),np.std(peak_size),max(peak_size)
+                peak_size_max = max(peak_size) if peak_size else 0
+                Results.measurements_crystal(subs,folder_P,temperature[folder],Co_latt.thickness,Co_latt.Ra_roughness,Co_latt.z_mean,Co_latt.surf_roughness_RMS,
+                                             len(peak_size),np.mean(peak_size),np.std(peak_size),peak_size_max
                                              ,np.mean(islands_terraces),np.std(islands_terraces),max(islands_terraces),np.mean(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),np.std(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),max(Co_latt.terraces))
                 
                 # Size of terrace per layer

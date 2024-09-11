@@ -112,7 +112,7 @@ def RMS_roughness(z):
     z_mean = np.mean(z)
     return np.sqrt(np.mean((np.array(z)-z_mean)**2))
 
-def plot_crystal_surface(Co_latt):
+def plot_crystal_surface(Co_latt,i):
     
     grid_crystal = Co_latt.grid_crystal
     z_step = Co_latt.basis_vectors[0][2]
@@ -156,8 +156,11 @@ def plot_crystal_surface(Co_latt):
     # Add color bar
     fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10)
     
+    plt.savefig('Surface' + str(i) + '.png',dpi=600, bbox_inches='tight', facecolor=fig.get_facecolor(), edgecolor='none', format = 'png')
+
     # Show the plot
     plt.show()
+
     return z
 
 def island_calculations(Co_latt):   
@@ -491,113 +494,50 @@ def plot_atom_neighbors(grid_crystal,sites_occupied):
     plane_poly = Poly3DCollection([list(zip(x, y, z))],color=colors_palette[2], alpha=0.5)
     axa.add_collection3d(plane_poly)
     
-def neighbors_calculation(Co_latt):
-    
-    grid_crystal = Co_latt.grid_crystal
-    sites_occupied = Co_latt.sites_occupied
-    
-    # Size of histogram: number of neighbors that a particle can have, plus particle without neighbors
-    histogram_neighbors = [0] * (len(Co_latt.latt.get_neighbors(0,0,0)) + 1)
-    
-    for site in sites_occupied:
-        if 'Substrate' in grid_crystal[site].supp_by: 
-            histogram_neighbors[len(grid_crystal[site].supp_by)-1] += 1
-        else:
-            histogram_neighbors[len(grid_crystal[site].supp_by)] += 1
-            
-    return histogram_neighbors
-
-def peak_detection(Co_latt):
-    
-    chemical_specie = Co_latt.chemical_specie
-    
-    total_visited = set()
-    
-    thickness = Co_latt.thickness
-    
-    sites_occupied = Co_latt.sites_occupied
-    sites_occupied_cart = [(Co_latt.idx_to_cart(site),site) for site in sites_occupied]
-    # Sorted from larger to smaller according to the z coordinates of the first set of coordinates
-    sites_occupied_cart = sorted(sites_occupied_cart, key=lambda coord: coord[0][2], reverse=True)
-    
-    peak_list = []
-    
-    for site in sites_occupied_cart:
-        
-        if site[1] not in total_visited and Co_latt.idx_to_cart(site[1])[2] > thickness:
-            peak_sites = set() 
-            peak_sites.add(site[1])
-            peak_visited = set()
-
-            peak_visited,peak_sites = build_peak(Co_latt,peak_visited,peak_sites,site[1],chemical_specie,thickness)
-            peak_list.append(Island(site[1],site[0],peak_sites))
-
-            total_visited.update(peak_visited)
-            
-    return peak_list
-
-def build_peak(Co_latt,visited,peak_sites,start_idx,chemical_specie,thickness):
-     
-    grid_crystal = Co_latt.grid_crystal
-
-    stack = [start_idx]
-
-    while stack:
-        idx = stack.pop()
-        site = Co_latt.grid_crystal[idx]
-        
-        for element in site.migration_paths['Up'] + site.migration_paths['Plane'] + site.migration_paths['Down']:
-
-            if element[0] not in visited and grid_crystal[element[0]].chemical_specie == chemical_specie:
-                visited.add(element[0])
-                peak_sites.add(element[0])
-                
-                if Co_latt.idx_to_cart(element[0])[2] > thickness:
-                    stack.append(element[0])
-
-    return visited,peak_sites
-    
             
 plt.rcParams["figure.dpi"] = 300
 system = ['Windows','Linux']
-choose_system = system[0]
+choose_system = system[1]
+file_variables = ['variables','variables2']
 
-if choose_system == 'Windows':
-    import shelve
-    
-    filename = 'variables'
-    
-    my_shelf = shelve.open(filename)
-    for key in my_shelf:
-        globals()[key]=my_shelf[key]
-    my_shelf.close()
-    
-    
-elif choose_system == 'Linux':
-    
-    import pickle
-    filename = 'variables.pkl'
-    
-    # Open the file in binary mode
-    with open(filename, 'rb') as file:
-      
-        # Call load method to deserialze
-        myvar = pickle.load(file)
+for i in range(2):
+    if choose_system == 'Windows':
+        import shelve
         
-    Co_latt = myvar['Co_latt']
+        filename = file_variables[i]
+        
+        my_shelf = shelve.open(filename)
+        for key in my_shelf:
+            globals()[key]=my_shelf[key]
+        my_shelf.close()
+        
+        
+    elif choose_system == 'Linux':
+        
+        import pickle
+        filename = file_variables[i]+'.pkl'
+        
+        # Open the file in binary mode
+        with open(filename, 'rb') as file:
+          
+            # Call load method to deserialze
+            myvar = pickle.load(file)
+            
+        Co_latt = myvar['Co_latt']
+    
+    
+    mass_gained = calculate_mass(Co_latt)
+    thickness, normalized_layers,layers = average_thickness(Co_latt)
+    
+    terraces = terrace_area(Co_latt,layers)
+    
+    fraction_sites_occupied = len(Co_latt.sites_occupied) / len(Co_latt.grid_crystal) 
+    z = plot_crystal_surface(Co_latt,i)
+    surf_roughness_RMS = RMS_roughness(z)
+    
+    
+    islands_list = island_calculations(Co_latt)
 
-
-mass_gained = calculate_mass(Co_latt)
-thickness, normalized_layers,layers = average_thickness(Co_latt)
-
-terraces = terrace_area(Co_latt,layers)
-
-fraction_sites_occupied = len(Co_latt.sites_occupied) / len(Co_latt.grid_crystal) 
-z = plot_crystal_surface(Co_latt)
-surf_roughness_RMS = RMS_roughness(z)
-
-
-islands_list = island_calculations(Co_latt)
                 
 #particles_in_plane = grid_crystal[sites_occupied[-5]].supp_by
 # particles_in_plane = [idx[0] for idx in grid_crystal[sites_occupied[-5]].migration_paths['Plane']]
