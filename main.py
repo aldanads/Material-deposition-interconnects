@@ -68,8 +68,7 @@ for n_sim in range(0,1):
                             print(idx)
                             
                 print(Co_latt.superbasin_dict.keys())
-                if idx == (2,4,-5):
-                    sys.exit()
+                    # sys.exit()
         
             if i%snapshoots_steps== 0:
     

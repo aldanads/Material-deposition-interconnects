@@ -233,13 +233,13 @@ def initialization(n_sim,save_data):
 
 
 def search_superbasin(Co_latt):
-                    
-    print('Sites_occupied:',Co_latt.sites_occupied)
-    for idx in Co_latt.sites_occupied:
+          
+    # We need a deepcopy because Co_latt.sites_occupied will be modified on site
+    # when calling Superbasin() and it will change the order of sites_occupied
+    sites_occupied = copy.deepcopy(Co_latt.sites_occupied)
+    for idx in sites_occupied:
         for event in Co_latt.grid_crystal[idx].site_events:
-            print('idx:',idx,'event:',event)
             if (idx not in Co_latt.superbasin_dict) and (event[3] <= Co_latt.E_min):
-                print('Idx superbasin:', idx)
                 Co_latt.superbasin_dict.update({idx: Superbasin(idx, Co_latt, Co_latt.E_min)})
 
 
