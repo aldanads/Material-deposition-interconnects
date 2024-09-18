@@ -11,11 +11,14 @@ import shutil
 import os 
 from crystal_lattice import Crystal_Lattice
 from superbasin import Superbasin
+import copy
+
 
 def initialization(n_sim,save_data):
     
+    seed = 42
     # Random seed as time
-    rng = np.random.default_rng() # Random Number Generator (RNG) object
+    rng = np.random.default_rng(seed) # Random Number Generator (RNG) object
 
     # Default resolution for figures
     plt.rcParams["figure.dpi"] = 100 # Default value of dpi = 300
@@ -74,7 +77,7 @@ def initialization(n_sim,save_data):
 # =============================================================================
         n_search_superbasin = 3 # If the time step is very small during 10 steps, search for superbasin
         time_step_limits = 1e-8 # Time needed for efficient evolution of the system
-        E_min = 0.5
+        E_min = 0.3
         superbasin_parameters = [n_search_superbasin, time_step_limits,E_min]
 # =============================================================================
 #       Different surface Structures- fcc Metals
@@ -228,17 +231,19 @@ def initialization(n_sim,save_data):
 
     return Co_latt,rng,paths,Results
 
+
 def search_superbasin(Co_latt):
                     
-    sites_occupied = Co_latt.sites_occupied
-    grid_crystal = Co_latt.grid_crystal
-
-    for idx in sites_occupied:
-        for event in grid_crystal[idx].site_events:
-            
+    print('Sites_occupied:',Co_latt.sites_occupied)
+    for idx in Co_latt.sites_occupied:
+        for event in Co_latt.grid_crystal[idx].site_events:
+            print('idx:',idx,'event:',event)
             if (idx not in Co_latt.superbasin_dict) and (event[3] <= Co_latt.E_min):
+                print('Idx superbasin:', idx)
                 Co_latt.superbasin_dict.update({idx: Superbasin(idx, Co_latt, Co_latt.E_min)})
-    
+
+
+
 def save_simulation(files_copy,dst,n_sim):
     
 

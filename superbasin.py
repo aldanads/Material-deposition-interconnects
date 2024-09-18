@@ -26,11 +26,11 @@ class Superbasin():
         self.particle_idx = idx
         self.E_min = E_min
         # Make a deep copy of Co_latt to avoid modifying the original object
-        Co_latt_copy = copy.deepcopy(Co_latt)
+
         sites_occupied = Co_latt.sites_occupied
         grid_crystal = Co_latt.grid_crystal
         num_mig_path = grid_crystal[sites_occupied[-1]].num_mig_path
-        self.trans_absorbing_states(idx,Co_latt_copy)
+        self.trans_absorbing_states(idx,Co_latt)
         
         self.transition_matrix()
         self.markov_matrix()
@@ -38,72 +38,7 @@ class Superbasin():
         self.calculate_transition_rates_absorbing_states(num_mig_path)
         self.calculate_superbasin_environment(grid_crystal)
         
-        """
-        DEFINE A METHOD TO CALCULATE SUPERBASIN ENVIRONMENT --> If some site is occupied
-        or disocuppied in the environment of the superbasin, we dismantle the superbasin
-        
-        If a move occurs that influences any of the superbasin states 
-        (i.e., a move into or out of the superbasin or a move which, through interactions, 
-         influences superbasin moves), then we dismantle the superbasin
-        """
-        
-    """
-    REMOVE THIS FUNCTION IF trans_absorbing_states WORKS
-    """    
-    def trans_absorbing_states_2(self,start_idx,Co_latt):
-        
-        stack = [start_idx]
-        visited = set()
-
-        grid_crystal = Co_latt.grid_crystal
-        self.transient_states_transitions = []
-        self.absorbing_states_transitions = []
-        
-        while stack:
-            idx = stack.pop()
-            site = grid_crystal[idx]
-
-            if idx not in visited:
-                for transition in site.site_events:
-                    transition_with_idx = transition + [idx]
-                    
-                    if transition[3] < self.E_min:
-                        
-                        if transition_with_idx not in self.transient_states_transitions:
-                            self.transient_states_transitions.append(transition_with_idx)
-                            stack.append(transition[1])
-                    else: 
-                        if transition_with_idx not in self.absorbing_states_transitions:
-                            self.absorbing_states_transitions.append(transition_with_idx)
-                        
-                    
-                # Control of the states visited
-                visited.add(idx)
-                
-                """
-                SHOULD I ALSO CALCULATE THE TRANSITION TO THE STATES THAT ARE 
-                nsition[3] > self.E_min
-                TO CHECK IF THEY ARE A TRANSITION OR A ABSORBING STATE
-                
-                IS TtraHERE A POSSIBILITY THAT ONE ENTER THIS STATE THEY HAVE AN EASY WAY TO 
-                GO OUT?
-                
-                AN ABSORBING STATE IS A CONFIGURATION THAT EVERY ACTIVATION ENERGY TO LEAVE
-                THAT STATE IS LARGE?
-                """
-                
-                # Virtual migrations to calculate activation energies
-                for transition in reversed(self.transient_states_transitions):
-                    if transition[1] not in visited:
-                        Co_latt.processes((transition[0], transition[1], transition[2], idx))
-                        break
-                
-        self.transient_states = list({transition[-1] for transition in self.absorbing_states_transitions})
-        self.absorbing_states = list({transition[1] for transition in self.absorbing_states_transitions})
-
-        self.superbasin_idx = self.absorbing_states + self.transient_states
-        
-        
+   
     def trans_absorbing_states(self,start_idx,Co_latt):
         
         stack = [start_idx]
@@ -114,7 +49,7 @@ class Superbasin():
         self.transient_states_transitions = []
         self.absorbing_states_transitions = []
         aux_transitions = []
-        
+
         while stack:
             idx = stack.pop()
 
@@ -124,8 +59,8 @@ class Superbasin():
                 
                 for transition in site.site_events:
                     transition_with_idx = transition + [idx]
-                    
                     if transition[3] < self.E_min:
+
                         is_absorbing = False # If it is a easy way out, it is a transient state (< E_min)
                         if transition_with_idx not in self.transient_states_transitions:
                             self.transient_states_transitions.append(transition_with_idx)
@@ -148,8 +83,9 @@ class Superbasin():
             # Virtual migrations to calculate activation energies
             if stack:
                 Co_latt.processes((transition[0], stack[-1], transition[2], idx))
+        
+        Co_latt.processes((transition[0], start_idx, transition[2], idx)) 
 
-                    
         # Construct the transitions to the absorbing states
         for absorbing_state in self.absorbing_states: 
             i = 0
@@ -165,11 +101,19 @@ class Superbasin():
         self.transient_states = list({transition[-1] for transition in self.transient_states_transitions})
 
         self.superbasin_idx = self.absorbing_states + self.transient_states 
-
+    
+        
+   
     def transition_matrix(self):
         
         self.A_transitions = []
         transitions = self.absorbing_states_transitions + self.transient_states_transitions
+        
+        # Create a dictionary for quick lookup
+        transition_dict = {}
+        for transition in transitions:
+            key = (transition[1], transition[-1])
+            transition_dict[key] = transition[0]
         
         for i,state_origin in enumerate(self.superbasin_idx):
             row = [] # Each row include the transition from each state_origin
@@ -187,15 +131,15 @@ class Superbasin():
                         row.append(tau)
                         
                 else:
-                    # Out of diagonal
-                    rate = -next((transition[0] for transition in transitions 
-                            if state_origin == transition[1] and state_destination == transition[-1]),0)
                     
+                    rate = -transition_dict.get((state_origin, state_destination), 0)
+                    rate = rate if rate > 0 else 0
                     row.append(rate)
                     
             self.A_transitions.append(row)
         self.A_transitions = np.array(self.A_transitions)
-            
+    
+     
     def markov_matrix(self):
         
         self.M_Markov = []
@@ -216,7 +160,8 @@ class Superbasin():
                     
             self.M_Markov.append(row)
         self.M_Markov = np.array(self.M_Markov)
-        
+      
+         
     def absorption_probability_matrix(self):
         
         self.B_absorption = []
@@ -236,6 +181,7 @@ class Superbasin():
         # Calculate the absorption probabilities matrix B
         self.B_absorption = np.dot(self.N, R_recurrent) 
         
+      
     def calculate_transition_rates_absorbing_states(self,num_mig_path,T=300):
         
         # Mean time to absorbing state j from the transient state i
@@ -257,7 +203,7 @@ class Superbasin():
             for transition_r, absorbing_state, EAct 
             in zip(self.transition_rates, self.absorbing_states, self.EAct)
             ]
-        
+  
     def calculate_superbasin_environment(self,grid_crystal):
         
         self.superbasin_environment = set()

@@ -22,7 +22,7 @@ def build_tree(arr):
     root.left = build_tree(arr[:mid])
     root.right = build_tree(arr[mid:])
     return root
-
+ 
 def update_data(root):
     if root is None:
         return

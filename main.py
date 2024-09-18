@@ -4,11 +4,14 @@ Created on Mon Jan 15 15:12:23 2024
 
 @author: samuel.delgado
 """
+import cProfile
+import sys
+
+# def main():
 from initialization import initialization,save_variables,search_superbasin
 from KMC import KMC
 import numpy as np
 import time
-import sys
 
 save_data = False
 
@@ -30,18 +33,17 @@ for n_sim in range(0,1):
 # =============================================================================
     if Co_latt.experiment == 'deposition':   
         
-        n_part = len(Co_latt.sites_occupied)
         nothing_happen = 0
         list_time_step = []
         thickness_limit = 1 # (1 nm)
         Co_latt.measurements_crystal()
         i = 0
-        
+
         while Co_latt.thickness < thickness_limit:
             i+=1
-            
             Co_latt,KMC_time_step = KMC(Co_latt,rng)
             list_time_step.append(KMC_time_step)
+            print(KMC_time_step/Co_latt.timestep_limits)
             Co_latt.deposition_specie(KMC_time_step,rng)
             if np.mean(list_time_step[-Co_latt.n_search_superbasin:]) <= Co_latt.time_step_limits:
                 nothing_happen +=1    
@@ -49,13 +51,25 @@ for n_sim in range(0,1):
                 nothing_happen = 0
             
             if nothing_happen >= Co_latt.n_search_superbasin:
-
+                for idx in Co_latt.sites_occupied:
+                    for event in Co_latt.grid_crystal[idx].site_events:
+                        
+                        if (idx not in Co_latt.superbasin_dict) and (event[3] <= Co_latt.E_min):
+                            print(idx)
+                print(Co_latt.superbasin_dict.keys())
+                
                 search_superbasin(Co_latt)
-                print("Create superbasins: ", len(Co_latt.superbasin_dict))
-                print("Sites occupied: ", len(Co_latt.sites_occupied))
                 nothing_happen = 0
+                
+                for idx in Co_latt.sites_occupied:
+                    for event in Co_latt.grid_crystal[idx].site_events:
+                        
+                        if (idx not in Co_latt.superbasin_dict) and (event[3] <= Co_latt.E_min):
+                            print(idx)
                             
-
+                print(Co_latt.superbasin_dict.keys())
+                if idx == (2,4,-5):
+                    sys.exit()
         
             if i%snapshoots_steps== 0:
     
@@ -88,6 +102,10 @@ for n_sim in range(0,1):
                                                   Co_latt.surf_roughness_RMS,end_time-starting_time)
     
                 Co_latt.plot_crystal(45,45,paths['data'],j)
+                
+                # print('j = ',j)
+                # if j >= 20:
+                #     sys.exit()
 
 # =============================================================================
 #     Annealing  
@@ -123,5 +141,14 @@ for n_sim in range(0,1):
     # Variables to save
     variables = {'Co_latt' : Co_latt}
     if save_data: save_variables(paths['program'],variables)
-    
 
+
+# # Use cProfile to profile the main function
+# if __name__ == '__main__':
+#     cProfile.run('main()', 'profile_output.prof')    
+
+# import pstats
+
+# # Load and analyze the profiling results
+# p = pstats.Stats('profile_output.prof')
+# p.strip_dirs().sort_stats('time').print_stats(15)  # Show top 10 time-consuming functions

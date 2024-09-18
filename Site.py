@@ -27,6 +27,8 @@ class Site():
         # Position close to 0 are supported by the substrate
         if self.position[2] == 0:
             self.supp_by.add('Substrate')
+            
+        self.cache_planes = {}
         
             
 # =============================================================================
@@ -34,7 +36,7 @@ class Site():
 # =============================================================================
     def neighbors_analysis(self,grid_crystal,neigh_idx,neigh_cart,crystal_size,event_labels,idx_origin):
        
-        self.num_mig_path = len(neigh_idx) + 2 # We consider two layers jumps: +1 upward, +1 downward
+        self.num_mig_path = len(neigh_idx) + 1 # +1 from superbasin
         #num_event = 0
         for idx,pos in zip(neigh_idx,neigh_cart):
             if tuple(idx) in grid_crystal:
@@ -211,13 +213,13 @@ class Site():
 #                     new_site_events.append([next_neighbor[0], num_event, act_energy + energy_change])
 # 
 # =============================================================================
-
                 # First nearest neighbors: 1 jump upward
                 # Supported by at least 2 particles (excluding this site)
+
             if site_idx not in self.supp_by and len(grid_crystal[site_idx].supp_by) > 2:
                 energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                 energy_change = max(energy_site_destiny - self.energy_site, 0)
-                
+               
                 # Migrating upward from the substrate
                 if 'Substrate' in self.supp_by and grid_crystal[site_idx].crystallographic_direction == (111):
                     new_site_events.append([site_idx, num_event, self.Act_E_list[1] + energy_change])
@@ -266,7 +268,7 @@ class Site():
 
                 # First nearest neighbors: 1 jump downward
                 # Supported by at least 2 particles (excluding this site)
-            if site_idx not in self.supp_by and ('Substrate' in grid_crystal[site_idx].supp_by or len(grid_crystal[site_idx].supp_by) > 2):
+            if site_idx not in self.supp_by and ('Substrate' in grid_crystal[site_idx].supp_by or len(grid_crystal[site_idx].supp_by) > 1):
                 energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                 energy_change = max(energy_site_destiny - self.energy_site, 0)
                 
@@ -306,9 +308,20 @@ class Site():
     def detect_planes(self,grid_crystal,crystallographic_planes):
         
         atom_coordinates = np.array([grid_crystal[idx].position for idx in self.supp_by if idx != 'Substrate'])
-
+        # Order the coordinates according to the first value, then the second, etc.
+        # We are ordering the row, not the elements of the coordinates (x,y,z)
+        sorted_atom_coordinates = sorted(atom_coordinates, key=lambda x: tuple(x))
+        sorted_atom_coordinates = tuple(map(tuple, sorted_atom_coordinates))
+        
+        # Check if the result is already cached
         if 'Substrate' in self.supp_by:
             self.crystallographic_direction = (111)
+            return
+        
+        if sorted_atom_coordinates in self.cache_planes:
+            self.crystallographic_direction = self.cache_planes[sorted_atom_coordinates]
+            return
+        
         elif len(atom_coordinates) > 2:
             # Perform PCA
             pca = PCA(n_components=3)
@@ -335,6 +348,9 @@ class Site():
                     
         else:
             self.crystallographic_direction = (111)
+            
+        # Cache the result
+        self.cache_planes[sorted_atom_coordinates] = self.crystallographic_direction
             
     def detect_edges(self,grid_crystal):
         

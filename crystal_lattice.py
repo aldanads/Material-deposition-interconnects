@@ -15,7 +15,7 @@ from ovito.data import *
 from ovito.pipeline import *
 from ovito.vis import *
 from ovito.io import export_file
-
+from concurrent.futures import ThreadPoolExecutor
 
 # Rotation of a vector - Is copper growing in [111] direction?
 # The basis vector is in [001]
@@ -51,8 +51,8 @@ class Crystal_Lattice():
         self.adsorption_sites = [] # Sites availables for deposition or migration
         # Obtain all the positions in the grid that are supported by the
         # substrate or other deposited chemical species
-        update_supp_av = [idx for idx in self.grid_crystal.keys()]
-        update_specie_events = []
+        update_supp_av = {idx for idx in self.grid_crystal.keys()}
+        update_specie_events = set()
         self.update_sites(update_specie_events,update_supp_av)
         
         #Transition rate for adsortion of chemical species
@@ -199,20 +199,27 @@ class Crystal_Lattice():
         self.crystallographic_planes = crystallographic_planes
             
         
-    def available_adsorption_sites(self, update_supp_av = []):
+    def available_adsorption_sites(self, update_supp_av = set()):
         
         
-        if update_supp_av == []:
-            for idx,site in self.grid_crystal.items():
-                if ('Substrate' in site.supp_by or len(site.supp_by) > 2) and (site.chemical_specie == 'Empty'):
-                    self.adsorption_sites.append(idx)
-        else:
-            for idx in update_supp_av:
-                if (idx in self.adsorption_sites) and (('Substrate' not in self.grid_crystal[idx].supp_by and len(self.grid_crystal[idx].supp_by) < 3) or (self.grid_crystal[idx].chemical_specie != 'Empty')):
-                    self.adsorption_sites.remove(idx)
+        if not update_supp_av:
+            self.adsorption_sites = [
+                idx for idx, site in self.grid_crystal.items()
+                if ('Substrate' in site.supp_by or len(site.supp_by) > 2) and site.chemical_specie == 'Empty'
+                ]
                     
-                elif (idx not in self.adsorption_sites) and ('Substrate' in self.grid_crystal[idx].supp_by or len(self.grid_crystal[idx].supp_by) > 2) and self.grid_crystal[idx].chemical_specie == 'Empty':
-                    self.adsorption_sites.append(idx)
+                    
+        else:
+            adsorption_sites_set = set(self.adsorption_sites)
+            for idx in update_supp_av:
+                site = self.grid_crystal[idx]
+                if idx in adsorption_sites_set:
+                    if (('Substrate' not in site.supp_by and len(site.supp_by) < 3) or (site.chemical_specie != 'Empty')):
+                        self.adsorption_sites.remove(idx)
+                    
+                else:
+                    if ('Substrate' in site.supp_by or len(site.supp_by) > 2) and site.chemical_specie == 'Empty':
+                        self.adsorption_sites.append(idx)
                     
         
                     
@@ -253,48 +260,11 @@ class Crystal_Lattice():
         self.timestep_limits = -np.log(1-P_limits)/self.TR_ad
         
     
-# =============================================================================
-#             Introduce particle
-# =============================================================================
-    def introduce_specie_site(self,idx,update_specie_events,update_supp_av):
-        
-        # Chemical specie deposited
-        self.grid_crystal[idx].introduce_specie(self.chemical_specie)
-        # Track sites occupied
-        self.sites_occupied.append(idx) 
-        # Track sites available
-        update_specie_events.append(idx)
-        
-        # CAREFUL! We don't update 2nd nearest neighbors
-        # Nodes we need to update
-        update_supp_av.update(self.grid_crystal[idx].nearest_neighbors_idx)
-        update_supp_av.add(idx) # Update the new specie to calculate its supp_by
-
-        return update_specie_events,update_supp_av
-    
-# =============================================================================
-#             Remove particle 
-# =============================================================================
-    def remove_specie_site(self,idx,update_specie_events,update_supp_av):
-        
-        # Chemical specie removed
-        self.grid_crystal[idx].remove_specie()
-        # Track sites occupied
-        self.sites_occupied.remove(idx) 
-        # Track sites available
-        update_specie_events.remove(idx)
-        
-        # CAREFUL! We don't update 2nd nearest neighbors
-        # Nodes we need to update
-        update_supp_av.update(self.grid_crystal[idx].nearest_neighbors_idx)
-        update_supp_av.add(idx) # Update the new empty space to calculate its supp_by
-        
-        return update_specie_events,update_supp_av
 
     def deposition_specie(self,t,rng,test = 0):  
 
         update_supp_av = set()
-        update_specie_events = []
+        update_specie_events = set()
         
         if test == 0:
             
@@ -482,12 +452,11 @@ class Crystal_Lattice():
  
         site_affected = self.grid_crystal[chosen_event[-1]]
         update_supp_av = set()
-        update_specie_events = [chosen_event[-1]]
-        
+        update_specie_events = {chosen_event[-1]}
 # =============================================================================
 #         Specie migration
 # =============================================================================
-        if chosen_event[2] < site_affected.num_mig_path:
+        if chosen_event[2] <= site_affected.num_mig_path:
             
             # print('Support balance: ',len(self.grid_crystal[chosen_event[-1]].supp_by)-len(self.grid_crystal[chosen_event[1]].supp_by))
             # Introduce specie in the site
@@ -503,6 +472,7 @@ class Crystal_Lattice():
 # =============================================================================
 # At every kMC step we have to check if we destroy any superbasin                      
 # =============================================================================
+   
     def update_superbasin(self,chosen_event):
             
         # We dismantle the superbasin if the chosen_event affect some of the states
@@ -513,26 +483,120 @@ class Crystal_Lattice():
 
         for key in keys_to_delete:
             del self.superbasin_dict[key]
-                    
+            
     
     def update_sites(self,update_specie_events,update_supp_av):
-
+            
         if update_supp_av:
+                
             # There are new sites supported by the deposited chemical species
             # For loop over neighbors
             for idx in update_supp_av:
                 self.grid_crystal[idx].supported_by(self.grid_crystal,self.crystallographic_planes)
                 self.available_adsorption_sites(update_supp_av)
-                if self.grid_crystal[idx].chemical_specie != 'Empty':
-                    update_specie_events.append(idx)
-        
-        
+
         if update_specie_events: 
             # Sites are not available because a particle has migrated there
             for idx in update_specie_events:
                 self.grid_crystal[idx].available_migrations(self.grid_crystal,idx)
                 self.grid_crystal[idx].transition_rates(self.temperature)
                     
+   
+    def update_sites_2(self,update_specie_events,update_supp_av, batch_size=10):
+
+        if update_supp_av:
+            with ThreadPoolExecutor() as executor:
+                # Split update_supp_av into batches
+                batches = [list(update_supp_av)[i:i + batch_size] for i in range(0, len(update_supp_av), batch_size)]
+                futures = []
+
+                for batch in batches:
+                    futures.append(executor.submit(self.process_batch, batch, update_specie_events))
+                        
+                for future in futures:
+                    future.result()  # Wait for all futures to complete
+                
+        
+        if update_specie_events: 
+            # Sites are not available because a particle has migrated there
+            for idx in update_specie_events:
+                self.grid_crystal[idx].available_migrations(self.grid_crystal,idx)
+                self.grid_crystal[idx].transition_rates(self.temperature)
+    
+                
+    def process_site(self, idx, update_specie_events):
+        self.grid_crystal[idx].supported_by(self.grid_crystal, self.crystallographic_planes)
+        self.available_adsorption_sites([idx])
+        if self.grid_crystal[idx].chemical_specie != 'Empty':
+            update_specie_events.append(idx)
+            
+    def process_batch(self, batch, update_specie_events):
+        for idx in batch:
+            self.process_site(idx, update_specie_events)
+
+# =============================================================================
+#             Introduce particle
+# =============================================================================
+    def introduce_specie_site(self,idx,update_specie_events,update_supp_av):
+        
+        # Chemical specie deposited
+        self.grid_crystal[idx].introduce_specie(self.chemical_specie)
+        # Track sites occupied
+        self.sites_occupied.append(idx) 
+        # Track sites available
+        update_specie_events.add(idx)
+        
+        # CAREFUL! We don't update 2nd nearest neighbors
+        # Nodes we need to update
+        update_supp_av.update(self.grid_crystal[idx].nearest_neighbors_idx)
+        update_supp_av.add(idx) # Update the new specie to calculate its supp_by
+        
+        # Include in update_specie_events all the particles that can migrate 
+        # to the sites in update_supp_av --> It might change the available migrations
+        # or the activation energy
+        for idx_supp_site in update_supp_av:
+            # Extend update_specie_events with sites that are not 'Substrate'
+            update_specie_events.update(
+                idx_site for idx_site in self.grid_crystal[idx_supp_site].supp_by 
+                if idx_site != 'Substrate'
+                )
+            # Check if the chemical specie is not 'Empty' and append idx
+            if self.grid_crystal[idx_supp_site].chemical_specie != 'Empty':
+                update_specie_events.add(idx_supp_site)
+
+        return update_specie_events,update_supp_av
+    
+# =============================================================================
+#             Remove particle 
+# =============================================================================
+    def remove_specie_site(self,idx,update_specie_events,update_supp_av):
+        
+        # Chemical specie removed
+        self.grid_crystal[idx].remove_specie()
+        # Track sites occupied
+        self.sites_occupied.remove(idx) 
+        # Track sites available
+        update_specie_events.discard(idx)
+        
+        # CAREFUL! We don't update 2nd nearest neighbors
+        # Nodes we need to update
+        update_supp_av.update(self.grid_crystal[idx].nearest_neighbors_idx)
+        update_supp_av.add(idx) # Update the new empty space to calculate its supp_by
+        
+        # Include in update_specie_events all the particles that can migrate 
+        # to the sites in update_supp_av --> It might change the available migrations
+        # or the activation energy
+        for idx_supp_site in update_supp_av:
+            # Extend update_specie_events with sites that are not 'Substrate'
+            update_specie_events.update(
+                idx_site for idx_site in self.grid_crystal[idx_supp_site].supp_by 
+                if idx_site != 'Substrate'
+                )
+            # Check if the chemical specie is not 'Empty' and append idx
+            if self.grid_crystal[idx_supp_site].chemical_specie != 'Empty':
+                update_specie_events.add(idx_supp_site)
+        
+        return update_specie_events,update_supp_av
 
     def track_time(self,t):
         
