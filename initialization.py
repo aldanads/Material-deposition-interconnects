@@ -77,7 +77,7 @@ def initialization(n_sim,save_data):
 # =============================================================================
         n_search_superbasin = 3 # If the time step is very small during 10 steps, search for superbasin
         time_step_limits = 1e-8 # Time needed for efficient evolution of the system
-        E_min = 0.3
+        E_min = 0.5
         superbasin_parameters = [n_search_superbasin, time_step_limits,E_min]
 # =============================================================================
 #       Different surface Structures- fcc Metals

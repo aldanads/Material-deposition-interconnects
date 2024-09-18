@@ -36,7 +36,7 @@ class Site():
 # =============================================================================
     def neighbors_analysis(self,grid_crystal,neigh_idx,neigh_cart,crystal_size,event_labels,idx_origin):
        
-        self.num_mig_path = len(neigh_idx) + 1 # +1 from superbasin
+        self.num_mig_path = len(neigh_idx)
         #num_event = 0
         for idx,pos in zip(neigh_idx,neigh_cart):
             if tuple(idx) in grid_crystal:

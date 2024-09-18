@@ -41,9 +41,8 @@ for n_sim in range(0,1):
 
         while Co_latt.thickness < thickness_limit:
             i+=1
-            Co_latt,KMC_time_step = KMC(Co_latt,rng)
+            Co_latt,KMC_time_step,chosen_event = KMC(Co_latt,rng)
             list_time_step.append(KMC_time_step)
-            print(KMC_time_step/Co_latt.timestep_limits)
             Co_latt.deposition_specie(KMC_time_step,rng)
             if np.mean(list_time_step[-Co_latt.n_search_superbasin:]) <= Co_latt.time_step_limits:
                 nothing_happen +=1    
@@ -51,42 +50,11 @@ for n_sim in range(0,1):
                 nothing_happen = 0
             
             if nothing_happen >= Co_latt.n_search_superbasin:
-                for idx in Co_latt.sites_occupied:
-                    for event in Co_latt.grid_crystal[idx].site_events:
-                        
-                        if (idx not in Co_latt.superbasin_dict) and (event[3] <= Co_latt.E_min):
-                            print(idx)
-                print(Co_latt.superbasin_dict.keys())
-                
                 search_superbasin(Co_latt)
                 nothing_happen = 0
-                
-                for idx in Co_latt.sites_occupied:
-                    for event in Co_latt.grid_crystal[idx].site_events:
-                        
-                        if (idx not in Co_latt.superbasin_dict) and (event[3] <= Co_latt.E_min):
-                            print(idx)
-                            
-                print(Co_latt.superbasin_dict.keys())
-                    # sys.exit()
+
         
             if i%snapshoots_steps== 0:
-    
-                # If there is only migration for many kMC steps, we increase once the timestep 
-                # for the deposition 
-                # if len(Co_latt.sites_occupied) == n_part:
-                #     nothing_happen +=1
-                #     if nothing_happen == 4:
-                #         Co_latt.deposition_specie(Co_latt.timestep_limits,rng)
-                #         if Co_latt.timestep_limits < float('Inf'):
-                #             Co_latt.track_time(Co_latt.timestep_limits)
-                #             Co_latt.add_time()
-                #         else:
-                #             Co_latt.add_time()
-    
-                # else: 
-                #     n_part = len(Co_latt.sites_occupied)
-                #     nothing_happen = 0
                 Co_latt.add_time()
                 
                 j+=1

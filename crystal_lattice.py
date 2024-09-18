@@ -456,7 +456,7 @@ class Crystal_Lattice():
 # =============================================================================
 #         Specie migration
 # =============================================================================
-        if chosen_event[2] <= site_affected.num_mig_path:
+        if chosen_event[2] <= site_affected.num_mig_path + 1: # 12 migration possibilities and 13 for migrating from superbasin
             
             # print('Support balance: ',len(self.grid_crystal[chosen_event[-1]].supp_by)-len(self.grid_crystal[chosen_event[1]].supp_by))
             # Introduce specie in the site
