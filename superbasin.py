@@ -7,6 +7,7 @@ Created on Wed Aug 28 13:31:56 2024
 import copy
 import numpy as np
 from scipy import constants
+import time
 
 
 # =============================================================================
@@ -101,20 +102,51 @@ class Superbasin():
         self.transient_states = list({transition[-1] for transition in self.transient_states_transitions})
 
         self.superbasin_idx = self.absorbing_states + self.transient_states 
-    
         
    
     def transition_matrix(self):
         
-        self.A_transitions = []
         transitions = self.absorbing_states_transitions + self.transient_states_transitions
         
+        # Create a dictionary for quick lookup
+        transition_dict = {(transition[1], transition[-1]): transition[0] 
+                           for transition in transitions}
+        # Initialize the transition matrix with zeros
+        n = len(self.superbasin_idx)
+        A_transitions = np.zeros((n, n))
+        
+        state_origins = self.superbasin_idx
+        state_destinations = self.superbasin_idx
+        
+        # Fill the diagonal elements
+        for i, state_origin in enumerate(state_origins):
+            
+            if state_origin in self.absorbing_states:
+                A_transitions[i, i] = 0
+            else:
+                tau = sum(transition[0] for transition in transitions if 
+                          state_origin == transition[-1])
+                A_transitions[i, i] = tau
+                
+        # Fill the off-diagonal elements
+        for i, state_origin in enumerate(state_origins):
+            for j, state_destination in enumerate(state_destinations):
+                if i != j:
+                    rate = -transition_dict.get((state_origin, state_destination), 0)
+                    A_transitions[i, j] = max(rate, 0)
+                    
+        self.A_transitions = A_transitions
+        
+    def transition_matrix_2(self):
+        self.A_transitions_2 = []
+        transitions = self.absorbing_states_transitions + self.transient_states_transitions
+
         # Create a dictionary for quick lookup
         transition_dict = {}
         for transition in transitions:
             key = (transition[1], transition[-1])
             transition_dict[key] = transition[0]
-        
+
         for i,state_origin in enumerate(self.superbasin_idx):
             row = [] # Each row include the transition from each state_origin
             for j,state_destination in enumerate(self.superbasin_idx):
@@ -136,8 +168,8 @@ class Superbasin():
                     rate = rate if rate > 0 else 0
                     row.append(rate)
                     
-            self.A_transitions.append(row)
-        self.A_transitions = np.array(self.A_transitions)
+            self.A_transitions_2.append(row)
+        self.A_transitions_2 = np.array(self.A_transitions_2)
     
      
     def markov_matrix(self):

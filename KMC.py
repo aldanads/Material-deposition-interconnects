@@ -58,4 +58,4 @@ def KMC(Co_latt,rng):
     Co_latt.update_superbasin(chosen_event)
     
 
-    return Co_latt,time_step,chosen_event
+    return Co_latt,time_step

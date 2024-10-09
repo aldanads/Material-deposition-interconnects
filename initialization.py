@@ -16,9 +16,9 @@ import copy
 
 def initialization(n_sim,save_data):
     
-    seed = 42
+    # seed = 42
     # Random seed as time
-    rng = np.random.default_rng(seed) # Random Number Generator (RNG) object
+    rng = np.random.default_rng() # Random Number Generator (RNG) object
 
     # Default resolution for figures
     plt.rcParams["figure.dpi"] = 100 # Default value of dpi = 300
@@ -234,15 +234,18 @@ def initialization(n_sim,save_data):
 
 def search_superbasin(Co_latt):
           
-    # We need a deepcopy because Co_latt.sites_occupied will be modified on site
+    # We need a deepcopy? Co_latt.sites_occupied will be modified on site
     # when calling Superbasin() and it will change the order of sites_occupied
-    sites_occupied = copy.deepcopy(Co_latt.sites_occupied)
+    # sites_occupied = copy.deepcopy(Co_latt.sites_occupied)
+    
+    # This approach should be more efficient and memory-friendly
+    sites_occupied = Co_latt.sites_occupied[:] 
+
     for idx in sites_occupied:
         for event in Co_latt.grid_crystal[idx].site_events:
             if (idx not in Co_latt.superbasin_dict) and (event[3] <= Co_latt.E_min):
                 Co_latt.superbasin_dict.update({idx: Superbasin(idx, Co_latt, Co_latt.E_min)})
-
-
+                
 
 def save_simulation(files_copy,dst,n_sim):
     
