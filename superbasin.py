@@ -30,13 +30,13 @@ class Superbasin():
 
         sites_occupied = Co_latt.sites_occupied
         grid_crystal = Co_latt.grid_crystal
-        num_mig_path = grid_crystal[sites_occupied[-1]].num_mig_path
+        num_event = Co_latt.num_event
         self.trans_absorbing_states(idx,Co_latt)
         
         self.transition_matrix()
         self.markov_matrix()
         self.absorption_probability_matrix()
-        self.calculate_transition_rates_absorbing_states(num_mig_path)
+        self.calculate_transition_rates_absorbing_states(num_event)
         self.calculate_superbasin_environment(grid_crystal)
         
    
@@ -214,7 +214,7 @@ class Superbasin():
         self.B_absorption = np.dot(self.N, R_recurrent) 
         
       
-    def calculate_transition_rates_absorbing_states(self,num_mig_path,T=300):
+    def calculate_transition_rates_absorbing_states(self,num_event,T=300):
         
         # Mean time to absorbing state j from the transient state i
         # (first passage time - FPT)
@@ -231,7 +231,7 @@ class Superbasin():
         self.EAct = -kb*T*np.log(self.transition_rates/nu0)
         
         self.site_events_absorbing = [
-            (transition_r, absorbing_state, num_mig_path + 1, EAct, self.particle_idx)
+            (transition_r, absorbing_state, num_event - 2, EAct, self.particle_idx)
             for transition_r, absorbing_state, EAct 
             in zip(self.transition_rates, self.absorbing_states, self.EAct)
             ]

@@ -5,29 +5,31 @@ Created on Mon Jan 15 15:12:23 2024
 @author: samuel.delgado
 """
 
+
 """
-4719396067 function calls (4710390063 primitive calls) in 26906.461 seconds
+Profiling - Reference: Grown 0.3 nm in a 2x2nm box
+
+1606142554 function calls (1601344011 primitive calls) in 3808.223 seconds
 
    Ordered by: internal time
-   List reduced from 2010 to 15 due to restriction <15>
+   List reduced from 1997 to 15 due to restriction <15>
 
    ncalls  tottime  percall  cumtime  percall filename:lineno(function)
- 55205739 8618.828    0.000 8754.190    0.000 Site.py:355(detect_edges)
- 55205739 3611.556    0.000 3736.298    0.000 crystal_lattice.py:202(available_adsorption_sites)
- 61491592 3262.338    0.000 3816.401    0.000 Site.py:156(available_migrations)
- 61491592 2269.977    0.000 3489.035    0.000 Site.py:414(transition_rates)
-191305668 1501.699    0.000 1501.699    0.000 Site.py:313(<lambda>)
- 61491592 1131.087    0.000 1131.087    0.000 Site.py:419(<listcomp>)
- 55205739 1070.504    0.000 13034.189    0.000 Site.py:91(supported_by)
- 55205739  708.300    0.000 3045.069    0.000 Site.py:308(detect_planes)
-    13175  616.443    0.047  617.056    0.047 linalg.py:1499(svd)
-273373586  449.113    0.000  489.033    0.000 Site.py:111(calculate_clustering_energy)
-  2887455  406.297    0.000 24482.225    0.008 crystal_lattice.py:488(update_sites)
- 56335730  345.652    0.000 1847.905    0.000 {built-in method builtins.sorted}
- 56476355  267.114    0.000  267.193    0.000 {built-in method numpy.array}
-1568718429/1568714227  213.142    0.000  213.147    0.000 {built-in method builtins.len}
- 94901339  195.571    0.000  343.297    0.000 {method 'update' of 'set' objects}
-
+ 21182531  727.770    0.000  773.141    0.000 crystal_lattice.py:210(available_adsorption_sites)
+ 20454173  439.688    0.000  593.239    0.000 Site.py:155(available_migrations)
+ 21182531  363.121    0.000 1312.305    0.000 Site.py:90(supported_by)
+ 21182531  229.669    0.000  632.346    0.000 Site.py:318(detect_planes)
+ 21182531  213.482    0.000  260.788    0.000 Site.py:365(detect_edges)
+ 20454173  148.285    0.000  148.285    0.000 Site.py:429(<listcomp>)
+ 88225131  130.736    0.000  142.564    0.000 Site.py:110(calculate_clustering_energy)
+  1125501  126.356    0.000 3090.793    0.003 crystal_lattice.py:511(update_sites)
+ 67895751  116.200    0.000  116.200    0.000 Site.py:323(<lambda>)
+ 21732308  114.275    0.000  230.751    0.000 {built-in method builtins.sorted}
+ 20454173  113.631    0.000  285.750    0.000 Site.py:424(transition_rates)
+     2550   93.557    0.037   93.557    0.037 {method 'encode' of 'ImagingEncoder' objects}
+ 22067444   85.175    0.000   85.215    0.000 {built-in method numpy.array}
+     5819   65.861    0.011  121.798    0.021 superbasin.py:107(transition_matrix)
+535043268/535040492   64.367    0.000   64.370    0.000 {built-in method builtins.len}
 """
 
 """
@@ -81,7 +83,7 @@ def main():
                 i+=1
                 Co_latt,KMC_time_step = KMC(Co_latt,rng)
                 list_time_step.append(KMC_time_step)
-                Co_latt.deposition_specie(KMC_time_step,rng)
+                #Co_latt.deposition_specie(KMC_time_step,rng)
                 if np.mean(list_time_step[-Co_latt.n_search_superbasin:]) <= Co_latt.time_step_limits:
                     nothing_happen +=1    
                 else:

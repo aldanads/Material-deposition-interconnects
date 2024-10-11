@@ -22,7 +22,7 @@ def KMC(Co_latt,rng):
 # =============================================================================
     TR_catalog = []
 
-    for idx in Co_latt.sites_occupied:
+    for idx in Co_latt.sites_occupied + Co_latt.adsorption_sites:
         if idx not in superbasin_dict:
             TR_catalog.extend([(item[0],item[1],item[2],idx) for item in grid_crystal[idx].site_events])
         else:

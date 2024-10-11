@@ -36,7 +36,6 @@ class Site():
 # =============================================================================
     def neighbors_analysis(self,grid_crystal,neigh_idx,neigh_cart,crystal_size,event_labels,idx_origin):
        
-        self.num_mig_path = len(neigh_idx)
         #num_event = 0
         for idx,pos in zip(neigh_idx,neigh_cart):
             if tuple(idx) in grid_crystal:
@@ -300,6 +299,17 @@ class Site():
 # =============================================================================
             
         self.site_events = new_site_events
+        
+    def deposition_event(self,TR,idx_origin,num_event,Act_E):
+        self.site_events.append([TR,idx_origin, num_event, Act_E])
+        
+    def remove_event_type(self,num_event):
+        
+        for i, event in enumerate(self.site_events):
+            if event[2] == num_event:
+                del self.site_events[i]
+                break
+                
       
 # =============================================================================
 #     Detect planes using PCA - We search the plane that contains most of the points

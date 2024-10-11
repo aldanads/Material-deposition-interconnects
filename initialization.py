@@ -16,9 +16,9 @@ import copy
 
 def initialization(n_sim,save_data):
     
-    # seed = 42
+    seed = 1
     # Random seed as time
-    rng = np.random.default_rng() # Random Number Generator (RNG) object
+    rng = np.random.default_rng(seed) # Random Number Generator (RNG) object
 
     # Default resolution for figures
     plt.rcParams["figure.dpi"] = 100 # Default value of dpi = 300
@@ -176,7 +176,7 @@ def initialization(n_sim,save_data):
 #     Initialize the crystal grid structure - nodes with empty spaces
 # =============================================================================
         Co_latt = Crystal_Lattice(lattice_properties,experimental_conditions,Act_E_list,ovito_file,superbasin_parameters)
-     
+
         # Maximum probability per site for deposition to establish a timestep limits
         # The maximum timestep is that one that occupy X% of the site during the deposition process
         P_limits = 0.02
