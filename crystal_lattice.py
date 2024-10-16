@@ -11,6 +11,11 @@ from scipy import constants
 import numpy as np
 from matplotlib import cm
 
+# Pymatgen for creating crystal structure and connect with Crystallography Open Database or Material Project
+from pymatgen.ext.cod import COD
+from pymatgen.core.operations import SymmOp
+from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
+
 from ovito.data import *
 from ovito.pipeline import *
 from ovito.vis import *
@@ -80,8 +85,21 @@ class Crystal_Lattice():
             self.cell = cell
         
         
+    
     # Model with all the possible lattice points
+    
     def lattice_model(self):
+        
+        id_material = 5000216
+        # Initialize COD with the database URL
+        cod = COD()
+        Co_structure = cod.get_structure_by_id(id_material)
+        # Number of unitcells
+        nx = 1# Unit cells
+        ny = 1 # Unit cells
+        nz = 1 # Unit cells
+        
+    def lattice_model_old(self):
         
         # Face centered cubic - 1 specie
         if self.bravais_latt == 'fcc':

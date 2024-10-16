@@ -444,11 +444,11 @@ class Island:
         self.z_starting_pos_cart = z_starting_pos_cart
         self.island_sites = island_sites
         
-    def layers_calculation(self,Co_latt):
+    def layers_calculation(self,Cu_latt):
         
-        grid_crystal = Co_latt.grid_crystal
-        z_step = Co_latt.basis_vectors[0][2]
-        z_steps = int(Co_latt.crystal_size[2]/z_step + 1)
+        grid_crystal = Cu_latt.grid_crystal
+        z_step = Cu_latt.basis_vectors[0][2]
+        z_steps = int(Cu_latt.crystal_size[2]/z_step + 1)
         layers = [0] * z_steps  # Initialize each layer separately
         
         for idx in self.island_sites:
@@ -458,16 +458,16 @@ class Island:
         
         self.layers = layers
         
-        self.island_terrace(Co_latt)
+        self.island_terrace(Cu_latt)
     
-    def island_terrace(self,Co_latt):
+    def island_terrace(self,Cu_latt):
         
-        grid_crystal = Co_latt.grid_crystal
-        z_step = Co_latt.basis_vectors[0][2]
-        z_steps = int(Co_latt.crystal_size[2]/z_step + 1)
+        grid_crystal = Cu_latt.grid_crystal
+        z_step = Cu_latt.basis_vectors[0][2]
+        z_steps = int(Cu_latt.crystal_size[2]/z_step + 1)
         sites_per_layer = len(grid_crystal)/z_steps
 
-        area_per_site = Co_latt.crystal_size[0] * Co_latt.crystal_size[1] / sites_per_layer
+        area_per_site = Cu_latt.crystal_size[0] * Cu_latt.crystal_size[1] / sites_per_layer
         
         terraces = [(self.layers[i-1] - self.layers[i]) * area_per_site for i in range(1,len(self.layers))
                     if (self.layers[i-1] - self.layers[i]) * area_per_site > 0]

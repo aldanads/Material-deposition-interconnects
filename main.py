@@ -58,10 +58,10 @@ def main():
     for n_sim in range(0,1):
         
     
-        Co_latt,rng,paths,Results = initialization(n_sim,save_data)
-        Co_latt.add_time()
+        Cu_latt,rng,paths,Results = initialization(n_sim,save_data)
+        Cu_latt.add_time()
     
-        Co_latt.plot_crystal(45,45)    
+        Cu_latt.plot_crystal(45,45)    
         j = 0
         
         snapshoots_steps = int(1e1)
@@ -71,44 +71,44 @@ def main():
     #     Deposition
     # 
     # =============================================================================
-        if Co_latt.experiment == 'deposition':   
+        if Cu_latt.experiment == 'deposition':   
             
             nothing_happen = 0
             list_time_step = []
             thickness_limit = 0.3 # (1 nm)
-            Co_latt.measurements_crystal()
+            Cu_latt.measurements_crystal()
             i = 0
     
-            while Co_latt.thickness < thickness_limit:
+            while Cu_latt.thickness < thickness_limit:
                 i+=1
-                Co_latt,KMC_time_step = KMC(Co_latt,rng)
+                Cu_latt,KMC_time_step = KMC(Cu_latt,rng)
                 list_time_step.append(KMC_time_step)
-                #Co_latt.deposition_specie(KMC_time_step,rng)
-                if np.mean(list_time_step[-Co_latt.n_search_superbasin:]) <= Co_latt.time_step_limits:
+                #Cu_latt.deposition_specie(KMC_time_step,rng)
+                if np.mean(list_time_step[-Cu_latt.n_search_superbasin:]) <= Cu_latt.time_step_limits:
                     nothing_happen +=1    
                 else:
                     nothing_happen = 0
                 
-                if nothing_happen >= Co_latt.n_search_superbasin:
-                    search_superbasin(Co_latt)
+                if nothing_happen >= Cu_latt.n_search_superbasin:
+                    search_superbasin(Cu_latt)
                     nothing_happen = 0
     
             
                 if i%snapshoots_steps== 0:
-                    Co_latt.add_time()
+                    Cu_latt.add_time()
                     
                     j+=1
-                    Co_latt.measurements_crystal()
-                    # print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',Co_latt.list_time[-1])
-                    # print(str(Co_latt.list_time[-1]/time_limit * 100) + ' %','| Total time: ',Co_latt.list_time[-1])
-                    print(str(Co_latt.thickness/thickness_limit * 100) + ' %','| Thickness: ', Co_latt.thickness, '| Total time: ',Co_latt.list_time[-1])
+                    Cu_latt.measurements_crystal()
+                    # print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',Cu_latt.list_time[-1])
+                    # print(str(Cu_latt.list_time[-1]/time_limit * 100) + ' %','| Total time: ',Cu_latt.list_time[-1])
+                    print(str(Cu_latt.thickness/thickness_limit * 100) + ' %','| Thickness: ', Cu_latt.thickness, '| Total time: ',Cu_latt.list_time[-1])
                     end_time = time.time()
                     if save_data:
-                        Results.measurements_crystal(Co_latt.list_time[-1],Co_latt.mass_gained,Co_latt.fraction_sites_occupied,
-                                                      Co_latt.thickness,np.mean(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),np.std(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),max(Co_latt.terraces),
-                                                      Co_latt.surf_roughness_RMS,end_time-starting_time)
+                        Results.measurements_crystal(Cu_latt.list_time[-1],Cu_latt.mass_gained,Cu_latt.fraction_sites_occupied,
+                                                      Cu_latt.thickness,np.mean(np.array(Cu_latt.terraces)[np.array(Cu_latt.terraces) > 0]),np.std(np.array(Cu_latt.terraces)[np.array(Cu_latt.terraces) > 0]),max(Cu_latt.terraces),
+                                                      Cu_latt.surf_roughness_RMS,end_time-starting_time)
         
-                    Co_latt.plot_crystal(45,45,paths['data'],j)
+                    Cu_latt.plot_crystal(45,45,paths['data'],j)
                     
                     # print('j = ',j)
                     # if j >= 20:
@@ -118,35 +118,35 @@ def main():
     #     Annealing  
     #            
     # =============================================================================
-        elif Co_latt.experiment == 'annealing':
+        elif Cu_latt.experiment == 'annealing':
             i = 0
             #otal_steps = int(2.5e6)
             total_steps = int(100)
-            Co_latt.measurements_crystal()
+            Cu_latt.measurements_crystal()
             
             while j*snapshoots_steps < total_steps:
     
                 i+=1
-                Co_latt,KMC_time_step = KMC(Co_latt,rng)
+                Cu_latt,KMC_time_step = KMC(Cu_latt,rng)
                 
                 if i%snapshoots_steps== 0:
-                    Co_latt.add_time()
+                    Cu_latt.add_time()
                     j+=1
-                    Co_latt.measurements_crystal()
-                    print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',Co_latt.list_time[-1])
+                    Cu_latt.measurements_crystal()
+                    print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',Cu_latt.list_time[-1])
                     end_time = time.time()
                     if save_data:
-                        Results.measurements_crystal(Co_latt.list_time[-1],Co_latt.mass_gained,Co_latt.fraction_sites_occupied,
-                                                      Co_latt.thickness,np.mean(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),np.std(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),max(Co_latt.terraces),
-                                                      Co_latt.surf_roughness_RMS,end_time-starting_time)
+                        Results.measurements_crystal(Cu_latt.list_time[-1],Cu_latt.mass_gained,Cu_latt.fraction_sites_occupied,
+                                                      Cu_latt.thickness,np.mean(np.array(Cu_latt.terraces)[np.array(Cu_latt.terraces) > 0]),np.std(np.array(Cu_latt.terraces)[np.array(Cu_latt.terraces) > 0]),max(Cu_latt.terraces),
+                                                      Cu_latt.surf_roughness_RMS,end_time-starting_time)
                         
-                    Co_latt.plot_crystal(45,45,paths['data'],j)
+                    Cu_latt.plot_crystal(45,45,paths['data'],j)
     
     
-        Co_latt.plot_crystal(45,45)
+        Cu_latt.plot_crystal(45,45)
         
         # Variables to save
-        variables = {'Co_latt' : Co_latt}
+        variables = {'Cu_latt' : Cu_latt}
         if save_data: save_variables(paths['program'],variables)
 
 

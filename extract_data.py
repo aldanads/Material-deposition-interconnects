@@ -82,41 +82,41 @@ for subs in folder_subs:
                     # Call load method to deserialze
                     myvar = pickle.load(file)
                     
-                Co_latt = myvar['Co_latt']
-                Co_latt.peak_detection()
-                Co_latt.islands_analysis()
-                Co_latt.neighbors_calculation()
-                Co_latt.RMS_roughness()
+                Cu_latt = myvar['Cu_latt']
+                Cu_latt.peak_detection()
+                Cu_latt.islands_analysis()
+                Cu_latt.neighbors_calculation()
+                Cu_latt.RMS_roughness()
 
                 peak_size = []
-                for peak in Co_latt.peak_list:
+                for peak in Cu_latt.peak_list:
                     if len(peak.island_sites) > 10:
                         peak_size.append(len(peak.island_sites))
                                         
                 peak_mean_size = np.mean(peak_size)
                 peak_std_size = np.std(peak_size)
                 islands_terraces = []
-                Co_latt.terrace_area()
-                for island in Co_latt.islands_list:
-                    island.layers_calculation(Co_latt)
+                Cu_latt.terrace_area()
+                for island in Cu_latt.islands_list:
+                    island.layers_calculation(Cu_latt)
                     islands_terraces.append(np.mean(np.array(island.terraces)[np.array(island.terraces) != 0]))
                 
                 # Results: thickness, roughness, islands, terraces
                 peak_size_max = max(peak_size) if peak_size else 0
-                Results.measurements_crystal(subs,folder_P,temperature[folder],Co_latt.thickness,Co_latt.Ra_roughness,Co_latt.z_mean,Co_latt.surf_roughness_RMS,
+                Results.measurements_crystal(subs,folder_P,temperature[folder],Cu_latt.thickness,Cu_latt.Ra_roughness,Cu_latt.z_mean,Cu_latt.surf_roughness_RMS,
                                              len(peak_size),np.mean(peak_size),np.std(peak_size),peak_size_max
-                                             ,np.mean(islands_terraces),np.std(islands_terraces),max(islands_terraces),np.mean(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),np.std(np.array(Co_latt.terraces)[np.array(Co_latt.terraces) > 0]),max(Co_latt.terraces))
+                                             ,np.mean(islands_terraces),np.std(islands_terraces),max(islands_terraces),np.mean(np.array(Cu_latt.terraces)[np.array(Cu_latt.terraces) > 0]),np.std(np.array(Cu_latt.terraces)[np.array(Cu_latt.terraces) > 0]),max(Cu_latt.terraces))
                 
                 # Size of terrace per layer
-                df_histogram_terraces = pd.DataFrame({subs + '_' + folder_P + '_' + str(temperature[folder]) + '_terrace_area': Co_latt.terraces})   
+                df_histogram_terraces = pd.DataFrame({subs + '_' + folder_P + '_' + str(temperature[folder]) + '_terrace_area': Cu_latt.terraces})   
                 dfs_histogram_terraces.append(df_histogram_terraces)
                 
                 # Histogram of neighbors
-                df_histogram_neighbors = pd.DataFrame({subs + '_' + folder_P + '_' + str(temperature[folder]) + '_neighbors': Co_latt.histogram_neighbors})   
+                df_histogram_neighbors = pd.DataFrame({subs + '_' + folder_P + '_' + str(temperature[folder]) + '_neighbors': Cu_latt.histogram_neighbors})   
                 dfs_histogram_neighbors.append(df_histogram_neighbors)
                 
                 # Ocuppation rate per layer
-                df_occ_rate = pd.DataFrame({subs + '_' + folder_P + '_' + str(temperature[folder]) + '_occupation_rate': Co_latt.layers[1]})   
+                df_occ_rate = pd.DataFrame({subs + '_' + folder_P + '_' + str(temperature[folder]) + '_occupation_rate': Cu_latt.layers[1]})   
                 dfs_occ_rate.append(df_occ_rate)
                 
 

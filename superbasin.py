@@ -22,16 +22,16 @@ import time
 
 class Superbasin():
     
-    def __init__(self,idx, Co_latt,E_min):
+    def __init__(self,idx, Cu_latt,E_min):
         
         self.particle_idx = idx
         self.E_min = E_min
-        # Make a deep copy of Co_latt to avoid modifying the original object
+        # Make a deep copy of Cu_latt to avoid modifying the original object
 
-        sites_occupied = Co_latt.sites_occupied
-        grid_crystal = Co_latt.grid_crystal
-        num_event = Co_latt.num_event
-        self.trans_absorbing_states(idx,Co_latt)
+        sites_occupied = Cu_latt.sites_occupied
+        grid_crystal = Cu_latt.grid_crystal
+        num_event = Cu_latt.num_event
+        self.trans_absorbing_states(idx,Cu_latt)
         
         self.transition_matrix()
         self.markov_matrix()
@@ -40,12 +40,12 @@ class Superbasin():
         self.calculate_superbasin_environment(grid_crystal)
         
    
-    def trans_absorbing_states(self,start_idx,Co_latt):
+    def trans_absorbing_states(self,start_idx,Cu_latt):
         
         stack = [start_idx]
         visited = set()
 
-        grid_crystal = Co_latt.grid_crystal
+        grid_crystal = Cu_latt.grid_crystal
         self.absorbing_states = []
         self.transient_states_transitions = []
         self.absorbing_states_transitions = []
@@ -83,9 +83,9 @@ class Superbasin():
                                 
             # Virtual migrations to calculate activation energies
             if stack:
-                Co_latt.processes((transition[0], stack[-1], transition[2], idx))
+                Cu_latt.processes((transition[0], stack[-1], transition[2], idx))
         
-        Co_latt.processes((transition[0], start_idx, transition[2], idx)) 
+        Cu_latt.processes((transition[0], start_idx, transition[2], idx)) 
 
         # Construct the transitions to the absorbing states
         for absorbing_state in self.absorbing_states: 
