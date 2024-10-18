@@ -7,11 +7,11 @@ Created on Wed Jan 17 17:43:50 2024
 from balanced_tree import Node, build_tree, update_data, search_value
 import numpy as np
 
-def KMC(Cu_latt,rng):
+def KMC(System_state,rng):
         
     time_step = 0
-    grid_crystal = Cu_latt.grid_crystal
-    superbasin_dict = Cu_latt.superbasin_dict
+    grid_crystal = System_state.grid_crystal
+    superbasin_dict = System_state.superbasin_dict
 
 # =============================================================================
 #     TR_catalog store:
@@ -22,7 +22,7 @@ def KMC(Cu_latt,rng):
 # =============================================================================
     TR_catalog = []
 
-    for idx in Cu_latt.sites_occupied + Cu_latt.adsorption_sites:
+    for idx in System_state.sites_occupied + System_state.adsorption_sites:
         if idx not in superbasin_dict:
             TR_catalog.extend([(item[0],item[1],item[2],idx) for item in grid_crystal[idx].site_events])
         else:
@@ -37,7 +37,7 @@ def KMC(Cu_latt,rng):
     sumTR = update_data(TR_tree)
     
 
-    if sumTR == None: return Cu_latt,time_step # Exit if there is not possible event
+    if sumTR == None: return System_state,time_step # Exit if there is not possible event
     # When we only have one node in the tree, it returns a tuple
     if type(sumTR) is tuple: sumTR = sumTR[0]
     # We search in our binary tree the event that happen
@@ -46,16 +46,16 @@ def KMC(Cu_latt,rng):
     time_step += -np.log(rng.random())/sumTR
     # If the time step is big because of the TR, we need to allow the deposition process to occur
     # We establish a time step limits that the deposition is relevant
-    if time_step > Cu_latt.timestep_limits:
+    if time_step > System_state.timestep_limits:
 
-        time_step = Cu_latt.timestep_limits
+        time_step = System_state.timestep_limits
         if rng.random() < 1-np.exp(-sumTR*time_step):
-            Cu_latt.processes(chosen_event)
+            System_state.processes(chosen_event)
 
     else:
-        Cu_latt.processes(chosen_event)
-    Cu_latt.track_time(time_step)  
-    Cu_latt.update_superbasin(chosen_event)
+        System_state.processes(chosen_event)
+    System_state.track_time(time_step)  
+    System_state.update_superbasin(chosen_event)
     
 
-    return Cu_latt,time_step
+    return System_state,time_step

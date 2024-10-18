@@ -47,115 +47,116 @@ Optimize:
 import cProfile
 import sys
 
-def main():
-    from initialization import initialization,save_variables,search_superbasin
-    from KMC import KMC
-    import numpy as np
-    import time
+# def main():
+from initialization import initialization,save_variables,search_superbasin
+from KMC import KMC
+import numpy as np
+import time
+
+save_data = False
+
+for n_sim in range(0,1):
     
-    save_data = False
+
+    System_state,rng,paths,Results = initialization(n_sim,save_data)
+    quit()
+    System_state.add_time()
+
+    System_state.plot_crystal(45,45)    
+    j = 0
     
-    for n_sim in range(0,1):
+    snapshoots_steps = int(1e1)
+    starting_time = time.time()
+
+# =============================================================================
+#     Deposition
+# 
+# =============================================================================
+    if System_state.experiment == 'deposition':   
         
-    
-        Cu_latt,rng,paths,Results = initialization(n_sim,save_data)
-        Cu_latt.add_time()
-    
-        Cu_latt.plot_crystal(45,45)    
-        j = 0
-        
-        snapshoots_steps = int(1e1)
-        starting_time = time.time()
-    
-    # =============================================================================
-    #     Deposition
-    # 
-    # =============================================================================
-        if Cu_latt.experiment == 'deposition':   
+        nothing_happen = 0
+        list_time_step = []
+        thickness_limit = 0.3 # (1 nm)
+        System_state.measurements_crystal()
+        i = 0
+
+        while System_state.thickness < thickness_limit:
+            i+=1
+            System_state,KMC_time_step = KMC(System_state,rng)
+            list_time_step.append(KMC_time_step)
+            #System_state.deposition_specie(KMC_time_step,rng)
+            if np.mean(list_time_step[-System_state.n_search_superbasin:]) <= System_state.time_step_limits:
+                nothing_happen +=1    
+            else:
+                nothing_happen = 0
             
-            nothing_happen = 0
-            list_time_step = []
-            thickness_limit = 0.3 # (1 nm)
-            Cu_latt.measurements_crystal()
-            i = 0
-    
-            while Cu_latt.thickness < thickness_limit:
-                i+=1
-                Cu_latt,KMC_time_step = KMC(Cu_latt,rng)
-                list_time_step.append(KMC_time_step)
-                #Cu_latt.deposition_specie(KMC_time_step,rng)
-                if np.mean(list_time_step[-Cu_latt.n_search_superbasin:]) <= Cu_latt.time_step_limits:
-                    nothing_happen +=1    
-                else:
-                    nothing_happen = 0
+            if nothing_happen >= System_state.n_search_superbasin:
+                search_superbasin(System_state)
+                nothing_happen = 0
+
+        
+            if i%snapshoots_steps== 0:
+                System_state.add_time()
                 
-                if nothing_happen >= Cu_latt.n_search_superbasin:
-                    search_superbasin(Cu_latt)
-                    nothing_happen = 0
+                j+=1
+                System_state.measurements_crystal()
+                # print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',System_state.list_time[-1])
+                # print(str(System_state.list_time[-1]/time_limit * 100) + ' %','| Total time: ',System_state.list_time[-1])
+                print(str(System_state.thickness/thickness_limit * 100) + ' %','| Thickness: ', System_state.thickness, '| Total time: ',System_state.list_time[-1])
+                end_time = time.time()
+                if save_data:
+                    Results.measurements_crystal(System_state.list_time[-1],System_state.mass_gained,System_state.fraction_sites_occupied,
+                                                  System_state.thickness,np.mean(np.array(System_state.terraces)[np.array(System_state.terraces) > 0]),np.std(np.array(System_state.terraces)[np.array(System_state.terraces) > 0]),max(System_state.terraces),
+                                                  System_state.surf_roughness_RMS,end_time-starting_time)
     
-            
-                if i%snapshoots_steps== 0:
-                    Cu_latt.add_time()
-                    
-                    j+=1
-                    Cu_latt.measurements_crystal()
-                    # print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',Cu_latt.list_time[-1])
-                    # print(str(Cu_latt.list_time[-1]/time_limit * 100) + ' %','| Total time: ',Cu_latt.list_time[-1])
-                    print(str(Cu_latt.thickness/thickness_limit * 100) + ' %','| Thickness: ', Cu_latt.thickness, '| Total time: ',Cu_latt.list_time[-1])
-                    end_time = time.time()
-                    if save_data:
-                        Results.measurements_crystal(Cu_latt.list_time[-1],Cu_latt.mass_gained,Cu_latt.fraction_sites_occupied,
-                                                      Cu_latt.thickness,np.mean(np.array(Cu_latt.terraces)[np.array(Cu_latt.terraces) > 0]),np.std(np.array(Cu_latt.terraces)[np.array(Cu_latt.terraces) > 0]),max(Cu_latt.terraces),
-                                                      Cu_latt.surf_roughness_RMS,end_time-starting_time)
-        
-                    Cu_latt.plot_crystal(45,45,paths['data'],j)
-                    
-                    # print('j = ',j)
-                    # if j >= 20:
-                    #     sys.exit()
-    
-    # =============================================================================
-    #     Annealing  
-    #            
-    # =============================================================================
-        elif Cu_latt.experiment == 'annealing':
-            i = 0
-            #otal_steps = int(2.5e6)
-            total_steps = int(100)
-            Cu_latt.measurements_crystal()
-            
-            while j*snapshoots_steps < total_steps:
-    
-                i+=1
-                Cu_latt,KMC_time_step = KMC(Cu_latt,rng)
+                System_state.plot_crystal(45,45,paths['data'],j)
                 
-                if i%snapshoots_steps== 0:
-                    Cu_latt.add_time()
-                    j+=1
-                    Cu_latt.measurements_crystal()
-                    print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',Cu_latt.list_time[-1])
-                    end_time = time.time()
-                    if save_data:
-                        Results.measurements_crystal(Cu_latt.list_time[-1],Cu_latt.mass_gained,Cu_latt.fraction_sites_occupied,
-                                                      Cu_latt.thickness,np.mean(np.array(Cu_latt.terraces)[np.array(Cu_latt.terraces) > 0]),np.std(np.array(Cu_latt.terraces)[np.array(Cu_latt.terraces) > 0]),max(Cu_latt.terraces),
-                                                      Cu_latt.surf_roughness_RMS,end_time-starting_time)
-                        
-                    Cu_latt.plot_crystal(45,45,paths['data'],j)
-    
-    
-        Cu_latt.plot_crystal(45,45)
+                # print('j = ',j)
+                # if j >= 20:
+                #     sys.exit()
+
+# =============================================================================
+#     Annealing  
+#            
+# =============================================================================
+    elif System_state.experiment == 'annealing':
+        i = 0
+        #otal_steps = int(2.5e6)
+        total_steps = int(100)
+        System_state.measurements_crystal()
         
-        # Variables to save
-        variables = {'Cu_latt' : Cu_latt}
-        if save_data: save_variables(paths['program'],variables)
+        while j*snapshoots_steps < total_steps:
+
+            i+=1
+            System_state,KMC_time_step = KMC(System_state,rng)
+            
+            if i%snapshoots_steps== 0:
+                System_state.add_time()
+                j+=1
+                System_state.measurements_crystal()
+                print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',System_state.list_time[-1])
+                end_time = time.time()
+                if save_data:
+                    Results.measurements_crystal(System_state.list_time[-1],System_state.mass_gained,System_state.fraction_sites_occupied,
+                                                  System_state.thickness,np.mean(np.array(System_state.terraces)[np.array(System_state.terraces) > 0]),np.std(np.array(System_state.terraces)[np.array(System_state.terraces) > 0]),max(System_state.terraces),
+                                                  System_state.surf_roughness_RMS,end_time-starting_time)
+                    
+                System_state.plot_crystal(45,45,paths['data'],j)
 
 
-# Use cProfile to profile the main function
-if __name__ == '__main__':
-    cProfile.run('main()', 'profile_output.prof')    
+    System_state.plot_crystal(45,45)
+    
+    # Variables to save
+    variables = {'System_state' : System_state}
+    if save_data: save_variables(paths['program'],variables)
 
-import pstats
 
-# Load and analyze the profiling results
-p = pstats.Stats('profile_output.prof')
-p.strip_dirs().sort_stats('time').print_stats(15)  # Show top 10 time-consuming functions
+# # Use cProfile to profile the main function
+# if __name__ == '__main__':
+#     cProfile.run('main()', 'profile_output.prof')    
+
+# import pstats
+
+# # Load and analyze the profiling results
+# p = pstats.Stats('profile_output.prof')
+# p.strip_dirs().sort_stats('time').print_stats(15)  # Show top 10 time-consuming functions

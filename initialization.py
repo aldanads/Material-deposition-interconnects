@@ -62,14 +62,16 @@ def initialization(n_sim,save_data):
 #         Crystal structure
 #         
 # =============================================================================
-        a = 0.358 # (nm)
-        b = 0.358 # (nm)
-        c = 0.358 # (nm)
-        lattice_constants = (a,b,c)
-        crystal_size = (2, 2,1) # (nm)
-        bravais_latt = ['fcc']
+        id_material = 5000216 # Cu
+        # a = 0.358 # (nm)
+        # b = 0.358 # (nm)
+        # c = 0.358 # (nm)
+        # lattice_constants = (a,b,c)
+        crystal_size = (20, 20,10) # (angstrom (Å))
+        # bravais_latt = ['fcc']
         orientation = ['001','111']
-        lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
+        # lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
+        crystal_features = [id_material,crystal_size,orientation[1]]
         
 # =============================================================================
 #             Superbasin parameters
@@ -175,12 +177,12 @@ def initialization(n_sim,save_data):
 # =============================================================================
 #     Initialize the crystal grid structure - nodes with empty spaces
 # =============================================================================
-        Cu_latt = Crystal_Lattice(lattice_properties,experimental_conditions,Act_E_list,ovito_file,superbasin_parameters)
+        System_state = Crystal_Lattice(crystal_features,experimental_conditions,Act_E_list,ovito_file,superbasin_parameters)
 
         # Maximum probability per site for deposition to establish a timestep limits
         # The maximum timestep is that one that occupy X% of the site during the deposition process
         P_limits = 0.02
-        Cu_latt.limit_kmc_timestep(P_limits)
+        System_state.limit_kmc_timestep(P_limits)
     
 # =============================================================================
 #     - test[0] - Normal deposition
@@ -197,14 +199,14 @@ def initialization(n_sim,save_data):
         test = [0,1,2,3,4,5,6,7,8]
 
         # Deposition process of chemical species
-        if Cu_latt.timestep_limits < float('inf'):
-            Cu_latt.deposition_specie(Cu_latt.timestep_limits,rng,test[test_selected])
-            Cu_latt.track_time(Cu_latt.timestep_limits) 
-            Cu_latt.add_time()
+        if System_state.timestep_limits < float('inf'):
+            System_state.deposition_specie(System_state.timestep_limits,rng,test[test_selected])
+            System_state.track_time(System_state.timestep_limits) 
+            System_state.add_time()
         else:
-            Cu_latt.deposition_specie(0,rng,test[test_selected])
-            Cu_latt.track_time(0) 
-            Cu_latt.add_time()
+            System_state.deposition_specie(0,rng,test[test_selected])
+            System_state.track_time(0) 
+            System_state.add_time()
             
     elif experiment == 'annealing':
         
@@ -218,33 +220,33 @@ def initialization(n_sim,save_data):
             # Call load method to deserialze
             myvar = pickle.load(file)
             
-        Cu_latt = myvar['Cu_latt']
+        System_state = myvar['System_state']
         
         temp = [300,500,800] #(K)
         
-        Cu_latt.temperature = temp[n_sim]
-        Cu_latt.experiment = experiment
+        System_state.temperature = temp[n_sim]
+        System_state.experiment = experiment
         P_limits = 1
-        Cu_latt.limit_kmc_timestep(P_limits)
-        Cu_latt.time = 0
-        Cu_latt.list_time = []
+        System_state.limit_kmc_timestep(P_limits)
+        System_state.time = 0
+        System_state.list_time = []
 
-    return Cu_latt,rng,paths,Results
+    return System_state,rng,paths,Results
 
 
-def search_superbasin(Cu_latt):
+def search_superbasin(System_state):
           
-    # We need a deepcopy? Cu_latt.sites_occupied will be modified on site
+    # We need a deepcopy? System_state.sites_occupied will be modified on site
     # when calling Superbasin() and it will change the order of sites_occupied
-    # sites_occupied = copy.deepcopy(Cu_latt.sites_occupied)
+    # sites_occupied = copy.deepcopy(System_state.sites_occupied)
     
     # This approach should be more efficient and memory-friendly
-    sites_occupied = Cu_latt.sites_occupied[:] 
+    sites_occupied = System_state.sites_occupied[:] 
 
     for idx in sites_occupied:
-        for event in Cu_latt.grid_crystal[idx].site_events:
-            if (idx not in Cu_latt.superbasin_dict) and (event[3] <= Cu_latt.E_min):
-                Cu_latt.superbasin_dict.update({idx: Superbasin(idx, Cu_latt, Cu_latt.E_min)})
+        for event in System_state.grid_crystal[idx].site_events:
+            if (idx not in System_state.superbasin_dict) and (event[3] <= System_state.E_min):
+                System_state.superbasin_dict.update({idx: Superbasin(idx, System_state, System_state.E_min)})
                 
 
 def save_simulation(files_copy,dst,n_sim):

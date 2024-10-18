@@ -36,31 +36,31 @@ class Site():
 # =============================================================================
     def neighbors_analysis(self,grid_crystal,neigh_idx,neigh_cart,crystal_size,event_labels,idx_origin):
        
+        tol = 1e-6
         #num_event = 0
         for idx,pos in zip(neigh_idx,neigh_cart):
             if tuple(idx) in grid_crystal:
                 self.nearest_neighbors_idx.append(tuple(idx))             
                 self.nearest_neighbors_cart.append(tuple(pos))
                 
-
                 # Migration in the plane
-                if round(pos[2]-self.position[2],3) == 0:
+                if -tol <= (pos[2]-self.position[2]) <= tol:
                     self.migration_paths['Plane'].append([tuple(idx),event_labels[tuple(idx - np.array(idx_origin))]])
                 
                 # Migration upward
-                elif round(pos[2]-self.position[2],3) > 0:
+                elif (pos[2]-self.position[2]) > tol:
                     self.migration_paths['Up'].append([tuple(idx),event_labels[tuple(idx - np.array(idx_origin))]])
                     
                 # Migration downward
-                elif round(pos[2]-self.position[2],3) < 0:
+                elif (pos[2]-self.position[2]) < -tol:
                     self.migration_paths['Down'].append([tuple(idx),event_labels[tuple(idx - np.array(idx_origin))]])
 
                     
             # Establish boundary conditions for neighbors in xy plane
             # If pos is out of the boundary in xy but within z limits:
-            elif (0 <= pos[2] <= crystal_size[2]):
+            elif (-tol <= pos[2] <= crystal_size[2] + tol):
                 # Apply periodic boundary conditions in the xy plane
-                pos = (round(pos[0] % crystal_size[0], 3), round(pos[1] % crystal_size[1], 3), pos[2])
+                pos = (pos[0] % crystal_size[0], pos[1] % crystal_size[1], pos[2])
     
                 # Find the nearest neighbor within the grid
                 min_dist, min_dist_idx = min(
@@ -72,17 +72,18 @@ class Site():
                 self.nearest_neighbors_cart.append(tuple(grid_crystal[min_dist_idx].position))
 
                 # Migration in the plane
-                if round(pos[2]-self.position[2],3) == 0:
+                if -tol <= (pos[2]-self.position[2]) <= tol:
                     self.migration_paths['Plane'].append([tuple(min_dist_idx),event_labels[tuple(idx - np.array(idx_origin))]])
                             
                 # Migration upward
-                elif round(pos[2]-self.position[2],3) > 0:
+                elif (pos[2]-self.position[2]) > tol:
                     self.migration_paths['Up'].append([tuple(min_dist_idx),event_labels[tuple(idx - np.array(idx_origin))]])
                         
                 # Migration downward
-                elif round(pos[2]-self.position[2],3) < 0:
+                elif (pos[2]-self.position[2]) < -tol:               
                     self.migration_paths['Down'].append([tuple(min_dist_idx),event_labels[tuple(idx - np.array(idx_origin))]])
               
+        
             
 # =============================================================================
 #         Occupied sites supporting this node
@@ -444,11 +445,11 @@ class Island:
         self.z_starting_pos_cart = z_starting_pos_cart
         self.island_sites = island_sites
         
-    def layers_calculation(self,Cu_latt):
+    def layers_calculation(self,System_state):
         
-        grid_crystal = Cu_latt.grid_crystal
-        z_step = Cu_latt.basis_vectors[0][2]
-        z_steps = int(Cu_latt.crystal_size[2]/z_step + 1)
+        grid_crystal = System_state.grid_crystal
+        z_step = System_state.basis_vectors[0][2]
+        z_steps = int(System_state.crystal_size[2]/z_step + 1)
         layers = [0] * z_steps  # Initialize each layer separately
         
         for idx in self.island_sites:
@@ -458,16 +459,16 @@ class Island:
         
         self.layers = layers
         
-        self.island_terrace(Cu_latt)
+        self.island_terrace(System_state)
     
-    def island_terrace(self,Cu_latt):
+    def island_terrace(self,System_state):
         
-        grid_crystal = Cu_latt.grid_crystal
-        z_step = Cu_latt.basis_vectors[0][2]
-        z_steps = int(Cu_latt.crystal_size[2]/z_step + 1)
+        grid_crystal = System_state.grid_crystal
+        z_step = System_state.basis_vectors[0][2]
+        z_steps = int(System_state.crystal_size[2]/z_step + 1)
         sites_per_layer = len(grid_crystal)/z_steps
 
-        area_per_site = Cu_latt.crystal_size[0] * Cu_latt.crystal_size[1] / sites_per_layer
+        area_per_site = System_state.crystal_size[0] * System_state.crystal_size[1] / sites_per_layer
         
         terraces = [(self.layers[i-1] - self.layers[i]) * area_per_site for i in range(1,len(self.layers))
                     if (self.layers[i-1] - self.layers[i]) * area_per_site > 0]

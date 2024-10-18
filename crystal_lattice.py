@@ -29,12 +29,14 @@ from concurrent.futures import ThreadPoolExecutor
 
 class Crystal_Lattice():
     
-    def __init__(self,lattice_properties,experimental_conditions,Act_E_list,ovito_file,superbasin_parameters):
-        self.lattice_constants = lattice_properties[0]
-        self.crystal_size = lattice_properties[1]
-        self.bravais_latt = lattice_properties[2]
-        self.latt_orientation = lattice_properties[3]
-        self.chemical_specie = experimental_conditions[4]
+    def __init__(self,crystal_features,experimental_conditions,Act_E_list,ovito_file,superbasin_parameters):
+        
+        # self.lattice_constants = lattice_properties[0]
+        self.id_material = crystal_features[0]
+        self.crystal_size = crystal_features[1]
+        # self.bravais_latt = lattice_properties[2]
+        self.latt_orientation = crystal_features[2]
+        # self.chemical_specie = experimental_conditions[4]
         self.temperature = experimental_conditions[3]
         self.mass_specie = experimental_conditions[2]
         self.experiment = experimental_conditions[5]
@@ -52,8 +54,13 @@ class Crystal_Lattice():
         self.crystal_grid()
         
         # Events corresponding to migrations + superbasin migration (+1) + deposition (+1)
-        self.num_event = len(self.latt.get_neighbor_positions((0,0,0))) + 2
-        self.calculate_crystallographic_planes()
+        # self.num_event = len(self.latt.get_neighbor_positions((0,0,0))) + 2
+        self.num_event = len(self.structure.get_neighbors(self.structure[0],3)) + 2
+        
+        """
+        REVISE self.calculate_crystallographic_planes() --> pymatgen has a method for this
+        """
+        # self.calculate_crystallographic_planes()
         
 
         self.sites_occupied = [] # Sites occupy be a chemical specie
@@ -67,7 +74,7 @@ class Crystal_Lattice():
         update_specie_events = set()
         
         
-        self.update_sites(update_specie_events,update_supp_av)
+        # self.update_sites(update_specie_events,update_supp_av)
         
 
         
@@ -84,21 +91,98 @@ class Crystal_Lattice():
             
             self.cell = cell
         
-        
     
     # Model with all the possible lattice points
     
     def lattice_model(self):
-        
-        id_material = 5000216
+
         # Initialize COD with the database URL
         cod = COD()
-        Co_structure = cod.get_structure_by_id(id_material)
-        # Number of unitcells
-        nx = 1# Unit cells
-        ny = 1 # Unit cells
-        nz = 1 # Unit cells
+        self.structure_basic = cod.get_structure_by_id(self.id_material)
         
+        """
+        REVISE self.basis_vectors and self.lattice_constants --> They are in structure --> Remove when it is not needed
+        """
+        self.lattice_constants = tuple(np.array(self.structure_basic.lattice.abc)/10)
+        
+        
+        self.chemical_specie = self.structure_basic.composition.reduced_formula
+        
+        if self.latt_orientation == '001':
+            
+            dimensions = [int(self.crystal_size[i] / self.structure.lattice.abc[i]) + 1 for i in range(3)]
+            self.basis_vectors = np.array(self.structure_basic.lattice.matrix)/2 # Basis vector in nm and half cell size
+            self.structure = self.structure_basic.copy()
+            self.structure.make_supercell(dimensions)
+                        
+        elif self.latt_orientation == '111':
+            
+            # Rotation matrix to align crystal with 111 direction to z-axis
+            rotation_matrix = np.array([
+                [1/np.sqrt(6), -1/np.sqrt(6), 2/np.sqrt(6)],
+                [1/np.sqrt(2), 1/np.sqrt(2), 0],
+                [-1/np.sqrt(3), 1/np.sqrt(3), 1/np.sqrt(3)]
+            ])
+            
+            # Symmetry operation
+            symm_op = SymmOp.from_rotation_and_translation(rotation_matrix, [0, 0, 0])
+
+            # Apply the rotation to the structure
+            self.structure_basic.apply_operation(symm_op)
+            # Divide by 2 because in each cell there are 4 atoms --> We need it to map into integer idx
+            self.basis_vectors = np.array(self.structure_basic.lattice.matrix)/2 # Basis vector in nm and half cell size
+            self.structure = self.structure_basic.copy()
+
+            # Apply the CubicSupercellTransformation
+            min_dimension = max(self.crystal_size) 
+            transformation = CubicSupercellTransformation(min_length=min_dimension,force_90_degrees = True,step_size=0.3)
+            self.structure = transformation.apply_transformation(self.structure)
+            
+        self.crystal_size = self.structure.lattice.abc
+            
+    def crystal_grid(self):
+            radius_neighbors = 3
+            self.coord_cache = {}
+            
+            # np.linalg.solve --> To obtain the linear combination of the basis vector for the site coordinate
+            # We obtain integer idx
+            self.grid_crystal = {
+                self.get_idx_coords(site.coords,self.basis_vectors):Site("Empty",
+                    tuple(site.coords),
+                    self.activation_energies)
+                for site in self.structure
+            }
+            
+            
+            # Create labels for each possible migration pathway
+            neighbors = self.structure.get_neighbors(self.structure[0], radius_neighbors)
+            event_labels = {tuple(self.get_idx_coords(site.coords,self.basis_vectors) - np.array(self.get_idx_coords(self.structure[0].coords,self.basis_vectors))):i 
+                            for i,site in enumerate(neighbors)}
+            
+            print(event_labels)
+            
+            # Obtain the neighbors at each site
+            for site in self.structure:
+                # Neighbors for each idx in grid_crystal
+                idx = self.get_idx_coords(site.coords,self.basis_vectors)
+                neighbors = self.structure.get_neighbors(site,radius_neighbors)
+                neighbors_positions = [neigh.coords for neigh in neighbors]
+                neighbors_idx = [self.get_idx_coords(neigh.coords,self.basis_vectors) for neigh in neighbors]
+                self.grid_crystal[idx].neighbors_analysis(self.grid_crystal,neighbors_idx,neighbors_positions,
+                                        self.crystal_size,event_labels,idx)
+                
+
+    def get_idx_coords(self, coords,basis_vectors):
+            # Check if the coordinates are already in the cache
+            coords_tuple = tuple(coords)
+            if coords_tuple not in self.coord_cache:
+                # Calculate and cache the rounded coordinates
+                idx_coords = np.linalg.solve(basis_vectors.transpose(), coords)
+                idx_coords = tuple(np.round(idx_coords).astype(int))
+                self.coord_cache[coords_tuple] = idx_coords
+            return self.coord_cache[coords_tuple]
+
+
     def lattice_model_old(self):
         
         # Face centered cubic - 1 specie
@@ -128,7 +212,7 @@ class Crystal_Lattice():
                 self.basis_vectors = vectors_2
 
     # Initialize the crystal grid with no chemical species
-    def crystal_grid(self):
+    def crystal_grid_old(self):
         
         if self.latt_orientation == '001':
             # Dictionary with lattice coordinates (indexes) as keys and Site objects as values
@@ -143,7 +227,7 @@ class Crystal_Lattice():
             }
             
             # Pruning the neighbors according to the lattice domain
-            # E.g.: (0,0,0) only has 3 neighbors within the domain
+            # E.g.: (0,0,0) doesn't have the lower 3 neighbors
             #  - Nearest neighbors indexes
             #  - Nearest neighbors cartesian
             for idx,site in self.grid_crystal.items():
@@ -272,7 +356,7 @@ class Crystal_Lattice():
         # Otherwise, we count the sites in the layer 0
         n_sites_layer_0 = 0
         for site in self.grid_crystal.values():
-            if site.position[2] == 0:
+            if site.position[2] <= 1e-6:
                 n_sites_layer_0 += 1
 
 
