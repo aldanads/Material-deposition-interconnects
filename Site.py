@@ -25,7 +25,8 @@ class Site():
         # We start from zero everytime in case the 
         self.supp_by = set()
         # Position close to 0 are supported by the substrate
-        if self.position[2] == 0:
+        tol = 1e-6
+        if self.position[2] <= tol:
             self.supp_by.add('Substrate')
             
         self.cache_planes = {}
@@ -39,6 +40,7 @@ class Site():
         tol = 1e-6
         #num_event = 0
         for idx,pos in zip(neigh_idx,neigh_cart):
+
             if tuple(idx) in grid_crystal:
                 self.nearest_neighbors_idx.append(tuple(idx))             
                 self.nearest_neighbors_cart.append(tuple(pos))
@@ -59,6 +61,8 @@ class Site():
             # Establish boundary conditions for neighbors in xy plane
             # If pos is out of the boundary in xy but within z limits:
             elif (-tol <= pos[2] <= crystal_size[2] + tol):
+                
+ 
                 # Apply periodic boundary conditions in the xy plane
                 pos = (pos[0] % crystal_size[0], pos[1] % crystal_size[1], pos[2])
     
@@ -67,7 +71,7 @@ class Site():
                     ((np.linalg.norm(np.array(site.position) - np.array(pos)), idx) for idx, site in grid_crystal.items()),
                     key=lambda x: x[0]
                 )
-    
+                
                 self.nearest_neighbors_idx.append(tuple(min_dist_idx))
                 self.nearest_neighbors_cart.append(tuple(grid_crystal[min_dist_idx].position))
 
@@ -365,7 +369,11 @@ class Site():
             
     def detect_edges(self,grid_crystal):
         
-        
+        # Dummy result
+        self.edges_v = {1:111, 2:111, 3:111, 4:111, 5:111, 6:111, 7:111, 8:111,
+                        9:111, 10:111, 11:111, 12:111}
+        return
+
         mig_paths = self.migration_paths['Plane']
         edges_v = {2:None, 3:None, 4:None, 6:None, 10:None, 11:None}
         

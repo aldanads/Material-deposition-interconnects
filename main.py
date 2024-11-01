@@ -43,6 +43,15 @@ Optimize:
     - available_migration --> cache?
 """
 
+"""
+TASKS now:
+    - Problem with neighbors --> Some of them are not created
+"""
+"""
+REFACTOR CRYSTAL EDGE AND CRYSTALLOGRAPHIC PLANES IN GENERAL
+After using pymatgen, all those things changed
+"""
+
 
 import cProfile
 import sys
@@ -59,7 +68,6 @@ for n_sim in range(0,1):
     
 
     System_state,rng,paths,Results = initialization(n_sim,save_data)
-    quit()
     System_state.add_time()
 
     System_state.plot_crystal(45,45)    
@@ -82,6 +90,7 @@ for n_sim in range(0,1):
 
         while System_state.thickness < thickness_limit:
             i+=1
+            quit()
             System_state,KMC_time_step = KMC(System_state,rng)
             list_time_step.append(KMC_time_step)
             #System_state.deposition_specie(KMC_time_step,rng)
@@ -112,7 +121,7 @@ for n_sim in range(0,1):
                 System_state.plot_crystal(45,45,paths['data'],j)
                 
                 # print('j = ',j)
-                # if j >= 20:
+                # if j == 2:
                 #     sys.exit()
 
 # =============================================================================

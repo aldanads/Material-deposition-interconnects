@@ -60,7 +60,7 @@ class Crystal_Lattice():
         """
         REVISE self.calculate_crystallographic_planes() --> pymatgen has a method for this
         """
-        # self.calculate_crystallographic_planes()
+        self.calculate_crystallographic_planes()
         
 
         self.sites_occupied = [] # Sites occupy be a chemical specie
@@ -74,7 +74,7 @@ class Crystal_Lattice():
         update_specie_events = set()
         
         
-        # self.update_sites(update_specie_events,update_supp_av)
+        self.update_sites(update_specie_events,update_supp_av)
         
 
         
@@ -159,8 +159,8 @@ class Crystal_Lattice():
             event_labels = {tuple(self.get_idx_coords(site.coords,self.basis_vectors) - np.array(self.get_idx_coords(self.structure[0].coords,self.basis_vectors))):i 
                             for i,site in enumerate(neighbors)}
             
-            print(event_labels)
-            
+            tol = 1e-6
+            missing_sites = []
             # Obtain the neighbors at each site
             for site in self.structure:
                 # Neighbors for each idx in grid_crystal
@@ -168,8 +168,37 @@ class Crystal_Lattice():
                 neighbors = self.structure.get_neighbors(site,radius_neighbors)
                 neighbors_positions = [neigh.coords for neigh in neighbors]
                 neighbors_idx = [self.get_idx_coords(neigh.coords,self.basis_vectors) for neigh in neighbors]
+                
+                # Some sites are not created with the dictionary comprenhension
+                # If the sites have neighbors that are within the crystal dimension range
+                # but not included, we included
+                for neigh_idx,pos in zip(neighbors_idx,neighbors_positions):
+                    if (neigh_idx not in self.grid_crystal) and (-tol <= pos[2] <= self.crystal_size[2] + tol):
+                        pos_aux = (pos[0] % self.crystal_size[0], pos[1] % self.crystal_size[1], pos[2])
+                        
+                        # If not in the boundary region, where we should apply periodic boundary conditions
+                       
+                        if tuple(pos) == pos_aux:
+                            missing_sites.append([neigh_idx,pos])
+                            self.grid_crystal[neigh_idx] = Site("Empty",
+                                tuple(pos),
+                                self.activation_energies)
+                  
                 self.grid_crystal[idx].neighbors_analysis(self.grid_crystal,neighbors_idx,neighbors_positions,
                                         self.crystal_size,event_labels,idx)
+            
+            # Include neighbors of the missing sites
+            for idx,pos in missing_sites:
+                # Detect neighbors through coordinates
+                neighbors = self.structure.get_sites_in_sphere(pos,radius_neighbors)
+                neighbors = [neighbor for neighbor in neighbors if not np.allclose(neighbor.coords, pos)]
+                neighbors_positions = [neigh.coords for neigh in neighbors]
+                neighbors_idx = [self.get_idx_coords(neigh.coords,self.basis_vectors) for neigh in neighbors]
+                
+                self.grid_crystal[idx].neighbors_analysis(self.grid_crystal,neighbors_idx,neighbors_positions,
+                                        self.crystal_size,event_labels,idx)
+                
+ 
                 
 
     def get_idx_coords(self, coords,basis_vectors):
@@ -531,8 +560,12 @@ class Crystal_Lattice():
         elif test == 7:
             
             update_supp_av = set()
-            update_specie_events = []
-            idx = self.adsorption_sites[46]
+            update_specie_events = set()
+            
+            for site_idx in self.adsorption_sites:
+                if (self.crystal_size[0] * 0.45 < self.grid_crystal[site_idx].position[0] < self.crystal_size[0] * 0.55) and (self.crystal_size[1] * 0.45 < self.grid_crystal[site_idx].position[1] < self.crystal_size[1] * 0.55):
+                    idx = site_idx
+                    break
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
             self.update_sites(update_specie_events,update_supp_av)
@@ -542,9 +575,11 @@ class Crystal_Lattice():
                 update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
                 self.update_sites(update_specie_events,update_supp_av)
                 
-            # Particle next to the cluster
-            idx_neighbor_plane = self.grid_crystal[neighbor[0]].migration_paths['Plane'][1][0]
-            update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_plane,update_specie_events,update_supp_av)
+            # Particle next to the cluster --> Select a site that is not occupied
+            for idx_neighbor_plane in self.grid_crystal[neighbor[0]].migration_paths['Plane']:
+                if idx_neighbor_plane[0] not in self.sites_occupied: break
+            
+            update_specie_events,update_supp_av = self.introduce_specie_site(tuple(idx_neighbor_plane[0]),update_specie_events,update_supp_av)
             self.update_sites(update_specie_events,update_supp_av)
                 
             # Cluster over the copper
@@ -882,7 +917,7 @@ class Crystal_Lattice():
     def average_thickness(self):
         
         grid_crystal = self.grid_crystal
-        z_step = self.basis_vectors[0][2]
+        z_step = next((vec[2] for vec in self.basis_vectors if vec[2] > 0), None)
         z_steps = int(self.crystal_size[2]/z_step + 1)
         layers = [0] * z_steps  # Initialize each layer separately
         
