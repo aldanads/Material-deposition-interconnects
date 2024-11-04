@@ -518,9 +518,11 @@ class Crystal_Lattice():
         elif test == 5:
             
             update_supp_av = set()
-            update_specie_events = []
-            idx = self.adsorption_sites[46]
-            # Introduce specie in the site
+            update_specie_events = set()
+            for site_idx in self.adsorption_sites:
+                if (self.crystal_size[0] * 0.45 < self.grid_crystal[site_idx].position[0] < self.crystal_size[0] * 0.55) and (self.crystal_size[1] * 0.45 < self.grid_crystal[site_idx].position[1] < self.crystal_size[1] * 0.55):
+                    idx = site_idx
+                    break            # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
             self.update_sites(update_specie_events,update_supp_av)
 
@@ -536,7 +538,7 @@ class Crystal_Lattice():
         elif test == 6:
 
             update_supp_av = set()
-            update_specie_events = []
+            update_specie_events = set()
             idx = self.adsorption_sites[46]
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
@@ -592,11 +594,43 @@ class Crystal_Lattice():
 
             # Create a deque object for the queue
             queue = deque()
-            queue.append(self.adsorption_sites[52])
+            for site_idx in self.adsorption_sites:
+                if (self.crystal_size[0] * 0.45 < self.grid_crystal[site_idx].position[0] < self.crystal_size[0] * 0.55) and (self.crystal_size[1] * 0.45 < self.grid_crystal[site_idx].position[1] < self.crystal_size[1] * 0.55):
+                    idx = site_idx
+                    break
+            queue.append(idx)
             visited = set()
             cluster_size = 29
             
             self.bfs_cluster(queue,visited,cluster_size)
+            
+        elif test == 9:
+            from collections import deque
+
+            # Create a deque object for the queue
+            queue = deque()
+            for site_idx in self.adsorption_sites:
+                if (self.crystal_size[0] * 0.45 < self.grid_crystal[site_idx].position[0] < self.crystal_size[0] * 0.55) and (self.crystal_size[1] * 0.45 < self.grid_crystal[site_idx].position[1] < self.crystal_size[1] * 0.55):
+                    idx = site_idx
+                    break
+            queue.append(idx)
+            visited = set()
+            cluster_size = 29
+            
+            self.bfs_cluster(queue,visited,cluster_size)
+            
+            ad_sites_aux = self.adsorption_sites.copy()
+            for site_idx in ad_sites_aux:
+                if self.grid_crystal[site_idx].position[2] > 0.1:
+                    update_specie_events,update_supp_av = self.introduce_specie_site(site_idx,update_specie_events,update_supp_av)
+                    self.update_sites(update_specie_events,update_supp_av)
+                    
+            ad_sites_aux = self.adsorption_sites.copy()
+            for site_idx in ad_sites_aux:
+                if self.grid_crystal[site_idx].position[2] > 2.2:
+                    update_specie_events,update_supp_av = self.introduce_specie_site(site_idx,update_specie_events,update_supp_av)
+                    self.update_sites(update_specie_events,update_supp_av)
+            
             
 
             
@@ -823,7 +857,7 @@ class Crystal_Lattice():
     
             axa.set_xlim([0, self.crystal_size[0]]) 
             axa.set_ylim([0, self.crystal_size[1]])
-            axa.set_zlim([0, 2*self.crystal_size[2]])
+            axa.set_zlim([0, self.crystal_size[2]])
             axa.set_aspect('equal', 'box')
             
             
@@ -834,7 +868,7 @@ class Crystal_Lattice():
     
             axb.set_xlim([0, self.crystal_size[0]]) 
             axb.set_ylim([0, self.crystal_size[1]])
-            axb.set_zlim([0, 2*self.crystal_size[2]])
+            axb.set_zlim([0, self.crystal_size[2]])
             axb.set_aspect('equal', 'box')
     
     
@@ -1200,7 +1234,7 @@ class Crystal_Lattice():
         if current_idx_site not in visited:
             visited.add(current_idx_site)
             update_supp_av = set()
-            update_specie_events = []
+            update_specie_events = set()
             
             update_specie_events,update_supp_av = self.introduce_specie_site(current_idx_site,update_specie_events,update_supp_av)
             self.update_sites(update_specie_events,update_supp_av)
