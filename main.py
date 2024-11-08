@@ -75,7 +75,6 @@ for n_sim in range(0,1):
     
     snapshoots_steps = int(1e1)
     starting_time = time.time()
-
 # =============================================================================
 #     Deposition
 # 
@@ -84,13 +83,11 @@ for n_sim in range(0,1):
         
         nothing_happen = 0
         list_time_step = []
-        thickness_limit = 0.3 # (1 nm)
+        thickness_limit = 30 # (1 nm)
         System_state.measurements_crystal()
         i = 0
-
         while System_state.thickness < thickness_limit:
             i+=1
-            quit()
             System_state,KMC_time_step = KMC(System_state,rng)
             list_time_step.append(KMC_time_step)
             #System_state.deposition_specie(KMC_time_step,rng)

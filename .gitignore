@@ -1,5 +1,6 @@
 __pycache__/
 Version 2024-10-10/
+Version 2024-11-08/
 video_via_images.py
 images_to_video.py
 Figure.csv
@@ -8,3 +9,4 @@ Histogram_terraces.csv
 Occupation_rate.csv
 ovito_files.py
 profile_output.prof
+config.json

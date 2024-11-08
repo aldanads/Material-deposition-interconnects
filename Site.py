@@ -92,7 +92,7 @@ class Site():
 # =============================================================================
 #         Occupied sites supporting this node
 # =============================================================================    
-    def supported_by(self,grid_crystal,crystallographic_planes):
+    def supported_by(self,grid_crystal,wulff_facets):
                  
         # Go over the nearest neighbors
         for idx in self.nearest_neighbors_idx:
@@ -110,7 +110,7 @@ class Site():
 
         self.detect_edges(grid_crystal)               
         self.calculate_clustering_energy()
-        self.detect_planes(grid_crystal,crystallographic_planes)
+        self.detect_planes(grid_crystal,wulff_facets)
                 
     def calculate_clustering_energy(self,supp_by_destiny = 0,idx_origin = 0):
         
@@ -178,7 +178,7 @@ class Site():
                     new_site_events.append([site_idx, num_event, self.Act_E_list[0] + energy_change])
                     
                 # Migrating on the film (111)
-                elif grid_crystal[site_idx].crystallographic_direction == (111):
+                elif grid_crystal[site_idx].wulff_facet == (1,1,1):
                     
                     if self.edges_v[num_event] == None: 
                         new_site_events.append([site_idx, num_event, self.Act_E_list[7] + energy_change])
@@ -188,7 +188,7 @@ class Site():
                         new_site_events.append([site_idx, num_event, self.Act_E_list[9] + energy_change])
                         
                 # Migrating on the film (100)
-                elif grid_crystal[site_idx].crystallographic_direction == (100):
+                elif grid_crystal[site_idx].wulff_facet == (1,0,0):
                     new_site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
 
 
@@ -225,18 +225,18 @@ class Site():
                 energy_change = max(energy_site_destiny - self.energy_site, 0)
                
                 # Migrating upward from the substrate
-                if 'Substrate' in self.supp_by and grid_crystal[site_idx].crystallographic_direction == (111):
+                if 'Substrate' in self.supp_by and grid_crystal[site_idx].wulff_facet == (111):
                     new_site_events.append([site_idx, num_event, self.Act_E_list[1] + energy_change])
                 
-                elif 'Substrate' in self.supp_by and grid_crystal[site_idx].crystallographic_direction == (100):
+                elif 'Substrate' in self.supp_by and grid_crystal[site_idx].wulff_facet == (100):
                     new_site_events.append([site_idx, num_event, self.Act_E_list[5] + energy_change])
                     
                 # Migrating upward from the film (111)
-                elif self.crystallographic_direction == (111):
+                elif self.wulff_facet == (1,1,1):
                     new_site_events.append([site_idx, num_event, self.Act_E_list[3] + energy_change])
                     
                 # Migrating upward from the film (100)
-                elif self.crystallographic_direction ==  (100):
+                elif self.wulff_facet ==  (1,0,0):
                     new_site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
 
 
@@ -277,18 +277,18 @@ class Site():
                 energy_change = max(energy_site_destiny - self.energy_site, 0)
                 
                 # From layer 1 to substrate
-                if self.crystallographic_direction == (111) and 'Substrate' in grid_crystal[site_idx].supp_by:
+                if self.wulff_facet == (1,1,1) and 'Substrate' in grid_crystal[site_idx].supp_by:
                     new_site_events.append([site_idx, num_event, self.Act_E_list[2] + energy_change])
                 
-                elif self.crystallographic_direction == (100) and 'Substrate' in grid_crystal[site_idx].supp_by:
+                elif self.wulff_facet == (1,0,0) and 'Substrate' in grid_crystal[site_idx].supp_by:
                     new_site_events.append([site_idx, num_event, self.Act_E_list[6] + energy_change])
                 
                 # Migrating downward from the film (111)
-                elif self.crystallographic_direction == (111):
+                elif self.wulff_facet == (1,1,1):
                     new_site_events.append([site_idx, num_event, self.Act_E_list[4] + energy_change])
                     
                 # Migrating downward from the film (100)
-                elif self.crystallographic_direction == (100):
+                elif self.wulff_facet == (1,0,0):
                     new_site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
                 
 # =============================================================================
@@ -314,13 +314,23 @@ class Site():
             if event[2] == num_event:
                 del self.site_events[i]
                 break
+            
+    def detect_planes_new(self,System_state):
+        
+        atom_coordinates = np.array([System_state.grid_crystal[idx].position for idx in self.supp_by if idx != 'Substrate'])
+
+        self.miller_index = System_state.structure.lattice.get_miller_index_from_coords(atom_coordinates, coords_are_cartesian=True, round_dp=0, verbose=True)
                 
-      
+        return self.miller_index
 # =============================================================================
 #     Detect planes using PCA - We search the plane that contains most of the points
 #     in supp_by  to know the surface where this site is attached 
 # =============================================================================
-    def detect_planes(self,grid_crystal,crystallographic_planes):
+
+    """
+    Wulff facets --> Adapt everything to the Wulff facets
+    """
+    def detect_planes(self,grid_crystal,wulff_facets):
         
         atom_coordinates = np.array([grid_crystal[idx].position for idx in self.supp_by if idx != 'Substrate'])
         # Order the coordinates according to the first value, then the second, etc.
@@ -330,11 +340,11 @@ class Site():
         
         # Check if the result is already cached
         if 'Substrate' in self.supp_by:
-            self.crystallographic_direction = (111)
+            self.wulff_facet = (1,1,1)
             return
         
         if sorted_atom_coordinates in self.cache_planes:
-            self.crystallographic_direction = self.cache_planes[sorted_atom_coordinates]
+            self.wulff_facet = self.cache_planes[sorted_atom_coordinates]
             return
         
         elif len(atom_coordinates) > 2:
@@ -352,20 +362,21 @@ class Site():
             
             # Define the plane by the two principal components with the largest eigenvalues
             plane_normal = np.cross(principal_components[0], principal_components[1])
+            self.plane_normal = plane_normal
             
             aux_min = 2
-            for plane in crystallographic_planes:
+            for plane in wulff_facets:
                 cross_product = np.cross(plane[1],plane_normal)
                 norm_cross_product = np.linalg.norm(cross_product)
                 if norm_cross_product < aux_min:
                     aux_min = norm_cross_product
-                    self.crystallographic_direction = plane[0]
+                    self.wulff_facet = plane[0]
                     
         else:
-            self.crystallographic_direction = (111)
+            self.wulff_facet = (1,1,1)
             
         # Cache the result
-        self.cache_planes[sorted_atom_coordinates] = self.crystallographic_direction
+        self.cache_planes[sorted_atom_coordinates] = self.wulff_facet
             
     def detect_edges(self,grid_crystal):
         

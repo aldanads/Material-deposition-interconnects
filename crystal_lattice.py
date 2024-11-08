@@ -12,9 +12,13 @@ import numpy as np
 from matplotlib import cm
 
 # Pymatgen for creating crystal structure and connect with Crystallography Open Database or Material Project
-from pymatgen.ext.cod import COD
+# from pymatgen.ext.cod import COD
 from pymatgen.core.operations import SymmOp
 from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
+from pymatgen.ext.matproj import MPRester
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from pymatgen.analysis.wulff import WulffShape
+from pymatgen.core.periodic_table import Element
 
 from ovito.data import *
 from ovito.pipeline import *
@@ -31,15 +35,13 @@ class Crystal_Lattice():
     
     def __init__(self,crystal_features,experimental_conditions,Act_E_list,ovito_file,superbasin_parameters):
         
-        # self.lattice_constants = lattice_properties[0]
         self.id_material = crystal_features[0]
         self.crystal_size = crystal_features[1]
-        # self.bravais_latt = lattice_properties[2]
         self.latt_orientation = crystal_features[2]
-        # self.chemical_specie = experimental_conditions[4]
-        self.temperature = experimental_conditions[3]
-        self.mass_specie = experimental_conditions[2]
-        self.experiment = experimental_conditions[5]
+        self.api_key = crystal_features[3]
+
+        self.temperature = experimental_conditions[2]
+        self.experiment = experimental_conditions[3]
         self.activation_energies = Act_E_list
         
         self.n_search_superbasin = superbasin_parameters[0]
@@ -60,13 +62,14 @@ class Crystal_Lattice():
         """
         REVISE self.calculate_crystallographic_planes() --> pymatgen has a method for this
         """
-        self.calculate_crystallographic_planes()
+        # self.calculate_crystallographic_planes()
+        self.Wulff_Shape()
         
 
         self.sites_occupied = [] # Sites occupy be a chemical specie
         self.adsorption_sites = [] # Sites availables for deposition or migration
         #Transition rate for adsortion of chemical species
-        self.transition_rate_adsorption(experimental_conditions[0:4])
+        self.transition_rate_adsorption(experimental_conditions[0:3])
         
         # Obtain all the positions in the grid that are supported by the
         # substrate or other deposited chemical species
@@ -97,8 +100,13 @@ class Crystal_Lattice():
     def lattice_model(self):
 
         # Initialize COD with the database URL
-        cod = COD()
-        self.structure_basic = cod.get_structure_by_id(self.id_material)
+        # cod = COD()
+        # self.structure_basic = cod.get_structure_by_id(self.id_material)
+        
+        mpr = MPRester(self.api_key)
+        structure = mpr.get_structure_by_material_id(self.id_material)
+        sga = SpacegroupAnalyzer(structure)
+        self.structure_basic = sga.get_conventional_standard_structure()
         
         """
         REVISE self.basis_vectors and self.lattice_constants --> They are in structure --> Remove when it is not needed
@@ -110,6 +118,7 @@ class Crystal_Lattice():
         
         if self.latt_orientation == '001':
             
+            self.rotation_matrix = np.eye(3)
             dimensions = [int(self.crystal_size[i] / self.structure.lattice.abc[i]) + 1 for i in range(3)]
             self.basis_vectors = np.array(self.structure_basic.lattice.matrix)/2 # Basis vector in nm and half cell size
             self.structure = self.structure_basic.copy()
@@ -118,14 +127,14 @@ class Crystal_Lattice():
         elif self.latt_orientation == '111':
             
             # Rotation matrix to align crystal with 111 direction to z-axis
-            rotation_matrix = np.array([
+            self.rotation_matrix = np.array([
                 [1/np.sqrt(6), -1/np.sqrt(6), 2/np.sqrt(6)],
                 [1/np.sqrt(2), 1/np.sqrt(2), 0],
                 [-1/np.sqrt(3), 1/np.sqrt(3), 1/np.sqrt(3)]
             ])
             
             # Symmetry operation
-            symm_op = SymmOp.from_rotation_and_translation(rotation_matrix, [0, 0, 0])
+            symm_op = SymmOp.from_rotation_and_translation(self.rotation_matrix, [0, 0, 0])
 
             # Apply the rotation to the structure
             self.structure_basic.apply_operation(symm_op)
@@ -290,6 +299,31 @@ class Crystal_Lattice():
                 neighbors_positions = [self.idx_to_cart(idx) for idx in self.latt.get_neighbors(idx)[:,:3]]
                 site.neighbors_analysis(self.grid_crystal,self.latt.get_neighbors(idx)[:,:3],neighbors_positions,self.crystal_size,event_labels,idx)
         
+    def Wulff_Shape(self):
+        
+        with MPRester(api_key=self.api_key) as mpr:
+            surface_properties_doc = mpr.materials.surface_properties.search(
+                material_ids=self.id_material
+                )
+        
+        miller_indices = []
+        surface_energies = []
+        for surface in surface_properties_doc[0].surfaces:
+            miller_indices.append(tuple(surface.miller_index))
+            surface_energies.append(surface.surface_energy)
+            
+        self.wulff_shape = WulffShape(self.structure_basic.lattice, miller_indices,surface_energies)
+        
+        # We can show the Wulff Shape with the following:
+        #self.wulff_shape.show()
+        
+        self.wulff_facets = [] # Miller index and normal vector
+        for facet in self.wulff_shape.facets:
+            self.wulff_facets.append([facet.miller,facet.normal])
+            
+        # I can still eliminate the parallel normal vectors
+        self.wulff_facets = sorted(self.wulff_facets,key = lambda x:x[0][0])
+    
     def calculate_crystallographic_planes(self):
         
 # =============================================================================
@@ -371,10 +405,11 @@ class Crystal_Lattice():
 # =============================================================================
         
         # Maxwell-Boltzman statistics for transition rate of adsorption rate
-        sticking_coeff, partial_pressure, mass_specie, T = experimental_conditions
-        
+        sticking_coeff, partial_pressure, T = experimental_conditions
+        self.mass_specie = Element(self.chemical_specie).atomic_mass
+
         # The mass in kg of a unit of the chemical specie
-        mass_specie = mass_specie / constants.Avogadro / 1000
+        self.mass_specie = self.mass_specie / constants.Avogadro / 1000
         
         # If the substrate surface is pristine, we take the supported sites,
         # which are actually those ones supported by the substrate
@@ -394,7 +429,7 @@ class Crystal_Lattice():
         area_specie = 1e-18 *self.crystal_size[0] * self.crystal_size[1] / n_sites_layer_0
         
         # Boltzmann constant (m^2 kg s^-2 K^-1)
-        self.TR_ad = sticking_coeff * partial_pressure * area_specie / np.sqrt(2 * constants.pi * mass_specie * constants.Boltzmann * T)
+        self.TR_ad = sticking_coeff * partial_pressure * area_specie / np.sqrt(2 * constants.pi * self.mass_specie * constants.Boltzmann * T)
     
         # Activation energy for deposition
         kb = constants.physical_constants['Boltzmann constant in eV/K'][0]
@@ -501,8 +536,10 @@ class Crystal_Lattice():
             
             update_supp_av = set()
             update_specie_events = []
-            idx = self.adsorption_sites[46]
-            # Introduce specie in the site
+            for site_idx in self.adsorption_sites:
+                if (self.crystal_size[0] * 0.45 < self.grid_crystal[site_idx].position[0] < self.crystal_size[0] * 0.55) and (self.crystal_size[1] * 0.45 < self.grid_crystal[site_idx].position[1] < self.crystal_size[1] * 0.55):
+                    idx = site_idx
+                    break            # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
             self.update_sites(update_specie_events,update_supp_av)
 
@@ -539,8 +576,10 @@ class Crystal_Lattice():
 
             update_supp_av = set()
             update_specie_events = set()
-            idx = self.adsorption_sites[46]
-            # Introduce specie in the site
+            for site_idx in self.adsorption_sites:
+                if (self.crystal_size[0] * 0.45 < self.grid_crystal[site_idx].position[0] < self.crystal_size[0] * 0.55) and (self.crystal_size[1] * 0.45 < self.grid_crystal[site_idx].position[1] < self.crystal_size[1] * 0.55):
+                    idx = site_idx
+                    break            # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
             self.update_sites(update_specie_events,update_supp_av)
 
@@ -636,10 +675,10 @@ class Crystal_Lattice():
             
     def processes(self,chosen_event):
  
-        site_affected = self.grid_crystal[chosen_event[-1]]
+        # site_affected = self.grid_crystal[chosen_event[-1]]
         update_supp_av = set()
         update_specie_events = {chosen_event[-1]}
-       
+        print(chosen_event)
 # =============================================================================
 #         Specie migration
 # =============================================================================
@@ -686,7 +725,7 @@ class Crystal_Lattice():
             # There are new sites supported by the deposited chemical species
             # For loop over neighbors
             for idx in update_supp_av:
-                self.grid_crystal[idx].supported_by(self.grid_crystal,self.crystallographic_planes)
+                self.grid_crystal[idx].supported_by(self.grid_crystal,self.wulff_facets[:14])
                 self.available_adsorption_sites(update_supp_av)
         
         if update_specie_events: 
@@ -719,7 +758,7 @@ class Crystal_Lattice():
     
                 
     def process_site(self, idx, update_specie_events):
-        self.grid_crystal[idx].supported_by(self.grid_crystal, self.crystallographic_planes)
+        self.grid_crystal[idx].supported_by(self.grid_crystal, self.wulff_facets)
         self.available_adsorption_sites([idx])
         if self.grid_crystal[idx].chemical_specie != 'Empty':
             update_specie_events.append(idx)
@@ -833,6 +872,7 @@ class Crystal_Lattice():
         plt.show()
         
         
+        
     def plot_crystal(self,azim = 60,elev = 45,path = '',i = 0):
         
         if self.ovito_file == False:
@@ -847,8 +887,8 @@ class Crystal_Lattice():
             positions = np.array([self.grid_crystal[idx].position for idx in self.sites_occupied])
             if positions.size != 0:
                 x, y, z = positions[:, 0], positions[:, 1], positions[:, 2]
-                axa.scatter3D(x, y, z, c='blue', marker='o')
-                axb.scatter3D(x, y, z, c='blue', marker='o')
+                axa.scatter3D(x, y, z, c='blue', marker='o',s=200)
+                axb.scatter3D(x, y, z, c='blue', marker='o',s=200)
             
             axa.set_xlabel('x-axis (nm)')
             axa.set_ylabel('y-axis (nm)')
@@ -857,9 +897,8 @@ class Crystal_Lattice():
     
             axa.set_xlim([0, self.crystal_size[0]]) 
             axa.set_ylim([0, self.crystal_size[1]])
-            axa.set_zlim([0, self.crystal_size[2]])
+            axa.set_zlim([0, self.crystal_size[2]/2])
             axa.set_aspect('equal', 'box')
-            
             
             axb.set_xlabel('x-axis (nm)')
             axb.set_ylabel('y-axis (nm)')
@@ -868,7 +907,7 @@ class Crystal_Lattice():
     
             axb.set_xlim([0, self.crystal_size[0]]) 
             axb.set_ylim([0, self.crystal_size[1]])
-            axb.set_zlim([0, self.crystal_size[2]])
+            axb.set_zlim([0, self.crystal_size[2]/2])
             axb.set_aspect('equal', 'box')
     
     
@@ -1154,26 +1193,34 @@ class Crystal_Lattice():
         return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
 
     # Function to rotate a vector
-    def rotate_vector(self,vector, axis, theta):
+    def rotate_vector(self,vector, axis=None, theta=None, rotation_matrix=None):
         """
-        Rotates a 3D vector around a specified axis.
-    
+        Rotates a 3D vector around a specified axis or using a provided rotation matrix. 
+        
         Parameters:
         - vector: The 3D vector to rotate.
-        - axis: The axis of rotation ('x', 'y', or 'z').
-        - theta: The rotation angle in radians.
+        - axis: The axis of rotation ('x', 'y', or 'z'). Optional if rotation_matrix is provided.
+        - theta: The rotation angle in radians. Optional if rotation_matrix is provided.
+        - rotation_matrix: A 3x3 rotation matrix. Optional if axis and theta are provided.
     
         Returns:
         The rotated vector.
         """
-        if axis == 'x':
-            R = np.array([[1, 0, 0], [0, np.cos(theta), -np.sin(theta)], [0, np.sin(theta), np.cos(theta)]])
-        elif axis == 'y':
-            R = np.array([[np.cos(theta), 0, np.sin(theta)], [0, 1, 0], [-np.sin(theta), 0, np.cos(theta)]])
-        elif axis == 'z':
-            R = np.array([[np.cos(theta), -np.sin(theta), 0], [np.sin(theta), np.cos(theta), 0], [0, 0, 1]])
+        if rotation_matrix is not None:
+            R = rotation_matrix
+        
+        elif axis is not None and theta is not None:
+            if axis == 'x':
+                R = np.array([[1, 0, 0], [0, np.cos(theta), -np.sin(theta)], [0, np.sin(theta), np.cos(theta)]])
+            elif axis == 'y':
+                R = np.array([[np.cos(theta), 0, np.sin(theta)], [0, 1, 0], [-np.sin(theta), 0, np.cos(theta)]])
+            elif axis == 'z':
+                R = np.array([[np.cos(theta), -np.sin(theta), 0], [np.sin(theta), np.cos(theta), 0], [0, 0, 1]])
+            else:
+                raise ValueError("Invalid axis. Use 'x', 'y', or 'z'.")
+                
         else:
-            raise ValueError("Invalid axis. Use 'x', 'y', or 'z'.")
+            raise ValueError("Either rotation_matrix or both axis and theta must be provided.")
         
         return np.dot(R, vector)
     

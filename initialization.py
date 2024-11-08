@@ -11,7 +11,8 @@ import shutil
 import os 
 from crystal_lattice import Crystal_Lattice
 from superbasin import Superbasin
-import copy
+# import copy
+import json
 
 
 def initialization(n_sim,save_data):
@@ -48,30 +49,30 @@ def initialization(n_sim,save_data):
 #         
 # =============================================================================
         sticking_coeff = 1
-        partial_pressure = 0.1 # (Pa = N m^-2 = kg m^-1 s^-2)
+        partial_pressure = 0.0 # (Pa = N m^-2 = kg m^-1 s^-2)
         # p = 0.1 - 10 typical values 
-        mass_specie = 63.546 # (mass of Copper in u) 
-        chemical_specie = 'Cu'
         # T = 573 + n_sim * 100 # (K)
         temp = [300,500,800]
         T = temp[n_sim] # (K)
         
-        experimental_conditions = [sticking_coeff,partial_pressure,mass_specie,T,chemical_specie,experiment]
+        experimental_conditions = [sticking_coeff,partial_pressure,T,experiment]
     
 # =============================================================================
 #         Crystal structure
 #         
 # =============================================================================
-        id_material = 5000216 # Cu
-        # a = 0.358 # (nm)
-        # b = 0.358 # (nm)
-        # c = 0.358 # (nm)
-        # lattice_constants = (a,b,c)
+        #id_material_COD = 5000216 # Cu
+        id_material_Material_Project = "mp-30" # Cu
         crystal_size = (20, 20,10) # (angstrom (Å))
-        # bravais_latt = ['fcc']
         orientation = ['001','111']
-        # lattice_properties = [lattice_constants,crystal_size,bravais_latt[0],orientation[1]]
-        crystal_features = [id_material,crystal_size,orientation[1]]
+
+        # Create a config.json file with the API key -> To avoid uploading to Github
+        with open('config.json') as config_file:
+            config = json.load(config_file)
+            api_key = config['api_key']
+        
+
+        crystal_features = [id_material_Material_Project,crystal_size,orientation[1],api_key]
         
 # =============================================================================
 #             Superbasin parameters
@@ -194,8 +195,10 @@ def initialization(n_sim,save_data):
 #     - test[6] - 2 hexagonal seeds - 2 layers and one particle on the top 
 #     - test[7] - 2 hexagonal seeds - 2 layers and one particle attach to the lateral
 #     - test[8] - cluster
+#     - test[9] - 3 Cu layers
+
 # =============================================================================
-        test_selected = 9
+        test_selected = 7
         test = [0,1,2,3,4,5,6,7,8,9]
 
         # Deposition process of chemical species
