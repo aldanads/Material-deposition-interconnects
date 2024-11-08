@@ -678,13 +678,10 @@ class Crystal_Lattice():
         # site_affected = self.grid_crystal[chosen_event[-1]]
         update_supp_av = set()
         update_specie_events = {chosen_event[-1]}
-        print(chosen_event)
 # =============================================================================
 #         Specie migration
 # =============================================================================
         if chosen_event[2] <= (self.num_event - 2): # 12 migration possibilities [0-11] and [12] for migrating from superbasin
-            
-            # print('Support balance: ',len(self.grid_crystal[chosen_event[-1]].supp_by)-len(self.grid_crystal[chosen_event[1]].supp_by))
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(chosen_event[1],update_specie_events,update_supp_av)
             # Remove particle

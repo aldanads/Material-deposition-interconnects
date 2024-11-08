@@ -377,6 +377,17 @@ class Site():
             
         # Cache the result
         self.cache_planes[sorted_atom_coordinates] = self.wulff_facet
+        
+    def detect_edges_new(self,grid_crystal):
+        
+        """
+        WORK on the EDGES
+        I know the planes of the elements on the top
+        Calculate the 6 edges --> Min distances between points surrounding a center
+        Calculate what movements are parallel to each edge
+        How to know the type of edge? Wulff facets?
+        """
+        
             
     def detect_edges(self,grid_crystal):
         

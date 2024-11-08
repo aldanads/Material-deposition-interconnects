@@ -89,8 +89,8 @@ for n_sim in range(0,1):
         while System_state.thickness < thickness_limit:
             i+=1
             System_state,KMC_time_step = KMC(System_state,rng)
+            quit()
             list_time_step.append(KMC_time_step)
-            #System_state.deposition_specie(KMC_time_step,rng)
             if np.mean(list_time_step[-System_state.n_search_superbasin:]) <= System_state.time_step_limits:
                 nothing_happen +=1    
             else:

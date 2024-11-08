@@ -49,7 +49,7 @@ def initialization(n_sim,save_data):
 #         
 # =============================================================================
         sticking_coeff = 1
-        partial_pressure = 0.0 # (Pa = N m^-2 = kg m^-1 s^-2)
+        partial_pressure = 0.1 # (Pa = N m^-2 = kg m^-1 s^-2)
         # p = 0.1 - 10 typical values 
         # T = 573 + n_sim * 100 # (K)
         temp = [300,500,800]
