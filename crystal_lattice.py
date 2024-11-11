@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from Site import Site,Island
 from scipy import constants
 import numpy as np
+import math
 from matplotlib import cm
 
 # Pymatgen for creating crystal structure and connect with Crystallography Open Database or Material Project
@@ -58,13 +59,9 @@ class Crystal_Lattice():
         # Events corresponding to migrations + superbasin migration (+1) + deposition (+1)
         # self.num_event = len(self.latt.get_neighbor_positions((0,0,0))) + 2
         self.num_event = len(self.structure.get_neighbors(self.structure[0],3)) + 2
-        
-        """
-        REVISE self.calculate_crystallographic_planes() --> pymatgen has a method for this
-        """
+
         # self.calculate_crystallographic_planes()
         self.Wulff_Shape()
-        
 
         self.sites_occupied = [] # Sites occupy be a chemical specie
         self.adsorption_sites = [] # Sites availables for deposition or migration
@@ -76,9 +73,9 @@ class Crystal_Lattice():
         update_supp_av = {idx for idx in self.grid_crystal.keys()}
         update_specie_events = set()
         
-        
         self.update_sites(update_specie_events,update_supp_av)
-        
+        self.create_edges()
+
 
         
         # ovito_file = True - Create LAAMPS files
@@ -323,6 +320,41 @@ class Crystal_Lattice():
             
         # I can still eliminate the parallel normal vectors
         self.wulff_facets = sorted(self.wulff_facets,key = lambda x:x[0][0])
+        
+        
+    def create_edges(self):
+        
+        for site_idx in self.adsorption_sites:
+            if (self.crystal_size[0] * 0.45 < self.grid_crystal[site_idx].position[0] < self.crystal_size[0] * 0.55) and (self.crystal_size[1] * 0.45 < self.grid_crystal[site_idx].position[1] < self.crystal_size[1] * 0.55):
+                idx = site_idx
+                break            # Introduce specie in the site
+        
+        # Neighbors only in plane
+        # neighbors = [[self.grid_crystal[neigh[0]].position,neigh[1]] for neigh in self.grid_crystal[idx].migration_paths['Plane']]
+        # Minimum distance between neighbors
+        # min_dist = np.linalg.norm(np.array(self.grid_crystal[idx].position) - np.array(np.array(neighbors[4][0])))
+        # self.edges = {}
+        
+        # for neighbor in neighbors:
+        #     for j in range(len(neighbors)):
+        #         if (math.isclose(np.linalg.norm(np.array(neighbor[0]) - np.array(np.array(neighbors[j][0]))), min_dist)) and ((neighbors[j][1],neighbor[1]) not in self.edges):
+        #             self.edges[(neighbor[1],neighbors[j][1])] = np.array(neighbor[0]) - np.array(np.array(neighbors[j][0]))
+        
+        self.mig_directions = [[neigh[1],np.array(self.grid_crystal[neigh[0]].position) - np.array(self.grid_crystal[idx].position)] for neigh in self.grid_crystal[idx].migration_paths['Plane']]
+        self.mig_parallel_facets = {}
+        
+        #Search for the facets that are parallel to the migration direction
+        for mig_direct in self.mig_directions:
+            facet_list = []
+            for facet in self.wulff_facets[:14]:
+                if (facet[1][2] > 0 and facet[1][2] != 1 and # Screen facets that are looking downward or parallel to the x-y plane
+                    abs(np.dot(facet[1][:2],mig_direct[1][:2])) < 1e-12): # Parallel between facet normal (x-y) and migration direction
+                        facet_list.append(facet)        
+                    
+            self.mig_parallel_facets[mig_direct[0]] = facet_list
+            
+                    
+                    
     
     def calculate_crystallographic_planes(self):
         

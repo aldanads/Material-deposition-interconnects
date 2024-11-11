@@ -322,14 +322,13 @@ class Site():
         self.miller_index = System_state.structure.lattice.get_miller_index_from_coords(atom_coordinates, coords_are_cartesian=True, round_dp=0, verbose=True)
                 
         return self.miller_index
+    
+    
 # =============================================================================
 #     Detect planes using PCA - We search the plane that contains most of the points
 #     in supp_by  to know the surface where this site is attached 
 # =============================================================================
 
-    """
-    Wulff facets --> Adapt everything to the Wulff facets
-    """
     def detect_planes(self,grid_crystal,wulff_facets):
         
         atom_coordinates = np.array([grid_crystal[idx].position for idx in self.supp_by if idx != 'Substrate'])
@@ -380,6 +379,7 @@ class Site():
         
     def detect_edges_new(self,grid_crystal):
         
+
         """
         WORK on the EDGES
         I know the planes of the elements on the top
