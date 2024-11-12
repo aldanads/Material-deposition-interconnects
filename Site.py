@@ -396,33 +396,6 @@ class Site():
                     if (grid_crystal[mig_paths[edge[0][0]]].chemical_specie == chemical_specie 
                         and grid_crystal[mig_paths[edge[0][1]]].chemical_specie == chemical_specie):
                         self.edges_v[num_event] = edge[1] # Associate the edge with the facet
-
-                # if num_event == 2 or num_event == 4:
-                #     if (grid_crystal[mig_paths[3][0]].chemical_specie == self.chemical_specie 
-                #         and grid_crystal[mig_paths[4][0]].chemical_specie == self.chemical_specie):
-                #         edges_v[num_event] = 100
-                        
-                #     if (grid_crystal[mig_paths[1][0]].chemical_specie == self.chemical_specie 
-                #         and grid_crystal[mig_paths[5][0]].chemical_specie == self.chemical_specie):
-                #         edges_v[num_event] = 111
-                    
-                # elif num_event == 3 or num_event == 6:
-                #     if (grid_crystal[mig_paths[0][0]].chemical_specie == self.chemical_specie 
-                #         and grid_crystal[mig_paths[4][0]].chemical_specie == self.chemical_specie):
-                #         edges_v[num_event] = 111
-                        
-                #     if (grid_crystal[mig_paths[2][0]].chemical_specie == self.chemical_specie 
-                #         and grid_crystal[mig_paths[5][0]].chemical_specie == self.chemical_specie):
-                #         edges_v[num_event] = 100 
-    
-                # elif num_event == 10 or num_event == 11:
-                #     if (grid_crystal[mig_paths[0][0]].chemical_specie == self.chemical_specie 
-                #         and grid_crystal[mig_paths[1][0]].chemical_specie == self.chemical_specie):
-                #         edges_v[num_event] = 100 
-                        
-                #     if (grid_crystal[mig_paths[2][0]].chemical_specie == self.chemical_specie 
-                #         and grid_crystal[mig_paths[3][0]].chemical_specie == self.chemical_specie):
-                #         edges_v[num_event] = 111
                     
 
 

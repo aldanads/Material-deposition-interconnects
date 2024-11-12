@@ -105,9 +105,6 @@ class Crystal_Lattice():
         sga = SpacegroupAnalyzer(structure)
         self.structure_basic = sga.get_conventional_standard_structure()
         
-        """
-        REVISE self.basis_vectors and self.lattice_constants --> They are in structure --> Remove when it is not needed
-        """
         self.lattice_constants = tuple(np.array(self.structure_basic.lattice.abc)/10)
         
         
@@ -218,84 +215,6 @@ class Crystal_Lattice():
             return self.coord_cache[coords_tuple]
 
 
-    def lattice_model_old(self):
-        
-        # Face centered cubic - 1 specie
-        if self.bravais_latt == 'fcc':
-            latt = lp.Lattice.fcc(self.lattice_constants[0])
-            latt.add_atom()
-            latt.add_connections(1)
-            latt.analyze()
-            latt.build((self.crystal_size[0], self.crystal_size[1],self.crystal_size[2]))
-            self.latt = latt
-
-            if self.latt_orientation == '001':
-                self.basis_vectors = self.latt.vectors # Basis vectors
-                self.positions_cartesian = self.latt.positions # Position in cartesian coordinates
-                self.positions_idx = self.latt.indices[:,:3] # Position in lattices coordinates (indexes)
-                
-            elif self.latt_orientation == '111':
-                basis_vectors = self.latt.vectors # Basis vectors
-
-                # Rotate around z axis 45 degrees
-                rotation_1 = ['z',np.pi/4]
-                vectors_1 = [list(self.rotate_vector(vector,rotation_1[0],rotation_1[1])) for vector in basis_vectors]
-
-                # We can calculate the angle establishing the condition that z components are the same for the three vectors 
-                rotation_2 = ['x',np.arctan(vectors_1[2][2]/(vectors_1[0][1] - vectors_1[2][1]))]
-                vectors_2 = [list(self.rotate_vector(vector,rotation_2[0],rotation_2[1])) for vector in vectors_1]
-                self.basis_vectors = vectors_2
-
-    # Initialize the crystal grid with no chemical species
-    def crystal_grid_old(self):
-        
-        if self.latt_orientation == '001':
-            # Dictionary with lattice coordinates (indexes) as keys and Site objects as values
-            # Site includes:
-            #  - Chemical specie - Empty
-            #  - Position in cartesian coordinates
-            self.grid_crystal = {
-                tuple(idx):Site("Empty",
-                    tuple(pos),
-                    self.activation_energies)
-                for idx, pos in zip(self.positions_idx, self.positions_cartesian)
-            }
-            
-            # Pruning the neighbors according to the lattice domain
-            # E.g.: (0,0,0) doesn't have the lower 3 neighbors
-            #  - Nearest neighbors indexes
-            #  - Nearest neighbors cartesian
-            for idx,site in self.grid_crystal.items():
-                site.neighbors_analysis(self.grid_crystal,self.latt.get_neighbors(idx)[:,:3],self.latt.get_neighbor_positions(idx))
-        
-        elif self.latt_orientation == '111':
-
-            start_idx_site = (0,0,0) # Starting site
-            self.grid_crystal = {start_idx_site:Site("Empty",
-                (0,0,0),
-                self.activation_energies)}
-            
-            # We employ a Depth-First Search algorithm to build the grid_crystal
-            # based on the nearest neighbors of each site
-            # -----------------------------------------------------------------------
-            # Recursive is only valid for small crystal structures --> recursion depth error
-            # visited = set()
-            # self.dfs_recursive(start_idx_site, visited))
-            # -----------------------------------------------------------------------
-            self.dfs_iterative(start_idx_site)
-            
-            self.positions_idx = list(self.grid_crystal.keys())
-            self.positions_cartesian = [site.position for site in self.grid_crystal.values()]
-            
-
-            event_labels = {(0,-1,0): 0, (0,0,-1):1, (1,0,-1):2, (1,-1,0):3, (-1,0,1):4, (0,0,1):5, 
-                            (-1,1,0):6, (1,0,0):7, (0,1,0):8, (-1,0,0):9, (0,1,-1):10, (0,-1,1):11}
-            
-            for idx,site in self.grid_crystal.items():
-                # Neighbors for each idx in grid_crystal
-                neighbors_positions = [self.idx_to_cart(idx) for idx in self.latt.get_neighbors(idx)[:,:3]]
-                site.neighbors_analysis(self.grid_crystal,self.latt.get_neighbors(idx)[:,:3],neighbors_positions,self.crystal_size,event_labels,idx)
-        
     def Wulff_Shape(self):
         
         with MPRester(api_key=self.api_key) as mpr:
@@ -398,55 +317,6 @@ class Crystal_Lattice():
                        
             self.dir_edge_facets[mig] = aux_edge_facet
             
-            
-        
-    def calculate_crystallographic_planes(self):
-        
-# =============================================================================
-#         Han, Yong, Feng Liu, Shao-Chun Li, Jin-Feng Jia, Qi-Kun Xue, and Byeong-Joo Lee. 
-#         "Kinetics of mesa overlayer growth: Climbing of adatoms onto the mesa top." 
-#         Applied Physics Letters 92, no. 2 (2008).
-# 
-#         Good figure for the crystallographic planes
-# 
-#         Good link:
-#         https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Surface_Science_(Nix)/01%3A_Structure_of_Solid_Surfaces/1.03%3A_Surface_Structures-_fcc_Metals
-# =============================================================================
-        # Crystallographic planes with (111) orentation
-        n_plane = np.cross(self.basis_vectors[0],self.basis_vectors[1])
-        crystallographic_planes = [((111),n_plane/np.linalg.norm(n_plane))]
-        
-        # Crystallographic planes with (111) orentation
-        n_plane = np.cross(self.basis_vectors[0],self.basis_vectors[2])
-        crystallographic_planes.append(((111),n_plane/np.linalg.norm(n_plane)))
-        
-        # Crystallographic planes with (111) orentation
-        n_plane = np.cross(self.basis_vectors[1],self.basis_vectors[2])
-        crystallographic_planes.append(((111),n_plane/np.linalg.norm(n_plane)))
-        
-        # Crystallographic planes with (111) orentation
-        crystallographic_planes.append(((111),np.array([0,0,1])))
-                
-        # Select the first element far from the boundaries
-        for idx,site in self.grid_crystal.items():
-            if ((self.lattice_constants[0] < site.position[0] < self.crystal_size[0] - self.lattice_constants[0]) and
-                (self.lattice_constants[1] < site.position[1] < self.crystal_size[1] - self.lattice_constants[1])):
-                    site_idx = idx
-                    break
-        
-        # Crystallographic planes with (100) orentation - (001) is equivalent
-        for v in self.basis_vectors:
-        
-            for neighbor in self.grid_crystal[site_idx].migration_paths['Plane']:
-                v_aux = np.array(self.idx_to_cart(neighbor[0])) - np.array(self.grid_crystal[site_idx].position)
-                if round(self.angle_between(v,v_aux) - np.pi /2,2) == 0.0:
-                    v2 = np.array(self.idx_to_cart(neighbor[0])) - np.array(self.grid_crystal[site_idx].position)
-                    
-            n_plane = np.cross(v,v2)
-            crystallographic_planes.append(((100),n_plane/np.linalg.norm(n_plane)))
-            
-        self.crystallographic_planes = crystallographic_planes
-            
         
     def available_adsorption_sites(self, update_supp_av = set()):
         
@@ -487,13 +357,7 @@ class Crystal_Lattice():
         # The mass in kg of a unit of the chemical specie
         self.mass_specie = self.mass_specie / constants.Avogadro / 1000
         
-        # If the substrate surface is pristine, we take the supported sites,
-        # which are actually those ones supported by the substrate
-        # if len(self.sites_occupied) == 0:
-        #     print(len(self.sites_occupied))
-        #     n_sites_layer_0 = len(self.adsorption_sites)
-        # if:
-        # Otherwise, we count the sites in the layer 0
+        
         n_sites_layer_0 = 0
         for site in self.grid_crystal.values():
             if site.position[2] <= 1e-6:
