@@ -62,6 +62,7 @@ class Crystal_Lattice():
 
         # self.calculate_crystallographic_planes()
         self.Wulff_Shape()
+        self.create_edges()
 
         self.sites_occupied = [] # Sites occupy be a chemical specie
         self.adsorption_sites = [] # Sites availables for deposition or migration
@@ -74,7 +75,6 @@ class Crystal_Lattice():
         update_specie_events = set()
         
         self.update_sites(update_specie_events,update_supp_av)
-        self.create_edges()
 
 
         
@@ -340,9 +340,8 @@ class Crystal_Lattice():
             
         """
         
-        for site_idx in self.adsorption_sites:
-            if (self.crystal_size[0] * 0.45 < self.grid_crystal[site_idx].position[0] < self.crystal_size[0] * 0.55) and (self.crystal_size[1] * 0.45 < self.grid_crystal[site_idx].position[1] < self.crystal_size[1] * 0.55):
-                idx = site_idx
+        for idx,site in self.grid_crystal.items():
+            if (self.crystal_size[0] * 0.45 < site.position[0] < self.crystal_size[0] * 0.55) and (self.crystal_size[1] * 0.45 < site.position[1] < self.crystal_size[1] * 0.55):
                 break            # Introduce specie in the site
         
         # Obtain the different edge in the plane
@@ -354,7 +353,8 @@ class Crystal_Lattice():
         
         for neighbor in neighbors:
             for j in range(len(neighbors)):
-                if (math.isclose(np.linalg.norm(np.array(neighbor[0]) - np.array(np.array(neighbors[j][0]))), min_dist)) and ((neighbors[j][1],neighbor[1]) not in edges):
+                if (math.isclose(np.linalg.norm(np.array(neighbor[0]) - np.array(np.array(neighbors[j][0]))), min_dist)) and ((neighbors[j][1],neighbor[1]) not in 
+                                                                                                                              edges):
                     edges[(neighbor[1],neighbors[j][1])] = np.array(neighbor[0]) - np.array(np.array(neighbors[j][0]))
         
         
@@ -798,7 +798,8 @@ class Crystal_Lattice():
             # There are new sites supported by the deposited chemical species
             # For loop over neighbors
             for idx in update_supp_av:
-                self.grid_crystal[idx].supported_by(self.grid_crystal,self.wulff_facets[:14])
+                self.grid_crystal[idx].supported_by(self.grid_crystal,self.wulff_facets[:14],
+                                                    self.dir_edge_facets,self.chemical_specie)
                 self.available_adsorption_sites(update_supp_av)
         
         if update_specie_events: 
@@ -831,7 +832,7 @@ class Crystal_Lattice():
     
                 
     def process_site(self, idx, update_specie_events):
-        self.grid_crystal[idx].supported_by(self.grid_crystal, self.wulff_facets)
+        self.grid_crystal[idx].supported_by(self.grid_crystal, self.wulff_facets[:,14],self.dir_edge_facets)
         self.available_adsorption_sites([idx])
         if self.grid_crystal[idx].chemical_specie != 'Empty':
             update_specie_events.append(idx)
@@ -960,8 +961,8 @@ class Crystal_Lattice():
             positions = np.array([self.grid_crystal[idx].position for idx in self.sites_occupied])
             if positions.size != 0:
                 x, y, z = positions[:, 0], positions[:, 1], positions[:, 2]
-                axa.scatter3D(x, y, z, c='blue', marker='o',s=200)
-                axb.scatter3D(x, y, z, c='blue', marker='o',s=200)
+                axa.scatter3D(x, y, z, c='blue', marker='o',s=200, alpha = 1)
+                axb.scatter3D(x, y, z, c='blue', marker='o',s=200, alpha = 1)
             
             axa.set_xlabel('x-axis (nm)')
             axa.set_ylabel('y-axis (nm)')

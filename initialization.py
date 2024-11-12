@@ -198,7 +198,7 @@ def initialization(n_sim,save_data):
 #     - test[9] - 3 Cu layers
 
 # =============================================================================
-        test_selected = 7
+        test_selected = 0
         test = [0,1,2,3,4,5,6,7,8,9]
 
         # Deposition process of chemical species

@@ -92,7 +92,7 @@ class Site():
 # =============================================================================
 #         Occupied sites supporting this node
 # =============================================================================    
-    def supported_by(self,grid_crystal,wulff_facets):
+    def supported_by(self,grid_crystal,wulff_facets,dir_edge_facets,chemical_specie):
                  
         # Go over the nearest neighbors
         for idx in self.nearest_neighbors_idx:
@@ -108,7 +108,7 @@ class Site():
                 self.supp_by.remove(idx)
                 
 
-        self.detect_edges(grid_crystal)               
+        self.detect_edges(grid_crystal,dir_edge_facets,chemical_specie)               
         self.calculate_clustering_energy()
         self.detect_planes(grid_crystal,wulff_facets)
                 
@@ -179,12 +179,11 @@ class Site():
                     
                 # Migrating on the film (111)
                 elif grid_crystal[site_idx].wulff_facet == (1,1,1):
-                    
                     if self.edges_v[num_event] == None: 
                         new_site_events.append([site_idx, num_event, self.Act_E_list[7] + energy_change])
-                    elif self.edges_v[num_event] == 111:
+                    elif self.edges_v[num_event] == (1,1,1):
                         new_site_events.append([site_idx, num_event, self.Act_E_list[10] + energy_change])
-                    elif self.edges_v[num_event] == 100:
+                    elif self.edges_v[num_event] == (1,0,0):
                         new_site_events.append([site_idx, num_event, self.Act_E_list[9] + energy_change])
                         
                 # Migrating on the film (100)
@@ -225,10 +224,10 @@ class Site():
                 energy_change = max(energy_site_destiny - self.energy_site, 0)
                
                 # Migrating upward from the substrate
-                if 'Substrate' in self.supp_by and grid_crystal[site_idx].wulff_facet == (111):
+                if 'Substrate' in self.supp_by and grid_crystal[site_idx].wulff_facet == (1,1,1):
                     new_site_events.append([site_idx, num_event, self.Act_E_list[1] + energy_change])
                 
-                elif 'Substrate' in self.supp_by and grid_crystal[site_idx].wulff_facet == (100):
+                elif 'Substrate' in self.supp_by and grid_crystal[site_idx].wulff_facet == (1,0,0):
                     new_site_events.append([site_idx, num_event, self.Act_E_list[5] + energy_change])
                     
                 # Migrating upward from the film (111)
@@ -376,64 +375,55 @@ class Site():
             
         # Cache the result
         self.cache_planes[sorted_atom_coordinates] = self.wulff_facet
-        
-    def detect_edges_new(self,grid_crystal):
-        
-
-        """
-        WORK on the EDGES
-        I know the planes of the elements on the top
-        Calculate the 6 edges --> Min distances between points surrounding a center
-        Calculate what movements are parallel to each edge
-        How to know the type of edge? Wulff facets?
-        """
-        
+           
             
-    def detect_edges(self,grid_crystal):
+    def detect_edges(self,grid_crystal,dir_edge_facets,chemical_specie):
         
-        # Dummy result
-        self.edges_v = {1:111, 2:111, 3:111, 4:111, 5:111, 6:111, 7:111, 8:111,
-                        9:111, 10:111, 11:111, 12:111}
-        return
-
-        mig_paths = self.migration_paths['Plane']
-        edges_v = {2:None, 3:None, 4:None, 6:None, 10:None, 11:None}
+        
+        mig_paths = {num_event:site_idx for site_idx, num_event in self.migration_paths['Plane']}       
+        self.edges_v = {i:None for i in mig_paths.keys()}
         
         bottom_support = all(site_idx in self.supp_by for site_idx, num_event in self.migration_paths['Down'])
             
-        
+        # To be an edge it must be support by the substrate or the atoms from the down layer
         if 'Substrate' in self.supp_by or bottom_support:
-        
-            for site_idx, num_event in self.migration_paths['Plane']:
-                
-                if num_event == 2 or num_event == 4:
-                    if (grid_crystal[mig_paths[3][0]].chemical_specie == self.chemical_specie 
-                        and grid_crystal[mig_paths[4][0]].chemical_specie == self.chemical_specie):
-                        edges_v[num_event] = 100
+            # Check for each migration direction the edges that are parallel
+            for num_event,site_idx in mig_paths.items():
+                edges = dir_edge_facets[num_event]
+            
+                # Check if one of the edges is occupied for the chemical speice (both sites)
+                for edge in edges:
+                    if (grid_crystal[mig_paths[edge[0][0]]].chemical_specie == chemical_specie 
+                        and grid_crystal[mig_paths[edge[0][1]]].chemical_specie == chemical_specie):
+                        self.edges_v[num_event] = edge[1] # Associate the edge with the facet
+
+                # if num_event == 2 or num_event == 4:
+                #     if (grid_crystal[mig_paths[3][0]].chemical_specie == self.chemical_specie 
+                #         and grid_crystal[mig_paths[4][0]].chemical_specie == self.chemical_specie):
+                #         edges_v[num_event] = 100
                         
-                    if (grid_crystal[mig_paths[1][0]].chemical_specie == self.chemical_specie 
-                        and grid_crystal[mig_paths[5][0]].chemical_specie == self.chemical_specie):
-                        edges_v[num_event] = 111
+                #     if (grid_crystal[mig_paths[1][0]].chemical_specie == self.chemical_specie 
+                #         and grid_crystal[mig_paths[5][0]].chemical_specie == self.chemical_specie):
+                #         edges_v[num_event] = 111
                     
-                elif num_event == 3 or num_event == 6:
-                    if (grid_crystal[mig_paths[0][0]].chemical_specie == self.chemical_specie 
-                        and grid_crystal[mig_paths[4][0]].chemical_specie == self.chemical_specie):
-                        edges_v[num_event] = 111
+                # elif num_event == 3 or num_event == 6:
+                #     if (grid_crystal[mig_paths[0][0]].chemical_specie == self.chemical_specie 
+                #         and grid_crystal[mig_paths[4][0]].chemical_specie == self.chemical_specie):
+                #         edges_v[num_event] = 111
                         
-                    if (grid_crystal[mig_paths[2][0]].chemical_specie == self.chemical_specie 
-                        and grid_crystal[mig_paths[5][0]].chemical_specie == self.chemical_specie):
-                        edges_v[num_event] = 100 
+                #     if (grid_crystal[mig_paths[2][0]].chemical_specie == self.chemical_specie 
+                #         and grid_crystal[mig_paths[5][0]].chemical_specie == self.chemical_specie):
+                #         edges_v[num_event] = 100 
     
-                elif num_event == 10 or num_event == 11:
-                    if (grid_crystal[mig_paths[0][0]].chemical_specie == self.chemical_specie 
-                        and grid_crystal[mig_paths[1][0]].chemical_specie == self.chemical_specie):
-                        edges_v[num_event] = 100 
+                # elif num_event == 10 or num_event == 11:
+                #     if (grid_crystal[mig_paths[0][0]].chemical_specie == self.chemical_specie 
+                #         and grid_crystal[mig_paths[1][0]].chemical_specie == self.chemical_specie):
+                #         edges_v[num_event] = 100 
                         
-                    if (grid_crystal[mig_paths[2][0]].chemical_specie == self.chemical_specie 
-                        and grid_crystal[mig_paths[3][0]].chemical_specie == self.chemical_specie):
-                        edges_v[num_event] = 111
+                #     if (grid_crystal[mig_paths[2][0]].chemical_specie == self.chemical_specie 
+                #         and grid_crystal[mig_paths[3][0]].chemical_specie == self.chemical_specie):
+                #         edges_v[num_event] = 111
                     
-        self.edges_v = edges_v
 
 
     def unit_vector(self,vector):

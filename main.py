@@ -43,10 +43,7 @@ Optimize:
     - available_migration --> cache?
 """
 
-"""
-TASKS now:
-    - Problem with neighbors --> Some of them are not created
-"""
+
 """
 REFACTOR CRYSTAL EDGE AND CRYSTALLOGRAPHIC PLANES IN GENERAL
 After using pymatgen, all those things changed
@@ -89,7 +86,7 @@ for n_sim in range(0,1):
         while System_state.thickness < thickness_limit:
             i+=1
             System_state,KMC_time_step = KMC(System_state,rng)
-            quit()
+            # quit()
             list_time_step.append(KMC_time_step)
             if np.mean(list_time_step[-System_state.n_search_superbasin:]) <= System_state.time_step_limits:
                 nothing_happen +=1    
