@@ -324,38 +324,82 @@ class Crystal_Lattice():
         
     def create_edges(self):
         
+        """
+        To obtain the relation between the migration, the edges and the facets we first need:
+            1. Calculate the edges
+            2. Calculate the facets parallel to each migration
+            3. Calculate the edges parallel to each migration
+            4. Associate each edge with a facet type
+            5. Relation between migration direction, edges and facet type
+            
+            Create a dictionary:
+                dir_edge_facets[migration_label] = aux_edge_facet
+                aux_edge_facet - list of lists:
+                    aux_edge_facet[0][0] = (4, 11) migrations defining the edge
+                    aux_edge_facet[0][1] = (1,0,0) facets
+            
+        """
+        
         for site_idx in self.adsorption_sites:
             if (self.crystal_size[0] * 0.45 < self.grid_crystal[site_idx].position[0] < self.crystal_size[0] * 0.55) and (self.crystal_size[1] * 0.45 < self.grid_crystal[site_idx].position[1] < self.crystal_size[1] * 0.55):
                 idx = site_idx
                 break            # Introduce specie in the site
         
+        # Obtain the different edge in the plane
         # Neighbors only in plane
-        # neighbors = [[self.grid_crystal[neigh[0]].position,neigh[1]] for neigh in self.grid_crystal[idx].migration_paths['Plane']]
+        neighbors = [[self.grid_crystal[neigh[0]].position,neigh[1]] for neigh in self.grid_crystal[idx].migration_paths['Plane']]
         # Minimum distance between neighbors
-        # min_dist = np.linalg.norm(np.array(self.grid_crystal[idx].position) - np.array(np.array(neighbors[4][0])))
-        # self.edges = {}
+        min_dist = np.linalg.norm(np.array(self.grid_crystal[idx].position) - np.array(np.array(neighbors[4][0])))
+        edges = {}
         
-        # for neighbor in neighbors:
-        #     for j in range(len(neighbors)):
-        #         if (math.isclose(np.linalg.norm(np.array(neighbor[0]) - np.array(np.array(neighbors[j][0]))), min_dist)) and ((neighbors[j][1],neighbor[1]) not in self.edges):
-        #             self.edges[(neighbor[1],neighbors[j][1])] = np.array(neighbor[0]) - np.array(np.array(neighbors[j][0]))
+        for neighbor in neighbors:
+            for j in range(len(neighbors)):
+                if (math.isclose(np.linalg.norm(np.array(neighbor[0]) - np.array(np.array(neighbors[j][0]))), min_dist)) and ((neighbors[j][1],neighbor[1]) not in edges):
+                    edges[(neighbor[1],neighbors[j][1])] = np.array(neighbor[0]) - np.array(np.array(neighbors[j][0]))
         
-        self.mig_directions = [[neigh[1],np.array(self.grid_crystal[neigh[0]].position) - np.array(self.grid_crystal[idx].position)] for neigh in self.grid_crystal[idx].migration_paths['Plane']]
-        self.mig_parallel_facets = {}
         
+        # Calculate the facets that are parallel to each migration
+        mig_directions = {neigh[1]:np.array(self.grid_crystal[neigh[0]].position) - np.array(self.grid_crystal[idx].position) for neigh in self.grid_crystal[idx].migration_paths['Plane']}
+        mig_parallel_facets = {}
         #Search for the facets that are parallel to the migration direction
-        for mig_direct in self.mig_directions:
+        for mig_direct,vector in mig_directions.items():
             facet_list = []
             for facet in self.wulff_facets[:14]:
                 if (facet[1][2] > 0 and facet[1][2] != 1 and # Screen facets that are looking downward or parallel to the x-y plane
-                    abs(np.dot(facet[1][:2],mig_direct[1][:2])) < 1e-12): # Parallel between facet normal (x-y) and migration direction
+                    abs(np.dot(facet[1][:2],vector[:2])) < 1e-12): # Parallel between facet normal vector (x-y) and migration direction
                         facet_list.append(facet)        
                     
-            self.mig_parallel_facets[mig_direct[0]] = facet_list
+            mig_parallel_facets[mig_direct] = facet_list
             
-                    
-                    
-    
+                       
+        # Calculate the edges parallel to the migration
+        parallel_mig_direction_edges = {}
+        for mig,facet in mig_parallel_facets.items():
+            list_edges = []
+            for edge,vector in edges.items():
+                
+                if abs(np.dot(vector,facet[1][1])) < 1e-12:
+                    list_edges.append(edge)
+                
+            parallel_mig_direction_edges[mig] = list_edges
+            
+        
+        # Associate edge with facets
+        # Edge is defined by two migrations: we sum them to obtain a vector that should be parallel to the facet
+        self.dir_edge_facets = {}
+        for mig,edges_2 in parallel_mig_direction_edges.items():
+            aux_edge_facet = []
+            for edge in edges_2:
+                v1 = mig_directions[edge[0]] + mig_directions[edge[1]]
+                
+                for facet in mig_parallel_facets[mig]:
+                    if np.dot(v1,facet[1]) > 0:
+                       aux_edge_facet.append([edge,facet[0]])
+                       
+            self.dir_edge_facets[mig] = aux_edge_facet
+            
+            
+        
     def calculate_crystallographic_planes(self):
         
 # =============================================================================
