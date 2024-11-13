@@ -33,14 +33,8 @@ Profiling - Reference: Grown 0.4 nm in a 2x2nm box
 """
 
 """
-Cache for:
-    - calculate_clustering_energy
-    - transition rates
-    - detect_edges
-    
 Optimize:
     - available_adsorption_sites --> cache?
-    - available_migration --> cache?
 """
 
 

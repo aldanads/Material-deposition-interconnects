@@ -32,6 +32,7 @@ class Site():
         self.cache_planes = {}
         self.cache_TR = {}
         self.cache_edges = {}
+        self.cache_clustering_energy = {}
 # =============================================================================
 #     We only consider the neighbors within the lattice domain            
 # =============================================================================
@@ -119,14 +120,32 @@ class Site():
         # We add 1 because if the site is occupied
         
         if supp_by_destiny == 0:
+            
+            # Check memory cache
+            cache_key = tuple(sorted(self.supp_by, key=lambda x: str(x)))
+            if cache_key in self.cache_clustering_energy:
+                self.energy_site = self.cache_clustering_energy[cache_key]
+                return
+            
             if 'Substrate' in self.supp_by:
                 self.energy_site = self.Act_E_list[-1][len(self.supp_by)] + self.Act_E_list[-2]
             else:
                 self.energy_site = self.Act_E_list[-1][len(self.supp_by)+1]
                 
+                # Store the result in the cache
+            self.cache_clustering_energy[cache_key] = self.energy_site
+                
         # We should consider the particle that would migrate there to calculate
         # the energy difference with the origin site
         else:
+            
+            # Check memory cache
+            cache_key = tuple(sorted(supp_by_destiny, key=lambda x: str(x)))
+            if cache_key in self.cache_clustering_energy:
+                return self.cache_clustering_energy[cache_key]
+
+
+            
             if 'Substrate' in supp_by_destiny and idx_origin in supp_by_destiny:
                 energy_site = self.Act_E_list[-1][len(supp_by_destiny)-1] + self.Act_E_list[-2]
             elif 'Substrate' in supp_by_destiny and idx_origin not in supp_by_destiny:
@@ -136,7 +155,11 @@ class Site():
             elif 'Substrate' not in supp_by_destiny and idx_origin not in supp_by_destiny:
                 energy_site = self.Act_E_list[-1][len(supp_by_destiny)+1]
             
+            # Store the result in the cache
+            self.cache_clustering_energy[cache_key] = energy_site
             return energy_site
+        
+        
    
 
    
