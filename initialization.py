@@ -17,9 +17,9 @@ import json
 
 def initialization(n_sim,save_data):
     
-    seed = 1
+    # seed = 1
     # Random seed as time
-    rng = np.random.default_rng(seed) # Random Number Generator (RNG) object
+    rng = np.random.default_rng() # Random Number Generator (RNG) object
 
     # Default resolution for figures
     plt.rcParams["figure.dpi"] = 100 # Default value of dpi = 300

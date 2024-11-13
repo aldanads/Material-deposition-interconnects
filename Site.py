@@ -30,8 +30,8 @@ class Site():
             self.supp_by.add('Substrate')
             
         self.cache_planes = {}
-        
-            
+        self.cache_TR = {}
+        self.cache_edges = {}
 # =============================================================================
 #     We only consider the neighbors within the lattice domain            
 # =============================================================================
@@ -314,7 +314,7 @@ class Site():
                 del self.site_events[i]
                 break
             
-    def detect_planes_new(self,System_state):
+    def detect_planes_test(self,System_state):
         
         atom_coordinates = np.array([System_state.grid_crystal[idx].position for idx in self.supp_by if idx != 'Substrate'])
 
@@ -379,6 +379,11 @@ class Site():
             
     def detect_edges(self,grid_crystal,dir_edge_facets,chemical_specie):
         
+        cache_key = tuple(sorted(self.supp_by, key=lambda x: str(x)))
+        
+        if cache_key in self.cache_edges:
+            self.cache_edges[cache_key]
+            return 
         
         mig_paths = {num_event:site_idx for site_idx, num_event in self.migration_paths['Plane']}       
         self.edges_v = {i:None for i in mig_paths.keys()}
@@ -397,8 +402,9 @@ class Site():
                         and grid_crystal[mig_paths[edge[0][1]]].chemical_specie == chemical_specie):
                         self.edges_v[num_event] = edge[1] # Associate the edge with the facet
                     
-
-
+        # Store the result in the cache
+        self.cache_edges[cache_key] = self.edges_v
+        
     def unit_vector(self,vector):
         """ Returns the unit vector of the vector."""
         return vector / np.linalg.norm(vector)
@@ -420,10 +426,15 @@ class Site():
         kb = constants.physical_constants['Boltzmann constant in eV/K'][0]
         nu0=7E12;  # nu0 (s^-1) bond vibration frequency
         
-        TR = [nu0*np.exp(-event[-1]/(kb*T)) for event in self.site_events]
-                
         # Iterate over site_events directly, no need to use range(len(...))
-        for event, tr_value in zip(self.site_events, TR):
+        for event in self.site_events:
+            if event[-1] in self.cache_TR:
+                tr_value = self.cache_TR[event[-1]]
+
+            else:
+                tr_value = nu0 * np.exp(-event[-1] / (kb * T))
+                self.cache_TR[event[-1]] = tr_value
+                
             # Use the length of event to determine the appropriate action
             if len(event) == 3:
                 # Insert at the beginning of the list for the binary tree

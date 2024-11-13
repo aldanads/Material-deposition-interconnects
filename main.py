@@ -7,29 +7,29 @@ Created on Mon Jan 15 15:12:23 2024
 
 
 """
-Profiling - Reference: Grown 0.3 nm in a 2x2nm box
+Profiling - Reference: Grown 0.4 nm in a 2x2nm box
 
-1606142554 function calls (1601344011 primitive calls) in 3808.223 seconds
+         2676429707 function calls (2668330686 primitive calls) in 9996.511 seconds
 
    Ordered by: internal time
-   List reduced from 1997 to 15 due to restriction <15>
+   List reduced from 12819 to 15 due to restriction <15>
 
    ncalls  tottime  percall  cumtime  percall filename:lineno(function)
- 21182531  727.770    0.000  773.141    0.000 crystal_lattice.py:210(available_adsorption_sites)
- 20454173  439.688    0.000  593.239    0.000 Site.py:155(available_migrations)
- 21182531  363.121    0.000 1312.305    0.000 Site.py:90(supported_by)
- 21182531  229.669    0.000  632.346    0.000 Site.py:318(detect_planes)
- 21182531  213.482    0.000  260.788    0.000 Site.py:365(detect_edges)
- 20454173  148.285    0.000  148.285    0.000 Site.py:429(<listcomp>)
- 88225131  130.736    0.000  142.564    0.000 Site.py:110(calculate_clustering_energy)
-  1125501  126.356    0.000 3090.793    0.003 crystal_lattice.py:511(update_sites)
- 67895751  116.200    0.000  116.200    0.000 Site.py:323(<lambda>)
- 21732308  114.275    0.000  230.751    0.000 {built-in method builtins.sorted}
- 20454173  113.631    0.000  285.750    0.000 Site.py:424(transition_rates)
-     2550   93.557    0.037   93.557    0.037 {method 'encode' of 'ImagingEncoder' objects}
- 22067444   85.175    0.000   85.215    0.000 {built-in method numpy.array}
-     5819   65.861    0.011  121.798    0.021 superbasin.py:107(transition_matrix)
-535043268/535040492   64.367    0.000   64.370    0.000 {built-in method builtins.len}
+ 87014705 1697.435    0.000 1993.252    0.000 crystal_lattice.py:321(available_adsorption_sites)
+ 98945669  966.934    0.000 1526.271    0.000 Site.py:160(available_migrations)
+ 87014705  785.962    0.000 1871.621    0.000 Site.py:331(detect_planes)
+ 98945669  760.480    0.000  915.542    0.000 Site.py:418(transition_rates)
+ 87014705  746.771    0.000 3516.502    0.000 Site.py:95(supported_by)
+ 87014705  527.334    0.000  700.369    0.000 Site.py:380(detect_edges)
+-1821479170/-1821489333  440.519   -0.000  440.525   -0.000 {built-in method builtins.len}
+  4458920  400.697    0.000 8351.543    0.002 crystal_lattice.py:658(update_sites)
+326221503  400.266    0.000  400.266    0.000 Site.py:336(<lambda>)
+ 88581059  367.008    0.000  767.598    0.000 {built-in method builtins.sorted}
+397918711  297.828    0.000  375.677    0.000 Site.py:115(calculate_clustering_energy)
+ 93885924  279.128    0.000  279.166    0.000 {built-in method numpy.array}
+    13224  215.039    0.016  474.352    0.036 superbasin.py:107(transition_matrix)
+619315526  213.524    0.000  213.545    0.000 {built-in method builtins.max}
+  4458667  180.502    0.000  284.071    0.000 crystal_lattice.py:748(remove_specie_site)
 """
 
 """
@@ -41,12 +41,6 @@ Cache for:
 Optimize:
     - available_adsorption_sites --> cache?
     - available_migration --> cache?
-"""
-
-
-"""
-REFACTOR CRYSTAL EDGE AND CRYSTALLOGRAPHIC PLANES IN GENERAL
-After using pymatgen, all those things changed
 """
 
 
@@ -80,7 +74,7 @@ for n_sim in range(0,1):
         
         nothing_happen = 0
         list_time_step = []
-        thickness_limit = 30 # (1 nm)
+        thickness_limit = 4 # (1 nm)
         System_state.measurements_crystal()
         i = 0
         while System_state.thickness < thickness_limit:
@@ -154,12 +148,12 @@ for n_sim in range(0,1):
     if save_data: save_variables(paths['program'],variables)
 
 
-# # Use cProfile to profile the main function
+# Use cProfile to profile the main function
 # if __name__ == '__main__':
 #     cProfile.run('main()', 'profile_output.prof')    
 
 # import pstats
 
-# # Load and analyze the profiling results
+# Load and analyze the profiling results
 # p = pstats.Stats('profile_output.prof')
 # p.strip_dirs().sort_stats('time').print_stats(15)  # Show top 10 time-consuming functions

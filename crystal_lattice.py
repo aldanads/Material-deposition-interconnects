@@ -671,7 +671,6 @@ class Crystal_Lattice():
             for idx in update_specie_events:
                 self.grid_crystal[idx].available_migrations(self.grid_crystal,idx)
                 self.grid_crystal[idx].transition_rates(self.temperature)
-                    
    
     def update_sites_2(self,update_specie_events,update_supp_av, batch_size=10):
 
