@@ -21,14 +21,7 @@ class Site():
         self.site_events = [] # Possible events corresponding to this node
         self.migration_paths = {'Plane':[],'Up':[],'Down':[]} # Possible migration sites with the corresponding label
        
-        # Set() to store the occupied sites that support this node
-        # We start from zero everytime in case the 
-        self.supp_by = set()
-        # Position close to 0 are supported by the substrate
-        tol = 1e-6
-        if self.position[2] <= tol:
-            self.supp_by.add('Substrate')
-            
+        # Cache memory            
         self.cache_planes = {}
         self.cache_TR = {}
         self.cache_edges = {}
@@ -94,21 +87,51 @@ class Site():
 #         Occupied sites supporting this node
 # =============================================================================    
     def supported_by(self,grid_crystal,wulff_facets,dir_edge_facets,chemical_specie):
+        
+        # Initialize supp_by as an empty list
+        self.supp_by = []
+        
+        # Position close to 0 are supported by the substrate
+        tol = 1e-6
+        if self.position[2] <= tol:
+            self.supp_by.append('Substrate')
                  
         # Go over the nearest neighbors
         for idx in self.nearest_neighbors_idx:
-            idx = tuple(idx)
+            # Select the occupied sites that support this node
+            if grid_crystal[idx].chemical_specie != "Empty":
+                self.supp_by.append(idx)
+                    
+        # Convert supp_by to a tuple
+        self.supp_by = tuple(self.supp_by)
+        
+        self.detect_edges(grid_crystal,dir_edge_facets,chemical_specie)               
+        self.calculate_clustering_energy()
+        self.detect_planes(grid_crystal,wulff_facets)
+        
+    def supported_by_2(self,grid_crystal,wulff_facets,dir_edge_facets,chemical_specie):
+        
+        if isinstance(self.supp_by, tuple):
+            self.supp_by = list(self.supp_by)
+                 
+        # Go over the nearest neighbors
+        for i,idx in enumerate(self.nearest_neighbors_idx):
+            # idx = tuple(idx)
             # Select the occupied sites that support this node
             ## I don't need to check if idx is in the domain, as the method
             ## neighbors_analysis() select the neighbors within the domain
-            if (grid_crystal[idx].chemical_specie != "Empty"):
-                self.supp_by.add(idx)
+            if (grid_crystal[idx].chemical_specie != "Empty") and (idx not in self.supp_by):
+                self.supp_by.insert(i+1,idx)
             # If some of the sites that supported this node disappear, remove
             # it from the supp_by set()
             elif (grid_crystal[idx].chemical_specie == "Empty") and (idx in self.supp_by):
                 self.supp_by.remove(idx)
                 
-
+        self.supp_by = tuple(self.supp_by)
+                        
+        if self.position == (8.762879735528042, 2.5296254870917156, 2.6569548053786724e-16):
+            print(self.supp_by)
+        
         self.detect_edges(grid_crystal,dir_edge_facets,chemical_specie)               
         self.calculate_clustering_energy()
         self.detect_planes(grid_crystal,wulff_facets)
@@ -122,7 +145,8 @@ class Site():
         if supp_by_destiny == 0:
             
             # Check memory cache
-            cache_key = tuple(sorted(self.supp_by, key=lambda x: str(x)))
+            # cache_key = tuple(sorted(self.supp_by, key=lambda x: str(x)))
+            cache_key = self.supp_by
             if cache_key in self.cache_clustering_energy:
                 self.energy_site = self.cache_clustering_energy[cache_key]
                 return
@@ -140,7 +164,8 @@ class Site():
         else:
             
             # Check memory cache
-            cache_key = tuple(sorted(supp_by_destiny, key=lambda x: str(x)))
+            # cache_key = tuple(sorted(supp_by_destiny, key=lambda x: str(x)))
+            cache_key = supp_by_destiny
             if cache_key in self.cache_clustering_energy:
                 return self.cache_clustering_energy[cache_key]
 
@@ -354,18 +379,20 @@ class Site():
     def detect_planes(self,grid_crystal,wulff_facets):
         
         atom_coordinates = np.array([grid_crystal[idx].position for idx in self.supp_by if idx != 'Substrate'])
+        # atom_coordinates = tuple([grid_crystal[idx].position for idx in self.supp_by if idx != 'Substrate'])
         # Order the coordinates according to the first value, then the second, etc.
         # We are ordering the row, not the elements of the coordinates (x,y,z)
-        sorted_atom_coordinates = sorted(atom_coordinates, key=lambda x: tuple(x))
-        sorted_atom_coordinates = tuple(map(tuple, sorted_atom_coordinates))
+        # sorted_atom_coordinates = sorted(atom_coordinates, key=lambda x: tuple(x))
+        # sorted_atom_coordinates = tuple(map(tuple, sorted_atom_coordinates))
+        cache_key = self.supp_by
         
         # Check if the result is already cached
         if 'Substrate' in self.supp_by:
             self.wulff_facet = (1,1,1)
             return
         
-        if sorted_atom_coordinates in self.cache_planes:
-            self.wulff_facet = self.cache_planes[sorted_atom_coordinates]
+        if cache_key in self.cache_planes:
+            self.wulff_facet = self.cache_planes[cache_key]
             return
         
         elif len(atom_coordinates) > 2:
@@ -397,12 +424,13 @@ class Site():
             self.wulff_facet = (1,1,1)
             
         # Cache the result
-        self.cache_planes[sorted_atom_coordinates] = self.wulff_facet
+        self.cache_planes[cache_key] = self.wulff_facet
            
             
     def detect_edges(self,grid_crystal,dir_edge_facets,chemical_specie):
         
-        cache_key = tuple(sorted(self.supp_by, key=lambda x: str(x)))
+        # cache_key = tuple(sorted(self.supp_by, key=lambda x: str(x)))
+        cache_key = self.supp_by
         
         if cache_key in self.cache_edges:
             self.cache_edges[cache_key]

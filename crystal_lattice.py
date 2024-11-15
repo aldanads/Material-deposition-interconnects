@@ -172,6 +172,7 @@ class Crystal_Lattice():
                 neighbors_positions = [neigh.coords for neigh in neighbors]
                 neighbors_idx = [self.get_idx_coords(neigh.coords,self.basis_vectors) for neigh in neighbors]
                 
+                
                 # Some sites are not created with the dictionary comprenhension
                 # If the sites have neighbors that are within the crystal dimension range
                 # but not included, we included
@@ -664,7 +665,7 @@ class Crystal_Lattice():
             for idx in update_supp_av:
                 self.grid_crystal[idx].supported_by(self.grid_crystal,self.wulff_facets[:14],
                                                     self.dir_edge_facets,self.chemical_specie)
-                self.available_adsorption_sites(update_supp_av)
+            self.available_adsorption_sites(update_supp_av)
         
         if update_specie_events: 
             # Sites are not available because a particle has migrated there
