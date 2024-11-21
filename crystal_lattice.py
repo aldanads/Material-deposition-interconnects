@@ -27,6 +27,8 @@ from ovito.vis import *
 from ovito.io import export_file
 from concurrent.futures import ThreadPoolExecutor
 
+import json
+
 # Rotation of a vector - Is copper growing in [111] direction?
 # The basis vector is in [001]
 # https://stackoverflow.com/questions/48265646/rotation-of-a-vector-python
@@ -622,13 +624,18 @@ class Crystal_Lattice():
 # =============================================================================
 #         Specie migration
 # =============================================================================
+
         if chosen_event[2] <= (self.num_event - 2): # 12 migration possibilities [0-11] and [12] for migrating from superbasin
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(chosen_event[1],update_specie_events,update_supp_av)
             # Remove particle
             update_specie_events,update_supp_av = self.remove_specie_site(chosen_event[-1],update_specie_events,update_supp_av)
+       
             # Update sites availables, the support to each site and available migrations
             self.update_sites(update_specie_events,update_supp_av)
+            
+                # print(self.sites_occupied)
+                # quit()
 
 # =============================================================================
 #         Specie deposition
@@ -750,7 +757,9 @@ class Crystal_Lattice():
         # Chemical specie removed
         self.grid_crystal[idx].remove_specie()
         # Track sites occupied
+
         self.sites_occupied.remove(idx) 
+   
         # Track sites available
         update_specie_events.discard(idx)
         
@@ -857,21 +866,54 @@ class Crystal_Lattice():
             plt.show()
             
         else:
+            
+            species_mapping = {self.chemical_specie: 1}  # Example species mapping
             sites_occupied_cart = [(self.idx_to_cart(site)) for site in self.sites_occupied]
+            species_ids = [species_mapping.get(self.grid_crystal[site].chemical_specie) for site in self.sites_occupied]
+            species = [self.grid_crystal[site].chemical_specie for site in self.sites_occupied]
+
+            # Define particle IDs
+            particle_ids = list(range(1, len(sites_occupied_cart) + 1))  # Unique IDs for each particle
+
+            time_step=round(self.time,5)
+            
             # Create the data collection containing a Particles object:
             data = DataCollection()
             particles = data.create_particles()
             
+            particles.create_property('Particle Identifier', data=particle_ids)
+            
             # Create the particle position property:
             pos_prop = particles.create_property('Position', data=sites_occupied_cart)
             
+            # Create the particle species property:
+            type_prop = particles.create_property('Particle Type', data=species_ids)
+            for specie in species:
+                type_prop.types.append(ParticleType(id = species_mapping[specie], name = specie, color = (0.0,1.0,0.0)))
+            
+            #species_prop = particles.create_property('Name', data=species)
+            
+            # Add the time step as a global attribute:
+            data.attributes['TimeStep'] = i
             data.objects.append(self.cell)
             
             # Create a pipeline, set the source and insert it into the scene:
             pipeline = Pipeline(source = StaticSource(data = data))
+
+            export_file(data, path+str(i)+".dump", "lammps/dump",
+                columns = ["Particle Identifier","Position.X", "Position.Y", "Position.Z","Particle Type"])
             
-            export_file(pipeline, path+str(i)+".dump", "lammps/dump",
-                columns = ["Position.X", "Position.Y", "Position.Z"])
+            # Write the metadata file
+            metadata = {species_mapping[specie]: specie for specie in species_mapping}
+            if i == 1:
+                with open(path + "metadata.json", 'w') as metadata_file:
+                    json.dump(metadata, metadata_file)
+                    
+            # Add the time step as a comment at the beginning of the dump file
+            with open(path + str(i) + ".dump", 'r+') as dump_file:
+                content = dump_file.read()
+                dump_file.seek(0, 0)
+                dump_file.write(f"# Time: {self.time:.10f}\n" + content)
         
     def plot_crystal_surface(self):
         

@@ -4,10 +4,8 @@ Created on Wed Aug 28 13:31:56 2024
 
 @author: samuel.delgado
 """
-import copy
 import numpy as np
 from scipy import constants
-import time
 
 
 # =============================================================================
@@ -22,16 +20,15 @@ import time
 
 class Superbasin():
     
-    def __init__(self,idx, System_state,E_min):
+    def __init__(self,idx, System_state,E_min,sites_occupied):
         
         self.particle_idx = idx
         self.E_min = E_min
         # Make a deep copy of System_state to avoid modifying the original object
 
-        sites_occupied = System_state.sites_occupied
         grid_crystal = System_state.grid_crystal
         num_event = System_state.num_event
-        self.trans_absorbing_states(idx,System_state)
+        self.trans_absorbing_states(idx,System_state,sites_occupied)
         
         self.transition_matrix()
         self.markov_matrix()
@@ -40,7 +37,7 @@ class Superbasin():
         self.calculate_superbasin_environment(grid_crystal)
         
    
-    def trans_absorbing_states(self,start_idx,System_state):
+    def trans_absorbing_states(self,start_idx,System_state,sites_occupied):
         
         stack = [start_idx]
         visited = set()
@@ -84,7 +81,8 @@ class Superbasin():
             # Virtual migrations to calculate activation energies
             if stack:
                 System_state.processes((transition[0], stack[-1], transition[2], idx))
-        
+                
+    
         System_state.processes((transition[0], start_idx, transition[2], idx)) 
 
         # Construct the transitions to the absorbing states
@@ -103,6 +101,8 @@ class Superbasin():
 
         self.superbasin_idx = self.absorbing_states + self.transient_states 
         
+        # Check that grid_crystal is in the original state
+        self.verify_grid_crystal(System_state,sites_occupied) 
    
     def transition_matrix(self):
         
@@ -246,6 +246,20 @@ class Superbasin():
             
         self.superbasin_environment = set(list(self.superbasin_environment) + self.superbasin_idx)
         
-        self.superbasin_environment.discard('Substrate')            
+        self.superbasin_environment.discard('Substrate') 
+
+    # Verify that we leave grid_crystal in the original state
+    def verify_grid_crystal(self,System_state,sites_occupied):       
+        
+        for site in sites_occupied:
+            # It should be occupied, but it is not
+            if System_state.grid_crystal[site].chemical_specie != System_state.chemical_specie:
+                # Select deposition event
+                event = System_state.grid_crystal[site].site_events[0]
+                # Remove the site from sites_occupied
+                System_state.sites_occupied.remove(event[1])
+                # Introduce the particle
+                System_state.processes((event[0], event[1], event[2], event[1])) 
+
         
       

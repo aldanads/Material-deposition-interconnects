@@ -17,9 +17,9 @@ import json
 
 def initialization(n_sim,save_data):
     
-    # seed = 1
+    seed = 1
     # Random seed as time
-    rng = np.random.default_rng() # Random Number Generator (RNG) object
+    rng = np.random.default_rng(seed) # Random Number Generator (RNG) object
 
     # Default resolution for figures
     plt.rcParams["figure.dpi"] = 100 # Default value of dpi = 300
@@ -28,7 +28,7 @@ def initialization(n_sim,save_data):
         files_copy = ['initialization.py', 'crystal_lattice.py','Site.py','main.py','KMC.py','balanced_tree.py','analysis.py']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Copper deposition\Simulations\Test\\'
+            dst = r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Material deposition exploration\Simulations\Test\\'
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = r'/sfiwork/samuel.delgado/Copper_deposition/Varying_substrate/batch_simulation/annealing/TaN/T300/'
             
@@ -38,7 +38,7 @@ def initialization(n_sim,save_data):
         paths = {'data': ''}
         Results = []
         
-    ovito_file = False
+    ovito_file = True
 
     experiments = ['deposition','annealing']
     experiment = experiments[0]
@@ -245,12 +245,28 @@ def search_superbasin(System_state):
     
     # This approach should be more efficient and memory-friendly
     sites_occupied = System_state.sites_occupied[:] 
+    
+    # print('Before calling superbasin')
+    # for site in sites_occupied:
+    #     print(site,System_state.grid_crystal[site].chemical_specie)
+    #     if System_state.grid_crystal[site].chemical_specie == 'Empty':
+    #         print(sites_occupied)
+    #         quit()
 
     for idx in sites_occupied:
         for event in System_state.grid_crystal[idx].site_events:
             if (idx not in System_state.superbasin_dict) and (event[3] <= System_state.E_min):
-                System_state.superbasin_dict.update({idx: Superbasin(idx, System_state, System_state.E_min)})
+                System_state.superbasin_dict.update({idx: Superbasin(idx, System_state, System_state.E_min,sites_occupied)})
                 
+                
+    # print('After calling superbasin')
+    # for site in sites_occupied:
+    #     print(site,System_state.grid_crystal[site].chemical_specie)
+    #     if System_state.grid_crystal[site].chemical_specie == 'Empty':
+    #         print(sites_occupied)
+    #         print(System_state.sites_occupied)
+    #         quit()
+
 
 def save_simulation(files_copy,dst,n_sim):
     
