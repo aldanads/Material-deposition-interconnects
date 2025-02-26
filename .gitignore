@@ -1,13 +1,17 @@
 __pycache__/
 Version 2024-10-10/
 Version 2024-11-08/
+Version 2024-11/
+activation_energies_memristors.json
 video_via_images.py
 images_to_video.py
 Figure.csv
-Histogram_neighbor.csv
+Histogram_neighbors.csv
 Histogram_terraces.csv
 Occupation_rate.csv
 ovito_files.py
 profile_output.prof
 config.json
 Test_pymatgen.py
+*grid_crystal*
+metadata.json

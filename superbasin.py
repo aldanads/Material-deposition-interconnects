@@ -25,17 +25,28 @@ class Superbasin():
         self.particle_idx = idx
         self.E_min = E_min
         # Make a deep copy of System_state to avoid modifying the original object
+        self.epsilon_min_decrement = 0.1  # Step to decrease E_min per retr       
+        self.retry_limit = max(round(E_min / self.epsilon_min_decrement),2)  # Maximum retry attempts
 
-        grid_crystal = System_state.grid_crystal
-        num_event = System_state.num_event
+        # Core workflow
         self.trans_absorbing_states(idx,System_state,sites_occupied)
+        if not self.absorbing_states or not self.transient_states:
+            self.valid = False  # Mark the object as invalid
+            return
+        
+        self.valid = True  # Mark the object as valid if absorbing states exist
+        
         
         self.transition_matrix()
         self.markov_matrix()
-        self.absorption_probability_matrix()
-        self.calculate_transition_rates_absorbing_states(num_event)
-        self.calculate_superbasin_environment(grid_crystal)
         
+        if not self.absorption_probability_matrix():
+            self.valid = False  # Mark as invalid if poor conditioning is detected
+            return
+        
+        self.calculate_transition_rates_absorbing_states(System_state.num_event)
+        self.calculate_superbasin_environment(System_state.grid_crystal)
+
    
     def trans_absorbing_states(self,start_idx,System_state,sites_occupied):
         
@@ -207,11 +218,34 @@ class Superbasin():
         
         # Calculate the fundamental matrix N
         I = np.eye(n_transient)
-        # self.N = np.linalg.inv(I - T_transient)
-        self.N = np.linalg.pinv(I - T_transient) # Pseudo-inverse 
+        I_reg = I - T_transient
+        
+        # Check for poor conditioning 
+        cond_number = np.linalg.cond(I_reg)
+        print('Conditioning number: ', cond_number)
+        if cond_number > 1e10: # In this case, the matrix is almost singular --> Large errors
+            print(f"Matrix is poorly conditioned (cond = {cond_number}). Adjust regularization or inspect T_transient.")
+            return False
+        
+        # Check for NaN or infinity values
+        if np.any(np.isnan(I_reg)) or np.any(np.isinf(I_reg)):
+            raise ValueError("I_reg = I - T_transient contains NaN or infinity values.")
+            return False
+        
+            # Regularize the matrix
+        epsilon = 1e-10
+        I_reg += epsilon * np.eye(I_reg.shape[0])
+        # Calculate the pseudo-inverse with error handling
+        try:
+            self.N = np.linalg.pinv(I - T_transient) # Pseudo-inverse
+        except np.linalg.LinAlgError:
+            print("SVD did not converge")
+            return False
         
         # Calculate the absorption probabilities matrix B
         self.B_absorption = np.dot(self.N, R_recurrent) 
+       
+        return True
         
       
     def calculate_transition_rates_absorbing_states(self,num_event,T=300):
@@ -220,6 +254,10 @@ class Superbasin():
         # (first passage time - FPT)
         FPT = np.sum(self.N, axis=1)
         # Calculate transition_rates
+        
+        # Avoid division by zero or very small values
+        epsilon = 1e-10  # Small value to avoid division by zero
+        FPT[FPT < epsilon] = epsilon
         transition_rates = self.B_absorption / FPT[:, None]
         
         # We are only interested in the absorbing states
@@ -228,13 +266,17 @@ class Superbasin():
         self.transition_rates = np.where(sum_transition_rates < 0, 0, sum_transition_rates)
         kb = constants.physical_constants['Boltzmann constant in eV/K'][0]
         nu0=7E12;  # nu0 (s^-1) bond vibration frequency
-        self.EAct = -kb*T*np.log(self.transition_rates/nu0)
-        
+        # The np.where() is included to handle transition_rates = 0
+        with np.errstate(divide='ignore'):
+            self.EAct = np.where(self.transition_rates > 0, -kb * T * np.log(self.transition_rates / nu0), 
+                                 np.inf)
+                
         self.site_events_absorbing = [
             (transition_r, absorbing_state, num_event - 2, EAct, self.particle_idx)
             for transition_r, absorbing_state, EAct 
             in zip(self.transition_rates, self.absorbing_states, self.EAct)
             ]
+        
   
     def calculate_superbasin_environment(self,grid_crystal):
         
@@ -255,11 +297,13 @@ class Superbasin():
             # It should be occupied, but it is not
             if System_state.grid_crystal[site].chemical_specie != System_state.chemical_specie:
                 # Select deposition event
-                event = System_state.grid_crystal[site].site_events[0]
+                # event = System_state.grid_crystal[site].site_events[0]
                 # Remove the site from sites_occupied
-                System_state.sites_occupied.remove(event[1])
+                # System_state.sites_occupied.remove(event[1])
+                System_state.sites_occupied.remove(site)
                 # Introduce the particle
-                System_state.processes((event[0], event[1], event[2], event[1])) 
+                # System_state.processes((event[0], event[1], event[2], event[1])) 
+                System_state.processes((0, site, System_state.num_event-1, site)) 
 
         
       
