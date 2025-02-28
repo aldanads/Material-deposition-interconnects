@@ -47,7 +47,7 @@ class Crystal_Lattice():
         use_parallel = crystal_features[4]
         self.facets_type = crystal_features[5]
         interstitial_specie = crystal_features[6]
-        interstitial = crystal_features[7]
+        mode = crystal_features[7]
         self.radius_neighbors = crystal_features[8]
         self.sites_generation_layer = crystal_features[9]
         
@@ -70,7 +70,8 @@ class Crystal_Lattice():
         self.list_time = []
         
         # Crystal_grid generation
-        self.lattice_model(interstitial_specie,api_key,self.radius_neighbors,interstitial)
+        # self.lattice_model_2(api_key, mode, interstitial_specie, self.radius_neighbors)
+        self.lattice_model(api_key, mode, interstitial_specie, self.radius_neighbors)
         self.crystal_grid(grid_crystal,self.radius_neighbors,use_parallel)
 
         self.sites_occupied = [] # Sites occupy be a chemical specie
@@ -103,43 +104,100 @@ class Crystal_Lattice():
         self.update_sites(update_specie_events,update_supp_av)
 
         self.lammps_file = lammps_file
-
-    
-    def lattice_model(self,interstitial_specie,api_key,radius_neighbors,interstitial = False):
+        
+    #def lattice_model(self,interstitial_specie,api_key,radius_neighbors,interstitial = False):
+    def lattice_model(self, api_key, mode, interstitial_specie=None, radius_neighbors=None):
+        """
+        Generate a lattice model based on the specified mode:
+        - 'regular': Uses the conventional crystal structure.
+        - 'interstitial': Adds interstitial atoms based on charge density.
+        - 'vacancy': Removes atoms to simulate vacancies (to be implemented).
+        
+        Parameters:
+            api_key (str): API key for the Materials Project.
+            mode (str): 'regular', 'interstitial', or 'vacancy'.
+            interstitial_specie (str, optional): The atomic species to use for interstitials.
+            radius_neighbors (float, optional): Neighbor radius for vacancy/interstitial detection.
+        """
 
         with MPRester(api_key) as mpr:
             structure = mpr.get_structure_by_material_id(self.id_material)
             
             # If we want to include interstitial sites
-            if interstitial:
+
+            if mode == 'interstitial':
                 chgcar = mpr.get_charge_density_from_material_id(self.id_material) #Download charge density from MP
                 cig = ChargeInterstitialGenerator() # Defect generator based on charge density
                 defects = cig.generate(chgcar, insert_species=[interstitial_specie]) # Generate interstitial specie
-                for defect in defects:
-                    structure_with_interstitial = defect.defect_structure # Select one defect to obtain the structure including the defect
-           
-                
-           
-        if self.latt_orientation == '001':
+                structure = next(defects).defect_structure  # Select one defect-modified structure
+        
+        
+
+        # Apply symmetry operations
+        symm_op = SymmOp.from_rotation_and_translation(self.rot_matrix(self.latt_orientation), [0, 0, 0])
+        sga = SpacegroupAnalyzer(structure)
+        self.structure_basic = sga.get_conventional_standard_structure()
+
+        # Determine chemical species
+        self.chemical_specie = interstitial_specie if mode == 'interstitial' else self.structure_basic.composition.reduced_formula
+    
+        # Extract lattice constants in nm
+        self.lattice_constants = tuple(np.array(self.structure_basic.lattice.abc) / 10)
+
+        # Apply rotation
+        self.structure_basic.apply_operation(symm_op)
+        self.structure = self.structure_basic.copy()
             
-            self.rotation_matrix = np.eye(3)
-                        
-        elif self.latt_orientation == '111':
+        # Apply the CubicSupercellTransformation
+        min_dimension = max(self.crystal_size) 
+        transformation = CubicSupercellTransformation(min_length=min_dimension,force_90_degrees = True,step_size=0.3)
+
+        # Handle interstitial sites explicitly
+        if mode == 'regular':
+            self.structure = transformation.apply_transformation(self.structure)
+
+        elif mode == 'interstitial':
+            structure_with_interstitial = transformation.apply_transformation(self.structure)
+            self.structure = Structure(structure_with_interstitial.lattice, [], [])
             
-            # Rotation matrix to align crystal with 111 direction to z-axis
-            self.rotation_matrix = np.array([
-                [1/np.sqrt(6), -1/np.sqrt(6), 2/np.sqrt(6)],
-                [1/np.sqrt(2), 1/np.sqrt(2), 0],
-                [-1/np.sqrt(3), 1/np.sqrt(3), 1/np.sqrt(3)]
-            ])
+            for site in structure_with_interstitial:
+                if site.specie.symbol == interstitial_specie:
+                    self.structure.append(site.specie, site.frac_coords)
+         
+        #elif mode == 'vacancy':
+            
+            
+        self.crystal_size = self.structure.lattice.abc
             
         
-                    
+        # Compute basis vectors #
+        # Scaling factor for the basis_vectors
+        # Find the minimum non-zero element of fractional coordinates greater than zero to find the scaling factor
+        # Scaling factor so integer times the basis vectors correspond to the sites
+        min_non_zero_element = min([
+            np.min(site.frac_coords[site.frac_coords > 1e-10]) for site in self.structure_basic if np.any(site.frac_coords > 1e-10)
+            ])
+        
+        self.basis_vectors = np.array(self.structure_basic.lattice.matrix) * min_non_zero_element  # Basis vector in nm scaled to the closest element
+
+    
+    def lattice_model_2(self,api_key, mode, interstitial_specie,radius_neighbors):
+
+        with MPRester(api_key) as mpr:
+            structure = mpr.get_structure_by_material_id(self.id_material)
+            
+            # If we want to include interstitial sites
+            if mode == 'interstitial':
+                chgcar = mpr.get_charge_density_from_material_id(self.id_material) #Download charge density from MP
+                cig = ChargeInterstitialGenerator() # Defect generator based on charge density
+                defects = cig.generate(chgcar, insert_species=[interstitial_specie]) # Generate interstitial specie
+                structure_with_interstitial = next(defects).defect_structure # Select one defect to obtain the structure including the defect
+        
         # Symmetry operation
-        symm_op = SymmOp.from_rotation_and_translation(self.rotation_matrix, [0, 0, 0])
+        symm_op = SymmOp.from_rotation_and_translation(self.rot_matrix(self.latt_orientation), [0, 0, 0])
 
         # If we are interested in the crystal structure (interstitial == False)
-        if interstitial == False:
+        if mode != 'interstitial':
             sga = SpacegroupAnalyzer(structure)
             self.structure_basic = sga.get_conventional_standard_structure()
             self.chemical_specie = self.structure_basic.composition.reduced_formula
@@ -149,7 +207,9 @@ class Crystal_Lattice():
             sga = SpacegroupAnalyzer(structure_with_interstitial)
             self.structure_basic = sga.get_conventional_standard_structure()
             self.chemical_specie = interstitial_specie
-            
+        
+        
+
         self.lattice_constants = tuple(np.array(self.structure_basic.lattice.abc)/10)
 
         # Apply the rotation to the structure
@@ -162,9 +222,8 @@ class Crystal_Lattice():
         min_dimension = max(self.crystal_size) 
         transformation = CubicSupercellTransformation(min_length=min_dimension,force_90_degrees = True,step_size=0.3)
         
-        if interstitial == False:
+        if mode != 'interstitial':
             self.structure = transformation.apply_transformation(self.structure)
-
             self.crystal_size = self.structure.lattice.abc
 
         else:
@@ -176,6 +235,8 @@ class Crystal_Lattice():
                     self.structure.append(site.specie, site.frac_coords)
             self.crystal_size = self.structure_with_interstitial.lattice.abc
             
+        for site in self.structure[:20]:
+            print(site)  
         # Scaling factor for the basis_vectors
         # Find the minimum non-zero element of fractional coordinates greater than zero to find the scaling factor
         # Scaling factor so integer times the basis vectors correspond to the sites
@@ -183,9 +244,21 @@ class Crystal_Lattice():
             np.min(site.frac_coords[site.frac_coords > 1e-10]) for site in self.structure_basic if np.any(site.frac_coords > 1e-10)
             ])
         
-        print
         self.basis_vectors = np.array(self.structure_basic.lattice.matrix) * min_non_zero_element  # Basis vector in nm scaled to the closest element
-
+        
+    def rot_matrix(self,latt_orientation):
+        if latt_orientation == '001':
+            
+            return np.eye(3)
+                        
+        elif latt_orientation == '111':
+            
+            # Rotation matrix to align crystal with 111 direction to z-axis
+            return np.array([
+                [1/np.sqrt(6), -1/np.sqrt(6), 2/np.sqrt(6)],
+                [1/np.sqrt(2), 1/np.sqrt(2), 0],
+                [-1/np.sqrt(3), 1/np.sqrt(3), 1/np.sqrt(3)]
+            ])
             
     def crystal_grid(self,grid_crystal,radius_neighbors,use_parallel=None):
         
@@ -251,6 +324,7 @@ class Crystal_Lattice():
                                        - np.array(self.get_idx_coords(self.structure[0].coords,self.basis_vectors))):i 
                             for i,site in enumerate(neighbors)}
             
+
             # Step 4: Perform neighbor analysis
             # Use ProcessPoolExecutor to parallelize the loop
             start_time = time.perf_counter()

@@ -40,22 +40,21 @@ from KMC import KMC
 import numpy as np
 import time
 
-save_data = True
-lammps_file = True
+save_data = False
+lammps_file = False
 
 # def main():
 
 for n_sim in range(0,8):
     
     System_state,rng,paths,Results = initialization(n_sim,save_data,lammps_file)
-    print(System_state.TR_gen)
-    exit()
+
     System_state.add_time()
         
     System_state.plot_crystal(45,45,paths['data'],0)    
     j = 0
     
-    snapshoots_steps = int(5e1)
+    snapshoots_steps = int(1e0)
     starting_time = time.time()
 # =============================================================================
 #     Deposition

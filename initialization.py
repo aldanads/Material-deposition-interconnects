@@ -37,7 +37,7 @@ def initialization(n_sim,save_data,lammps_file):
         if platform.system() == 'Windows': # When running in laptop
             dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Material deposition exploration\Simulations\Test')
         elif platform.system() == 'Linux': # HPC works on Linux
-            dst = Path(r'/sfiwork/samuel.delgado/Mapping/10nm/Ag')
+            dst = Path(r'/sfiwork/samuel.delgado/Mapping/5nm/Ag/Substrate_range_v2')
             
         paths,Results = save_simulation(files_copy,dst,n_sim) # Create folders and python files
         
@@ -63,11 +63,11 @@ def initialization(n_sim,save_data,lammps_file):
 #       characteristics and interplay between growth parameters and films morphology"
 # =============================================================================
         sticking_coeff = 1        
-        # partial_pressure = 113 # (Pa = N m^-2 = kg m^-1 s^-2)
-        partial_pressure = 100
+        partial_pressure = 113 # (Pa = N m^-2 = kg m^-1 s^-2)
+        #partial_pressure = 100
         # p = 0.1 - 10 typical values 
         # T = 573 + n_sim * 100 # (K)
-        temp = 300
+        temp = 431
         T = temp # (K)
         
         experimental_conditions = [sticking_coeff,partial_pressure,T,experiment]
@@ -76,14 +76,14 @@ def initialization(n_sim,save_data,lammps_file):
 #         Crystal structure
 #         
 # =============================================================================
-        material_selection = {"Ni":"mp-23","Cu":"mp-30", "Pd": "mp-2","Ag":"mp-124","Pt":"mp-126","Au":"mp-81"}
-        id_material_Material_Project = material_selection['Ag']
+        material_selection = {"Ni":"mp-23","Cu":"mp-30", "Pd": "mp-2","Ag":"mp-124","Pt":"mp-126","Au":"mp-81", "PbZrO3":"mp-1068577"}
+        id_material_Material_Project = material_selection['Cu']
         crystal_size = (20,20,20) # (angstrom (Å))
         orientation = ['001','111']
         use_parallel = None
         facets_type = [(1,1,1),(1,0,0)]
         interstitial_specie = None
-        interstitial = False
+        mode = ['regular']
         radius_neighbors = 3
         sites_generation_layer = ['bottom_layer','top_layer']
 
@@ -105,7 +105,9 @@ def initialization(n_sim,save_data,lammps_file):
             formula = material_summary[0].formula_pretty
 
             
-        crystal_features = [id_material_Material_Project,crystal_size,orientation[1],api_key,use_parallel,facets_type,interstitial_specie,interstitial,radius_neighbors,sites_generation_layer[0]]
+        crystal_features = [id_material_Material_Project,crystal_size,orientation[1],
+                            api_key,use_parallel,
+                            facets_type,interstitial_specie,mode[0],radius_neighbors,sites_generation_layer[0]]
         
 # =============================================================================
 #             Superbasin parameters
@@ -305,7 +307,7 @@ def initialization(n_sim,save_data,lammps_file):
         use_parallel = None
         facets_type = None
         interstitial_specie = 'Ag'
-        interstitial = True
+        mode = ['interstitial', 'vacancy']
         radius_neighbors = 4
         sites_generation_layer = ['bottom_layer','top_layer']
 
@@ -327,8 +329,10 @@ def initialization(n_sim,save_data,lammps_file):
             formula = material_summary[0].formula_pretty
 
 
-        crystal_features = [id_material_Material_Project,crystal_size,orientation[0],api_key,use_parallel,facets_type,interstitial_specie,interstitial,radius_neighbors,sites_generation_layer[1]]
-        
+        crystal_features = [id_material_Material_Project,crystal_size,orientation[0],
+                            api_key,use_parallel,
+                            facets_type,interstitial_specie,mode[0],radius_neighbors,sites_generation_layer[1]]
+
         # =============================================================================
         #             Superbasin parameters
         #     
@@ -373,6 +377,8 @@ def initialization(n_sim,save_data,lammps_file):
 
         Act_E_list = [E_gen_defect, E_mig_plane, E_mig_upward,E_mig_downward,
                       binding_energy_bottom_layer,E_clustering] 
+        
+
         
         
         filename = 'grid_crystal'
