@@ -58,9 +58,10 @@ class Site():
             # If pos is out of the boundary in xy but within z limits:
             elif (-tol <= pos[2] <= crystal_size[2] + tol):
                 
+    
                 # Apply periodic boundary conditions in the xy plane
                 pos = (pos[0] % crystal_size[0], pos[1] % crystal_size[1], pos[2])
-    
+
                 # Find the nearest neighbor within the grid
                 min_dist, min_dist_idx = min(
                     ((np.linalg.norm(np.array(site.position) - np.array(pos)), idx) 
@@ -89,7 +90,7 @@ class Site():
 # =============================================================================
 #         Occupied sites supporting this node
 # =============================================================================    
-    def supported_by(self,grid_crystal,wulff_facets,dir_edge_facets,chemical_specie,domain_height):
+    def supported_by(self,grid_crystal,wulff_facets,dir_edge_facets,chemical_specie,defect_specie,domain_height):
         
         # Initialize supp_by as an empty list
         self.supp_by = []
@@ -106,7 +107,7 @@ class Site():
         # Go over the nearest neighbors
         for idx in self.nearest_neighbors_idx:
             # Select the occupied sites that support this node
-            if grid_crystal[idx].chemical_specie != "Empty":
+            if grid_crystal[idx].chemical_specie != defect_specie:
                 self.supp_by.append(idx)
                     
         # Convert supp_by to a tuple
@@ -117,30 +118,6 @@ class Site():
             self.detect_edges(grid_crystal,dir_edge_facets,chemical_specie)               
             self.detect_planes(grid_crystal,wulff_facets[:14])
         
-    def supported_by_2(self,grid_crystal,wulff_facets,dir_edge_facets,chemical_specie):
-        
-        if isinstance(self.supp_by, tuple):
-            self.supp_by = list(self.supp_by)
-                 
-        # Go over the nearest neighbors
-        for i,idx in enumerate(self.nearest_neighbors_idx):
-            # idx = tuple(idx)
-            # Select the occupied sites that support this node
-            ## I don't need to check if idx is in the domain, as the method
-            ## neighbors_analysis() select the neighbors within the domain
-            if (grid_crystal[idx].chemical_specie != "Empty") and (idx not in self.supp_by):
-                self.supp_by.insert(i+1,idx)
-            # If some of the sites that supported this node disappear, remove
-            # it from the supp_by set()
-            elif (grid_crystal[idx].chemical_specie == "Empty") and (idx in self.supp_by):
-                self.supp_by.remove(idx)
-                
-        self.supp_by = tuple(self.supp_by)
-                        
-        
-        self.detect_edges(grid_crystal,dir_edge_facets,chemical_specie)               
-        self.calculate_clustering_energy()
-        self.detect_planes(grid_crystal,wulff_facets)
                 
     def calculate_clustering_energy(self,supp_by_destiny = 0,idx_origin = 0):
         
@@ -204,8 +181,8 @@ class Site():
         self.chemical_specie = chemical_specie
         #self.site_events.append(['Desorption',self.num_event])
 
-    def remove_specie(self):
-        self.chemical_specie = 'Empty'
+    def remove_specie(self,defect_specie):
+        self.chemical_specie = defect_specie
         #self.site_events.remove(['Desorption',self.num_event])
         self.site_events = []
 

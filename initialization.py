@@ -11,6 +11,7 @@ import shutil
 from crystal_lattice import Crystal_Lattice
 from superbasin import Superbasin
 from pymatgen.ext.matproj import MPRester
+# from mp_api.client import MPRester
 import json
 from pathlib import Path
 
@@ -35,9 +36,9 @@ def initialization(n_sim,save_data,lammps_file):
                       'balanced_tree.py','analysis.py','superbasin.py','activation_energies_deposition.json']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Material deposition exploration\Simulations\Test')
+            dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\PZT\Simulations\Tests')
         elif platform.system() == 'Linux': # HPC works on Linux
-            dst = Path(r'/sfiwork/samuel.delgado/Mapping/5nm/Ag/Substrate_range_v2')
+            dst = Path(r'/sfiwork/samuel.delgado/Mapping/5nm/Ag/Substrate_range_downward_v2')
             
         paths,Results = save_simulation(files_copy,dst,n_sim) # Create folders and python files
         
@@ -46,7 +47,7 @@ def initialization(n_sim,save_data,lammps_file):
         Results = []
         
     experiments = ['deposition','annealing','ECM memristor']
-    experiment = experiments[0]
+    experiment = experiments[2]
 
     if experiment == 'deposition':         
 # =============================================================================
@@ -77,12 +78,12 @@ def initialization(n_sim,save_data,lammps_file):
 #         
 # =============================================================================
         material_selection = {"Ni":"mp-23","Cu":"mp-30", "Pd": "mp-2","Ag":"mp-124","Pt":"mp-126","Au":"mp-81", "PbZrO3":"mp-1068577"}
-        id_material_Material_Project = material_selection['Cu']
+        id_material_Material_Project = material_selection['Ag']
         crystal_size = (20,20,20) # (angstrom (Å))
         orientation = ['001','111']
         use_parallel = None
         facets_type = [(1,1,1),(1,0,0)]
-        interstitial_specie = None
+        defect_specie = 'Empty'
         mode = ['regular']
         radius_neighbors = 3
         sites_generation_layer = ['bottom_layer','top_layer']
@@ -101,13 +102,17 @@ def initialization(n_sim,save_data,lammps_file):
         # Retrieve material data
         with MPRester(api_key) as mpr:
             # Retrieve material summary information
+            # material_summary = mpr.summary.search(material_ids=[id_material_Material_Project])
+            # formula = material_summary[0].get('formula_pretty')
+            
             material_summary = mpr.materials.summary.search(material_ids=[id_material_Material_Project])
             formula = material_summary[0].formula_pretty
+
 
             
         crystal_features = [id_material_Material_Project,crystal_size,orientation[1],
                             api_key,use_parallel,
-                            facets_type,interstitial_specie,mode[0],radius_neighbors,sites_generation_layer[0]]
+                            facets_type,defect_specie,mode[0],radius_neighbors,sites_generation_layer[0]]
         
 # =============================================================================
 #             Superbasin parameters
@@ -175,13 +180,13 @@ def initialization(n_sim,save_data,lammps_file):
         E_mig_sub = 0.5
         #E_mig_sub = E_dataset[0] # (eV)
         E_mig_upward_subs_layer111 = E_dataset[1] * (0.1 + 0.2 * n_sim)
-        E_mig_downward_layer111_subs = E_dataset[2]
+        E_mig_downward_layer111_subs = E_dataset[2] * (1.6 - 0.2 * n_sim)
         E_mig_upward_layer1_layer2_111 = E_dataset[3] * (0.1 + 0.2 * n_sim)
-        E_mig_downward_layer2_layer1_111 = E_dataset[4] #* (1.6 - 0.2 * n_sim)
+        E_mig_downward_layer2_layer1_111 = E_dataset[4] * (1.6 - 0.2 * n_sim)
         E_mig_upward_subs_layer100 = E_dataset[5] * (0.1 + 0.2 * n_sim)
-        E_mig_downward_layer100_subs = E_dataset[6]
+        E_mig_downward_layer100_subs = E_dataset[6] * (1.6 - 0.2 * n_sim)
         E_mig_111_terrace_Cu = E_dataset[7]
-        E_mig_100_terrace_Cu = E_dataset[8] * (0.1 + 0.2 * n_sim)
+        E_mig_100_terrace_Cu = E_dataset[8] * (1.6 - 0.2 * n_sim)
         E_mig_edge_100 = E_dataset[9]
         E_mig_edge_111 = E_dataset[10]
 
@@ -300,13 +305,16 @@ def initialization(n_sim,save_data,lammps_file):
         #         Crystal structure
         #         
         # =============================================================================
-        material_selection = {"CeO2":"mp-20194"}
-        id_material_Material_Project = material_selection["CeO2"]
-        crystal_size = (20,20,20) # (angstrom (Å))
+        material_selection = {"CeO2":"mp-20194", "ZrPbO3":"mp-1068577"}
+        technologies = ['ECM','PZT']
+        techonology = technologies[1]
+        id_material_Material_Project = material_selection["ZrPbO3"]
+        crystal_size = (100,100,100) # (angstrom (Å))
         orientation = ['001']
         use_parallel = None
         facets_type = None
-        interstitial_specie = 'Ag'
+        defect_species = ['Ag','O']
+        defect_specie = defect_species[1]
         mode = ['interstitial', 'vacancy']
         radius_neighbors = 4
         sites_generation_layer = ['bottom_layer','top_layer']
@@ -327,11 +335,12 @@ def initialization(n_sim,save_data,lammps_file):
             # Retrieve material summary information
             material_summary = mpr.materials.summary.search(material_ids=[id_material_Material_Project])
             formula = material_summary[0].formula_pretty
+            
 
 
         crystal_features = [id_material_Material_Project,crystal_size,orientation[0],
                             api_key,use_parallel,
-                            facets_type,interstitial_specie,mode[0],radius_neighbors,sites_generation_layer[1]]
+                            facets_type,defect_specie,mode[1],radius_neighbors,sites_generation_layer[1]]
 
         # =============================================================================
         #             Superbasin parameters
@@ -354,18 +363,19 @@ def initialization(n_sim,save_data,lammps_file):
             data = json.load(file)
             
         E_dataset = []
-        for interstitial in data['ECM']:
+        for defect in data[techonology]:
             # Search the selected element we retrieved from Materials Project
-            if interstitial['Interstitial_specie'] == interstitial_specie:
-                
+            if defect['defect_specie'] == defect_specie:
+
                 #Search the activation energies
-                for key,activation_energies in interstitial.items():
+                for key,activation_energies in defect.items():
                     if 'activation_energies' in key:
                         # Select the dataset
                         for act_energy in activation_energies.values():
                             if isinstance(act_energy, (int, float)):
                                 E_dataset.append(act_energy)
                                 
+                               
         E_gen_defect = E_dataset[0] # (eV)
         E_mig_plane = E_dataset[1]
         E_mig_upward = E_dataset[2]
@@ -384,6 +394,9 @@ def initialization(n_sim,save_data,lammps_file):
         filename = 'grid_crystal'
         System_state = initialize_grid_crystal(filename,crystal_features,experimental_conditions,Act_E_list, 
               lammps_file,superbasin_parameters,save_data)  
+        
+        P = 0.005
+        System_state.defect_gen(rng,P)
         
         # This timestep_limits will depend on the V/s ratio
         System_state.timestep_limits = float('inf')
