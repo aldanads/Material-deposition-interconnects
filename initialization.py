@@ -36,7 +36,7 @@ def initialization(n_sim,save_data,lammps_file):
                       'balanced_tree.py','analysis.py','superbasin.py','activation_energies_deposition.json']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\PZT\Simulations\Tests')
+            dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Memristor ECM\Simulations\Tests')
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = Path(r'/sfiwork/samuel.delgado/Mapping/5nm/Ag/Substrate_range_downward_v2')
             
@@ -83,7 +83,9 @@ def initialization(n_sim,save_data,lammps_file):
         orientation = ['001','111']
         use_parallel = None
         facets_type = [(1,1,1),(1,0,0)]
-        defect_specie = 'Empty'
+        defect_specie = None
+        affected_sites = ['Empty']
+        affected_site = affected_sites[0]
         mode = ['regular']
         radius_neighbors = 3
         sites_generation_layer = ['bottom_layer','top_layer']
@@ -112,7 +114,7 @@ def initialization(n_sim,save_data,lammps_file):
             
         crystal_features = [id_material_Material_Project,crystal_size,orientation[1],
                             api_key,use_parallel,
-                            facets_type,defect_specie,mode[0],radius_neighbors,sites_generation_layer[0]]
+                            facets_type,defect_specie,affected_site,mode[0],radius_neighbors,sites_generation_layer[0]]
         
 # =============================================================================
 #             Superbasin parameters
@@ -307,14 +309,16 @@ def initialization(n_sim,save_data,lammps_file):
         # =============================================================================
         material_selection = {"CeO2":"mp-20194", "ZrPbO3":"mp-1068577"}
         technologies = ['ECM','PZT']
-        techonology = technologies[1]
-        id_material_Material_Project = material_selection["ZrPbO3"]
-        crystal_size = (100,100,100) # (angstrom (Å))
+        techonology = technologies[0]
+        id_material_Material_Project = material_selection["CeO2"]
+        crystal_size = (50,50,50) # (angstrom (Å))
         orientation = ['001']
         use_parallel = None
         facets_type = None
-        defect_species = ['Ag','O']
-        defect_specie = defect_species[1]
+        defect_species = ['Ag','O_vacancy']
+        defect_specie = defect_species[0]
+        affected_sites = ['Empty','O']
+        affected_site = affected_sites[0]
         mode = ['interstitial', 'vacancy']
         radius_neighbors = 4
         sites_generation_layer = ['bottom_layer','top_layer']
@@ -340,7 +344,7 @@ def initialization(n_sim,save_data,lammps_file):
 
         crystal_features = [id_material_Material_Project,crystal_size,orientation[0],
                             api_key,use_parallel,
-                            facets_type,defect_specie,mode[1],radius_neighbors,sites_generation_layer[1]]
+                            facets_type,defect_specie,affected_site,mode[0],radius_neighbors,sites_generation_layer[1]]
 
         # =============================================================================
         #             Superbasin parameters
@@ -395,7 +399,7 @@ def initialization(n_sim,save_data,lammps_file):
         System_state = initialize_grid_crystal(filename,crystal_features,experimental_conditions,Act_E_list, 
               lammps_file,superbasin_parameters,save_data)  
         
-        P = 0.005
+        P = 0
         System_state.defect_gen(rng,P)
         
         # This timestep_limits will depend on the V/s ratio

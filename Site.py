@@ -90,7 +90,7 @@ class Site():
 # =============================================================================
 #         Occupied sites supporting this node
 # =============================================================================    
-    def supported_by(self,grid_crystal,wulff_facets,dir_edge_facets,chemical_specie,defect_specie,domain_height):
+    def supported_by(self,grid_crystal,wulff_facets,dir_edge_facets,chemical_specie,affected_site,domain_height):
         
         # Initialize supp_by as an empty list
         self.supp_by = []
@@ -107,7 +107,7 @@ class Site():
         # Go over the nearest neighbors
         for idx in self.nearest_neighbors_idx:
             # Select the occupied sites that support this node
-            if grid_crystal[idx].chemical_specie != defect_specie:
+            if grid_crystal[idx].chemical_specie != affected_site:
                 self.supp_by.append(idx)
                     
         # Convert supp_by to a tuple
@@ -181,8 +181,8 @@ class Site():
         self.chemical_specie = chemical_specie
         #self.site_events.append(['Desorption',self.num_event])
 
-    def remove_specie(self,defect_specie):
-        self.chemical_specie = defect_specie
+    def remove_specie(self,affected_site):
+        self.chemical_specie = affected_site
         #self.site_events.remove(['Desorption',self.num_event])
         self.site_events = []
 

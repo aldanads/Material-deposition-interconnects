@@ -47,9 +47,10 @@ class Crystal_Lattice():
         use_parallel = crystal_features[4]
         self.facets_type = crystal_features[5]
         self.defect_specie = crystal_features[6]
-        self.mode = crystal_features[7]
-        self.radius_neighbors = crystal_features[8]
-        self.sites_generation_layer = crystal_features[9]
+        self.affected_site = crystal_features[7]
+        self.mode = crystal_features[8]
+        self.radius_neighbors = crystal_features[9]
+        self.sites_generation_layer = crystal_features[10]
         
         # Deposition
         self.sticking_coefficient = experimental_conditions[0]
@@ -73,6 +74,11 @@ class Crystal_Lattice():
         # self.lattice_model_2(api_key, mode, defect_specie, self.radius_neighbors)
         self.lattice_model(api_key, self.mode, self.defect_specie, self.radius_neighbors)
         self.crystal_grid(grid_crystal,self.radius_neighbors,self.mode,self.defect_specie,use_parallel)
+        
+        # for idx,site in self.grid_crystal.items():
+            # print(site.site_events)
+            
+        # exit()
 
         self.sites_occupied = [] # Sites occupy be a chemical specie
         self.adsorption_sites = [] # Sites availables for deposition or migration
@@ -94,6 +100,7 @@ class Crystal_Lattice():
             nu0=7E12;  # nu0 (s^-1) bond vibration frequency
             T = 300
             self.TR_gen = nu0 * np.exp(-self.Act_E_gen / (kb * T))
+
 
         
         # Obtain all the positions in the grid that are supported by the
@@ -139,7 +146,7 @@ class Crystal_Lattice():
 
         # Determine chemical species
         if mode == 'vacancy':
-            self.chemical_specie = defect_specie + '_' + mode
+            self.chemical_specie = defect_specie
         elif mode == 'interstitial':
             self.chemical_specie = defect_specie 
         else:
@@ -173,7 +180,7 @@ class Crystal_Lattice():
             self.structure = Structure(structure_original.lattice,[],[])
             
             for site in structure_original:
-                if site.specie.symbol == defect_specie:
+                if site.specie.symbol == self.affected_site:
                     self.structure.append(site.specie, site.frac_coords)
 
 
@@ -286,20 +293,20 @@ class Crystal_Lattice():
             
             # Step 1: Create the initial grid_crystal dictionary
             # We obtain integer idx
-            if mode == 'vacancy':
-                self.grid_crystal = {
-                    self.get_idx_coords(site.coords,self.basis_vectors):Site(defect_specie,
-                        tuple(site.coords),
-                        self.activation_energies)
-                    for site in self.structure
-                }
-            else:
-                self.grid_crystal = {
-                    self.get_idx_coords(site.coords,self.basis_vectors):Site("Empty",
-                        tuple(site.coords),
-                        self.activation_energies)
-                    for site in self.structure
-                }
+            # if mode == 'vacancy':
+            self.grid_crystal = {
+                self.get_idx_coords(site.coords,self.basis_vectors):Site(self.affected_site,
+                    tuple(site.coords),
+                    self.activation_energies)
+                for site in self.structure
+            }
+            # else:
+                # self.grid_crystal = {
+                #     self.get_idx_coords(site.coords,self.basis_vectors):Site("Empty",
+                #         tuple(site.coords),
+                #         self.activation_energies)
+                #     for site in self.structure
+                # }
                     
             # Step 2: Handle missing neighbors
             # Search for missing sites before we start the neighbor analysis
@@ -327,14 +334,18 @@ class Crystal_Lattice():
                         
                         # If not in the boundary region, where we should apply periodic boundary conditions
                         if tuple(pos) == pos_aux:
-                            if mode == 'vacancy':
-                                self.grid_crystal[neigh_idx] = Site(defect_specie,
-                                     tuple(pos),
-                                     self.activation_energies)
-                            else:
-                                self.grid_crystal[neigh_idx] = Site("Empty",
-                                     tuple(pos),
-                                     self.activation_energies)
+                            self.grid_crystal[neigh_idx] = Site(self.affected_site,
+                                          tuple(pos),
+                                          self.activation_energies)
+                            
+                            # if mode == 'vacancy':
+                            #     self.grid_crystal[neigh_idx] = Site(defect_specie,
+                            #          tuple(pos),
+                            #          self.activation_energies)
+                            # else:
+                            #     self.grid_crystal[neigh_idx] = Site("Empty",
+                            #          tuple(pos),
+                            #          self.activation_energies)
                 
                 self.domain_height = domain_height
                 
@@ -406,6 +417,7 @@ class Crystal_Lattice():
             self.domain_height = self.crystal_size[2]
             
             for site in self.grid_crystal.values():
+                site.site_events = []
                 site.Act_E_list = self.activation_energies
 
     def get_num_cores(self):
@@ -566,29 +578,35 @@ class Crystal_Lattice():
         
     def available_generation_sites(self, sites_generation_layer,update_supp_av = set()):
         
-        
         if self.mode == 'vacancy': return
-        
+
         if not update_supp_av:
+
             self.adsorption_sites = [
                 idx for idx, site in self.grid_crystal.items()
-                if (sites_generation_layer in site.supp_by or len(site.supp_by) > 2) and site.chemical_specie == 'Empty'
+                if (sites_generation_layer in site.supp_by or len(site.supp_by) > 2) and site.chemical_specie == self.affected_site
                 ]
+                
                     
                     
         else:
             adsorption_sites_set = set(self.adsorption_sites)
+
             for idx in update_supp_av:
                 site = self.grid_crystal[idx]
+
                 if idx in adsorption_sites_set:
-                    if ((sites_generation_layer not in site.supp_by and len(site.supp_by) < 3) or (site.chemical_specie != 'Empty')):
+                    if ((sites_generation_layer not in site.supp_by and len(site.supp_by) < 3) or (site.chemical_specie != self.affected_site)):
                         self.adsorption_sites.remove(idx)
                         site.remove_event_type(self.num_event-1)
                     
                 else:
-                    if (sites_generation_layer in site.supp_by or len(site.supp_by) > 2) and site.chemical_specie == 'Empty':
+                    if (sites_generation_layer in site.supp_by or len(site.supp_by) > 2) and site.chemical_specie == self.affected_site:
                         self.adsorption_sites.append(idx)
                         site.deposition_event(self.TR_gen,idx,self.num_event-1,self.Act_E_gen)
+                        
+
+
         
                     
     def transition_rate_adsorption(self,experimental_conditions):
@@ -884,6 +902,7 @@ class Crystal_Lattice():
 # =============================================================================
 #         Specie migration
 # =============================================================================
+
         if chosen_event[2] <= (self.num_event - 2): # 12 migration possibilities [0-11] and [12] for migrating from superbasin
             
             # Introduce specie in the site
@@ -928,7 +947,7 @@ class Crystal_Lattice():
             # For loop over neighbors
             for idx in update_supp_av:
                 self.grid_crystal[idx].supported_by(self.grid_crystal,self.wulff_facets,
-                                                    self.dir_edge_facets,self.chemical_specie,self.defect_specie,
+                                                    self.dir_edge_facets,self.chemical_specie,self.affected_site,
                                                     self.domain_height)
             self.available_generation_sites(self.sites_generation_layer,update_supp_av)
         
@@ -996,14 +1015,14 @@ class Crystal_Lattice():
             # Extend update_specie_events with sites that are not 'Substrate'
             update_specie_events.update(
                 idx_site for idx_site in self.grid_crystal[idx_supp_site].supp_by 
-                if idx_site != 'bottom_layer' and idx_site != 'top_layer' and self.grid_crystal[idx_site].chemical_specie != self.defect_specie
+                if idx_site != 'bottom_layer' and idx_site != 'top_layer' and self.grid_crystal[idx_site].chemical_specie != self.affected_site
                 )
               # Need to check if this is empty or not because we haven't updated yet self.grid_crystal[idx_supp_site].supp_by
               # We don't want to update_specie_events of ghost particles that are "supporting" something
               # Case: Particle remove at the border might find problems with NN. Maybe NN are different at one side and the other of the border
             
             # Check if the chemical specie is not 'Empty' and append idx
-            if self.grid_crystal[idx_supp_site].chemical_specie != self.defect_specie:
+            if self.grid_crystal[idx_supp_site].chemical_specie != self.affected_site:
                 update_specie_events.add(idx_supp_site)
 
         return update_specie_events,update_supp_av
@@ -1014,7 +1033,7 @@ class Crystal_Lattice():
     def remove_specie_site(self,idx,update_specie_events,update_supp_av):
         
         # Chemical specie removed
-        self.grid_crystal[idx].remove_specie(self.defect_specie)
+        self.grid_crystal[idx].remove_specie(self.affected_site)
         # Track sites occupied
 
         self.sites_occupied.remove(idx) 
@@ -1041,7 +1060,7 @@ class Crystal_Lattice():
                   # Case: The support of the particle we have just eliminated (idx) hasn't been removed yet from self.grid_crystal[idx_supp_site].supp_by
             
             # Check if the chemical specie is not 'Empty' and append idx
-            if self.grid_crystal[idx_supp_site].chemical_specie != 'Empty':
+            if self.grid_crystal[idx_supp_site].chemical_specie != self.affected_site:
                 update_specie_events.add(idx_supp_site)
         
         return update_specie_events,update_supp_av
