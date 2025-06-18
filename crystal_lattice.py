@@ -1251,7 +1251,7 @@ class Crystal_Lattice():
     def average_thickness(self):
         
         grid_crystal = self.grid_crystal
-        z_step = next((vec[2] for vec in self.basis_vectors if vec[2] > 1e-10), None)
+        z_step = next((vec[2] * 2 for vec in self.basis_vectors if vec[2] > 1e-10), None)
         z_steps = round(self.crystal_size[2]/z_step + 1)
         layers = [0] * z_steps  # Initialize each layer separately
 
@@ -1275,7 +1275,7 @@ class Crystal_Lattice():
         
         layers = self.layers[0]
         grid_crystal = self.grid_crystal
-        z_step = next((vec[2] for vec in self.basis_vectors if vec[2] > 0), None)
+        z_step = next((vec[2] * 2 for vec in self.basis_vectors if vec[2] > 0), None)
         z_steps = round(self.crystal_size[2]/z_step + 1)
         sites_per_layer = len(grid_crystal)/z_steps
 
@@ -1318,6 +1318,7 @@ class Crystal_Lattice():
                 
         self.histogram_neighbors = histogram_neighbors
     
+    # Island is the full structure, not only the part that growth over the mean thickness
     def islands_analysis(self):
 
         # visited = set()
@@ -1328,15 +1329,20 @@ class Crystal_Lattice():
         count_islands = [0] * len(normalized_layers)
         layers_no_complete = np.where(np.array(normalized_layers) != 1.0)
         count_islands[normalized_layers == 1] = 1
-        z_step = next((vec[2] for vec in self.basis_vectors if vec[2] > 0), None)
+        z_step = next((vec[2] * 2 for vec in self.basis_vectors if vec[2] > 0), None)
+
 
 
         islands_list = []
+        
 
         for z_idx in layers_no_complete[0]:    
             z_layer = round(z_idx * z_step,3)
-            for idx_site in self.sites_occupied:     
-                if self.grid_crystal[idx_site].position[2] == z_layer: 
+            
+            for idx_site in self.sites_occupied:   
+
+                if np.isclose(self.grid_crystal[idx_site].position[2], z_layer,atol=1e-1): 
+
                     island_slice = set()
                     total_visited,island_slice = self.detect_islands(idx_site,total_visited,island_slice,self.chemical_specie)
 
@@ -1347,9 +1353,10 @@ class Crystal_Lattice():
                         islands_list.append(Island(z_idx,z_layer,island_sites))
                         count_islands[z_idx] += 1
                         total_visited.update(island_visited)
-
-
                         
+
+
+                 
         self.islands_list = islands_list
         
 # =============================================================================
@@ -1402,11 +1409,19 @@ class Crystal_Lattice():
 
         return visited,island_sites
     
-    
+    # Peak are the part of the film that growth over the mean thickness level
     def peak_detection(self):
         
         chemical_specie = self.chemical_specie
-        thickness = self.thickness
+        
+        # Thickness can be the mean thickness
+        #thickness = self.thickness
+        # Or we can choose a reference layer when less than X% of the layer is occupied after the maximum occupation layer in the film
+        idx_max_layer = np.where(np.array(self.layers[1]) == max(np.array(self.layers[1]))) # The position of the most occupied layer
+        reference_layer = np.where(np.array(self.layers[1])[idx_max_layer[0][0]:] < 0.7) # The layer that is less than a X% occupied after the maximum
+        z_step = next((vec[2] * 2 for vec in self.basis_vectors if vec[2] > 1e-10), None)
+        thickness = z_step * reference_layer[0][0]
+
         sites_occupied = self.sites_occupied
     
         # Convert occupied sites to Cartesian coordinates and sort by z-coordinate in descending order
@@ -1570,7 +1585,7 @@ class Crystal_Lattice():
     def obtain_surface_coord(self):
         
         grid_crystal = self.grid_crystal
-        z_step = next((vec[2] for vec in self.basis_vectors if vec[2] > 0), None)
+        z_step = next((vec[2] * 2 for vec in self.basis_vectors if vec[2] > 0), None)
 
         x = []
         y = []

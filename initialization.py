@@ -24,9 +24,9 @@ import time
 
 def initialization(n_sim,save_data,lammps_file):
     
-    seed = 1
+    #seed = 1
     # Random seed as time
-    rng = np.random.default_rng(seed) # Random Number Generator (RNG) object
+    rng = np.random.default_rng() # Random Number Generator (RNG) object
 
     # Default resolution for figures
     plt.rcParams["figure.dpi"] = 100 # Default value of dpi = 300
@@ -36,7 +36,7 @@ def initialization(n_sim,save_data,lammps_file):
                       'balanced_tree.py','analysis.py','superbasin.py','activation_energies_deposition.json']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Memristor ECM\Simulations\Tests')
+            dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\PZT\Simulations\Tests')
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = Path(r'/sfiwork/samuel.delgado/Mapping/5nm/Ag/Substrate_range_downward_v2')
             
@@ -47,7 +47,7 @@ def initialization(n_sim,save_data,lammps_file):
         Results = []
         
     experiments = ['deposition','annealing','ECM memristor']
-    experiment = experiments[2]
+    experiment = experiments[1]
 
     if experiment == 'deposition':         
 # =============================================================================
@@ -83,9 +83,7 @@ def initialization(n_sim,save_data,lammps_file):
         orientation = ['001','111']
         use_parallel = None
         facets_type = [(1,1,1),(1,0,0)]
-        defect_specie = None
-        affected_sites = ['Empty']
-        affected_site = affected_sites[0]
+        defect_specie = 'Empty'
         mode = ['regular']
         radius_neighbors = 3
         sites_generation_layer = ['bottom_layer','top_layer']
@@ -114,7 +112,7 @@ def initialization(n_sim,save_data,lammps_file):
             
         crystal_features = [id_material_Material_Project,crystal_size,orientation[1],
                             api_key,use_parallel,
-                            facets_type,defect_specie,affected_site,mode[0],radius_neighbors,sites_generation_layer[0]]
+                            facets_type,defect_specie,mode[0],radius_neighbors,sites_generation_layer[0]]
         
 # =============================================================================
 #             Superbasin parameters
@@ -271,8 +269,9 @@ def initialization(n_sim,save_data,lammps_file):
             
     elif experiment == 'annealing':
         
-        path = r'/sfihome/samuel.delgado/Copper_deposition/Varying_substrate/annealing/TaN/T500/'
-        filename = path + 'variables.pkl'
+        script_directory = Path(__file__).parent
+        #path = r'/sfihome/samuel.delgado/Copper_deposition/Varying_substrate/annealing/TaN/T500/'
+        filename = script_directory / 'variables.pkl'
         
         # Open the file in binary mode
         with open(filename, 'rb') as file:
@@ -282,14 +281,31 @@ def initialization(n_sim,save_data,lammps_file):
             
         System_state = myvar['System_state']
         
-        temp = [300,500,800] #(K)
-        
+        temp = [723] #(K)
+    
         System_state.temperature = temp[n_sim]
         System_state.experiment = experiment
         P_limits = 1
         System_state.limit_kmc_timestep(P_limits)
         System_state.time = 0
         System_state.list_time = []
+        System_state.E_min = 0.0
+        System_state.n_search_superbasin = 25
+        System_state.time_step_limits = 1e-10
+        System_state.E_min_lim_superbasin = 0.20
+        
+        """
+        Adapt variables in System_state to the most updated code:
+            self.affected_site
+            self.mode
+        """
+        System_state.affected_site = "Empty"
+        System_state.mode = "Regular"
+        System_state.TR_gen = 0;
+        for site in System_state.adsorption_sites:
+            if System_state.grid_crystal[site].site_events:
+                System_state.grid_crystal[site].site_events[0][0] = System_state.TR_gen
+
         
     elif experiment == 'ECM memristor':
         # =============================================================================
@@ -309,16 +325,14 @@ def initialization(n_sim,save_data,lammps_file):
         # =============================================================================
         material_selection = {"CeO2":"mp-20194", "ZrPbO3":"mp-1068577"}
         technologies = ['ECM','PZT']
-        techonology = technologies[0]
-        id_material_Material_Project = material_selection["CeO2"]
-        crystal_size = (50,50,50) # (angstrom (Å))
+        techonology = technologies[1]
+        id_material_Material_Project = material_selection["ZrPbO3"]
+        crystal_size = (100,100,100) # (angstrom (Å))
         orientation = ['001']
         use_parallel = None
         facets_type = None
-        defect_species = ['Ag','O_vacancy']
-        defect_specie = defect_species[0]
-        affected_sites = ['Empty','O']
-        affected_site = affected_sites[0]
+        defect_species = ['Ag','O']
+        defect_specie = defect_species[1]
         mode = ['interstitial', 'vacancy']
         radius_neighbors = 4
         sites_generation_layer = ['bottom_layer','top_layer']
@@ -344,13 +358,13 @@ def initialization(n_sim,save_data,lammps_file):
 
         crystal_features = [id_material_Material_Project,crystal_size,orientation[0],
                             api_key,use_parallel,
-                            facets_type,defect_specie,affected_site,mode[0],radius_neighbors,sites_generation_layer[1]]
+                            facets_type,defect_specie,mode[1],radius_neighbors,sites_generation_layer[1]]
 
         # =============================================================================
         #             Superbasin parameters
         #     
         # =============================================================================
-        n_search_superbasin = 25 # If the time step is very small during 10 steps, search for superbasin
+        n_search_superbasin = 25 # If the time step is very small during n_search_superbasin steps, search for superbasin
         time_step_limits = 1e-7 # Time needed for efficient evolution of the system
         E_min = 0.0
         energy_step = 0.05
@@ -399,7 +413,7 @@ def initialization(n_sim,save_data,lammps_file):
         System_state = initialize_grid_crystal(filename,crystal_features,experimental_conditions,Act_E_list, 
               lammps_file,superbasin_parameters,save_data)  
         
-        P = 0
+        P = 0.005
         System_state.defect_gen(rng,P)
         
         # This timestep_limits will depend on the V/s ratio
