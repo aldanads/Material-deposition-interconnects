@@ -153,14 +153,14 @@ for sub in folder_subs:
             #System_state.RMS_roughness()
         
             # Create files with the particles
-            """
-            if 'Pt' in root:
+            
+            if 'Pd' in root:
                 print(root)
                 System_state.plot_crystal(45,45,'',i)
                 i += 1
 
                 if i == 8: exit()
-            """
+            
             
             """
             Calculate area per site

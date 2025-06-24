@@ -38,7 +38,7 @@ def initialization(n_sim,save_data,lammps_file):
         if platform.system() == 'Windows': # When running in laptop
             dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\PZT\Simulations\Tests')
         elif platform.system() == 'Linux': # HPC works on Linux
-            dst = Path(r'/sfiwork/samuel.delgado/Mapping/5nm/Ag/Substrate_range_downward_v2')
+            dst = Path(r'/FS1\Docs2\samuel.delgado\My Documents\Publications\Control of fcc metal morphology via substrate interaction\Simulations\Test')
             
         paths,Results = save_simulation(files_copy,dst,n_sim) # Create folders and python files
         
@@ -47,7 +47,7 @@ def initialization(n_sim,save_data,lammps_file):
         Results = []
         
     experiments = ['deposition','annealing','ECM memristor']
-    experiment = experiments[1]
+    experiment = experiments[2]
 
     if experiment == 'deposition':         
 # =============================================================================
@@ -79,7 +79,7 @@ def initialization(n_sim,save_data,lammps_file):
 # =============================================================================
         material_selection = {"Ni":"mp-23","Cu":"mp-30", "Pd": "mp-2","Ag":"mp-124","Pt":"mp-126","Au":"mp-81", "PbZrO3":"mp-1068577"}
         id_material_Material_Project = material_selection['Ag']
-        crystal_size = (20,20,20) # (angstrom (Å))
+        crystal_size = (50,50,50) # (angstrom (Å))
         orientation = ['001','111']
         use_parallel = None
         facets_type = [(1,1,1),(1,0,0)]
@@ -271,7 +271,7 @@ def initialization(n_sim,save_data,lammps_file):
         
         script_directory = Path(__file__).parent
         #path = r'/sfihome/samuel.delgado/Copper_deposition/Varying_substrate/annealing/TaN/T500/'
-        filename = script_directory / 'variables.pkl'
+        filename = script_directory / 'variables_AsDeposited.pkl'
         
         # Open the file in binary mode
         with open(filename, 'rb') as file:
@@ -286,6 +286,8 @@ def initialization(n_sim,save_data,lammps_file):
         System_state.temperature = temp[n_sim]
         System_state.experiment = experiment
         P_limits = 1
+        System_state.TR_gen = 0;
+        System_state.Act_E_gen = 0
         System_state.limit_kmc_timestep(P_limits)
         System_state.time = 0
         System_state.list_time = []
@@ -293,6 +295,9 @@ def initialization(n_sim,save_data,lammps_file):
         System_state.n_search_superbasin = 25
         System_state.time_step_limits = 1e-10
         System_state.E_min_lim_superbasin = 0.20
+        System_state.domain_height = System_state.crystal_size[2]
+        System_state.sites_generation_layer = 'bottom_layer'
+        System_state.facets_type = [(1,1,1),(1,0,0)]
         
         """
         Adapt variables in System_state to the most updated code:
@@ -301,7 +306,7 @@ def initialization(n_sim,save_data,lammps_file):
         """
         System_state.affected_site = "Empty"
         System_state.mode = "Regular"
-        System_state.TR_gen = 0;
+        
         for site in System_state.adsorption_sites:
             if System_state.grid_crystal[site].site_events:
                 System_state.grid_crystal[site].site_events[0][0] = System_state.TR_gen
@@ -327,7 +332,7 @@ def initialization(n_sim,save_data,lammps_file):
         technologies = ['ECM','PZT']
         techonology = technologies[1]
         id_material_Material_Project = material_selection["ZrPbO3"]
-        crystal_size = (100,100,100) # (angstrom (Å))
+        crystal_size = (50,50,50) # (angstrom (Å))
         orientation = ['001']
         use_parallel = None
         facets_type = None
@@ -360,6 +365,7 @@ def initialization(n_sim,save_data,lammps_file):
                             api_key,use_parallel,
                             facets_type,defect_specie,mode[1],radius_neighbors,sites_generation_layer[1]]
 
+        
         # =============================================================================
         #             Superbasin parameters
         #     
@@ -413,7 +419,7 @@ def initialization(n_sim,save_data,lammps_file):
         System_state = initialize_grid_crystal(filename,crystal_features,experimental_conditions,Act_E_list, 
               lammps_file,superbasin_parameters,save_data)  
         
-        P = 0.005
+        P = 0.1
         System_state.defect_gen(rng,P)
         
         # This timestep_limits will depend on the V/s ratio
