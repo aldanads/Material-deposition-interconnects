@@ -75,9 +75,6 @@ class Superbasin():
                             self.transient_states_transitions.append(transition_with_idx)
                     else:
                         aux_transitions.append(transition_with_idx)
-                        
-                    last_transition = transition  # update last known transition
-
                     
                 if is_absorbing:
                     self.absorbing_states.append(idx)
@@ -97,9 +94,7 @@ class Superbasin():
                 System_state.processes((transition[0], stack[-1], transition[2], idx))
                 
     
-        # Return to the original state
-        if last_transition:
-            System_state.processes((transition[0], start_idx, transition[2], idx)) 
+        System_state.processes((transition[0], start_idx, transition[2], idx)) 
 
         # Construct the transitions to the absorbing states
         for absorbing_state in self.absorbing_states: 

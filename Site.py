@@ -85,8 +85,7 @@ class Site():
                 elif (pos[2]-self.position[2]) < -tol:               
                     self.migration_paths['Down'].append([tuple(min_dist_idx),event_labels[tuple(idx - np.array(idx_origin))]])
               
-        # self.mig_paths_plane = {num_event:site_idx for site_idx, num_event in self.migration_paths['Plane']}       
-        self.mig_paths = {num_event:site_idx for site_idx, num_event in self.migration_paths['Plane']}       
+        self.mig_paths_plane = {num_event:site_idx for site_idx, num_event in self.migration_paths['Plane']}       
 
 # =============================================================================
 #         Occupied sites supporting this node
@@ -402,22 +401,20 @@ class Site():
             self.cache_edges[cache_key]
             return 
 
-        # self.edges_v = {i:None for i in self.mig_paths_plane.keys()}
-        self.edges_v = {i:None for i in self.mig_paths.keys()}
+        self.edges_v = {i:None for i in self.mig_paths_plane.keys()}
         
         bottom_support = all(site_idx in self.supp_by for site_idx, num_event in self.migration_paths['Down'])
             
         # To be an edge it must be support by the substrate or the atoms from the down layer
         if 'bottom_layer' in self.supp_by or bottom_support:
             # Check for each migration direction the edges that are parallel
-            # for num_event,site_idx in self.mig_paths_plane.items():
-            for num_event,site_idx in self.mig_paths.items():
+            for num_event,site_idx in self.mig_paths_plane.items():
                 edges = dir_edge_facets[num_event]
             
                 # Check if one of the edges is occupied for the chemical speice (both sites)
                 for edge in edges:
-                    if (grid_crystal[self.mig_paths[edge[0][0]]].chemical_specie == chemical_specie 
-                        and grid_crystal[self.mig_paths[edge[0][1]]].chemical_specie == chemical_specie):
+                    if (grid_crystal[self.mig_paths_plane[edge[0][0]]].chemical_specie == chemical_specie 
+                        and grid_crystal[self.mig_paths_plane[edge[0][1]]].chemical_specie == chemical_specie):
                         self.edges_v[num_event] = edge[1] # Associate the edge with the facet
                     
         # Store the result in the cache
@@ -664,4 +661,4 @@ class Island:
             first_nonzero_layer = next(i for i, layer in enumerate(cluster) if layer != 0)
             cluster_diameter = 2 * np.sqrt(cluster[first_nonzero_layer] * area_per_site / np.pi) 
             
-            self.cluster_aspect_ratio.append(cluster_diameter/height_cluster)
+            self.cluster_aspect_ratio.append(height_cluster/cluster_diameter)

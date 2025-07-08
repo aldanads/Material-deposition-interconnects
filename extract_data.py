@@ -35,11 +35,13 @@ path = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Control of fc
 
 materials = ['Ag', 'Au', 'Cu', 'Ni', 'Pd', 'Pt']
 
+
 # Subfolders in the base path
 folder_subs = [path / material for material in materials]
 path_2 = Path('Program')  # Subpath for variables
-growth_type = ['Homoepitaxial','Substrate_range','Substrate_range_downward','Substrate_range_v2','Substrate_range_downward_v2']
+growth_type = ['Homoepitaxial','Substrate_range','Substrate_range_downward','Substrate_range_v2','Substrate_range_downward_v2','annealing']
 file_variables = ['variables.pkl']
+root_parts = 3
 
 # Data saved in a OS
 system = ['Windows','Linux']
@@ -72,15 +74,18 @@ dfs_aspect_ratio = []
 
 for sub in folder_subs:
 
-    folder_P = sub / growth_type[3]
-    i = 0
+    folder_P = sub / growth_type[5]
+    i_count = 0
     for root, dirs, files in os.walk(folder_P):
       
-        
+        if ("Pd" in root and "descent" in root and "weak" in root and "E_min_limit_02" in root and
+            "E_min_limit_025" not in root): continue
+
         dirs.sort()
         if 'Program' in dirs:
             
-            key_parts = root.split(os.sep)[-3:]  # Extract the parts "Ru25", "P=0.1", "Sim_1"
+            if growth_type[5] == 'annealing': root_parts = 6
+            key_parts = root.split(os.sep)[-root_parts:]  # Extract the parts "Ru25", "P=0.1", "Sim_1"
             key = os.path.join(*key_parts)
             filename = os.path.join(root, 'Program', file_variables[0])
             print(root)
@@ -105,7 +110,6 @@ for sub in folder_subs:
 
             System_state.affected_site = "Empty"
             System_state.mode = "regular"
-            System_state.measurements_crystal()
 
             System_state.islands_analysis()
             
@@ -149,17 +153,20 @@ for sub in folder_subs:
             Peak detection calculated only with atoms_deposited -> Removed the rest
             """
             System_state.peak_detection()
+            System_state.sites_occupied = set(System_state.sites_occupied)
             System_state.neighbors_calculation()
+            System_state.measurements_crystal()
+
             #System_state.RMS_roughness()
         
             # Create files with the particles
             
-            if 'Pd' in root:
-                print(root)
-                System_state.plot_crystal(45,45,'',i)
-                i += 1
+            # if 'Pt' in root:
+            #     print(root)
+            #     System_state.plot_crystal(45,45,'',i_count)
+            #     i_count += 1
 
-                if i == 8: exit()
+            #     if i_count == 8: exit()
             
             
             """
@@ -169,18 +176,29 @@ for sub in folder_subs:
             z_steps = round(System_state.crystal_size[2]/z_step + 1)
             sites_per_layer = len(System_state.grid_crystal)/z_steps
             area_per_site = System_state.crystal_size[0] * System_state.crystal_size[1] / sites_per_layer
+            
     
             peak_size = []
             peak_base_area = []
             all_terraces = []
             aspect_ratio_island = []
-            
+            seen_clusters = set()
+
             for island in System_state.islands_list:
                 
-                aspect_ratio_island.extend(island.cluster_aspect_ratio)
 
-                for cluster in island.cluster_list:
-                    peak_size.append(len(cluster))
+                for i in reversed(range(len(island.cluster_list))):
+                    cluster = island.cluster_list[i]
+                    cluster_key = frozenset(cluster)
+                    
+                    if cluster_key in seen_clusters:
+                        del island.cluster_list[i]
+                        del island.cluster_layers[i]
+                        del island.cluster_terraces[i]
+                        del island.cluster_aspect_ratio[i]
+                    else:
+                        seen_clusters.add(cluster_key)
+                        peak_size.append(len(cluster))
                     
                 for cluster_layer in island.cluster_layers:
                     # We select the base of the cluster/island
@@ -188,7 +206,7 @@ for sub in folder_subs:
                     if first_non_zero is not None:
                         peak_base_area.append(cluster_layer[first_non_zero] * area_per_site)
                        
-                if island.merge_layer_index > 0:
+                if island.merge_layer_index > 0 and island.cluster_terraces:
                     terraces = np.array(System_state.terraces[1:island.merge_layer_index])
                     all_terraces.extend(terraces[terraces > 0])
                     
@@ -196,15 +214,23 @@ for sub in folder_subs:
                     terraces = np.array(terraces[1:])
                     all_terraces.extend(terraces[terraces > 0])
                     
+                aspect_ratio_island.extend(island.cluster_aspect_ratio)
 
-            substrate_exposure = System_state.crystal_size[0] * System_state.crystal_size[1] - max(System_state.layers[0]) * area_per_site
                     
+            total_area = System_state.crystal_size[0] * System_state.crystal_size[1]
+            substrate_exposure = (System_state.crystal_size[0] * System_state.crystal_size[1] - max(System_state.layers[0]) * area_per_site) / total_area
+
             peak_mean_size = np.mean(peak_size)
             peak_std_size = np.std(peak_size)
             
             mean_terraces = np.mean(all_terraces)
             std_terraces = np.std(all_terraces)
-            max_terraces = max(all_terraces)
+            if all_terraces:
+                max_terraces = max(all_terraces) / total_area
+            else:
+                max_terraces = max(System_state.terraces) / total_area
+            
+            peak_base_area = np.array(peak_base_area) / total_area
 
             
 # =============================================================================
@@ -244,7 +270,8 @@ for sub in folder_subs:
                     
                     if j == (island.merge_layer_index + 6): break
                     
-            # if "Pt" in root and "Sim_3" in root: exit()
+            # if "descent" in root and "weak" in root and "E_min_limit_025" in root: exit()
+            # if ("Ag" in root and 'homoepitaxial' in root and "E_min_limit_025" in root): exit()
                 
             Results.measurements_crystal(key,
                                          System_state.thickness,
