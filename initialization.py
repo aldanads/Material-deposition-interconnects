@@ -177,16 +177,16 @@ def initialization(n_sim,save_data,lammps_file):
                             if isinstance(act_energy, (int, float)):
                                 E_dataset.append(act_energy)
         
-        E_mig_sub = 0.5
-        #E_mig_sub = E_dataset[0] # (eV)
-        E_mig_upward_subs_layer111 = E_dataset[1] * (0.1 + 0.2 * n_sim)
-        E_mig_downward_layer111_subs = E_dataset[2] * (1.6 - 0.2 * n_sim)
-        E_mig_upward_layer1_layer2_111 = E_dataset[3] * (0.1 + 0.2 * n_sim)
-        E_mig_downward_layer2_layer1_111 = E_dataset[4] * (1.6 - 0.2 * n_sim)
-        E_mig_upward_subs_layer100 = E_dataset[5] * (0.1 + 0.2 * n_sim)
-        E_mig_downward_layer100_subs = E_dataset[6] * (1.6 - 0.2 * n_sim)
+        # E_mig_sub = 0.5
+        E_mig_sub = E_dataset[0] # (eV)
+        E_mig_upward_subs_layer111 = E_dataset[1] #* (0.1 + 0.2 * n_sim)
+        E_mig_downward_layer111_subs = E_dataset[2] #* (1.6 - 0.2 * n_sim)
+        E_mig_upward_layer1_layer2_111 = E_dataset[3] #* (0.1 + 0.2 * n_sim)
+        E_mig_downward_layer2_layer1_111 = E_dataset[4] #* (1.6 - 0.2 * n_sim)
+        E_mig_upward_subs_layer100 = E_dataset[5] #* (0.1 + 0.2 * n_sim)
+        E_mig_downward_layer100_subs = E_dataset[6] #* (1.6 - 0.2 * n_sim)
         E_mig_111_terrace_Cu = E_dataset[7]
-        E_mig_100_terrace_Cu = E_dataset[8] * (1.6 - 0.2 * n_sim)
+        E_mig_100_terrace_Cu = E_dataset[8] #* (1.6 - 0.2 * n_sim)
         E_mig_edge_100 = E_dataset[9]
         E_mig_edge_111 = E_dataset[10]
 
@@ -200,7 +200,7 @@ def initialization(n_sim,save_data,lammps_file):
         # =============================================================================
 
         # Binding energy | Desorption energy: https://doi.org/10.1039/D1SC04708F
-        binding_energy = E_dataset[-2] * (0.1 + 0.2 * n_sim)
+        binding_energy = E_dataset[-2] #* (0.1 + 0.2 * n_sim)
 
              
 
