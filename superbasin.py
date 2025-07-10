@@ -58,6 +58,7 @@ class Superbasin():
         self.transient_states_transitions = []
         self.absorbing_states_transitions = []
         aux_transitions = []
+        last_transition = None
 
         while stack:
             idx = stack.pop()
