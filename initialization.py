@@ -36,7 +36,7 @@ def initialization(n_sim,save_data,lammps_file):
                       'balanced_tree.py','analysis.py','superbasin.py','activation_energies_deposition.json']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\PZT\Simulations\Tests')
+            dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Control of fcc metal morphology via substrate interaction\Simulations\Test')
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = Path(r'/FS1\Docs2\samuel.delgado\My Documents\Publications\Control of fcc metal morphology via substrate interaction\Simulations\Test')
             
@@ -47,7 +47,7 @@ def initialization(n_sim,save_data,lammps_file):
         Results = []
         
     experiments = ['deposition','annealing','ECM memristor']
-    experiment = experiments[2]
+    experiment = experiments[1]
 
     if experiment == 'deposition':         
 # =============================================================================
@@ -292,20 +292,20 @@ def initialization(n_sim,save_data,lammps_file):
         System_state.time = 0
         System_state.list_time = []
         System_state.E_min = 0.0
-        System_state.n_search_superbasin = 25
-        System_state.time_step_limits = 1e-10
-        System_state.E_min_lim_superbasin = 0.20
-        System_state.domain_height = System_state.crystal_size[2]
-        System_state.sites_generation_layer = 'bottom_layer'
-        System_state.facets_type = [(1,1,1),(1,0,0)]
+        #System_state.n_search_superbasin = 25
+        #System_state.time_step_limits = 1e-10
+        #System_state.E_min_lim_superbasin = 0.20
+        #System_state.domain_height = System_state.crystal_size[2]
+        #System_state.sites_generation_layer = 'bottom_layer'
+        #System_state.facets_type = [(1,1,1),(1,0,0)]
         
         """
         Adapt variables in System_state to the most updated code:
             self.affected_site
             self.mode
         """
-        System_state.affected_site = "Empty"
-        System_state.mode = "Regular"
+        #System_state.affected_site = "Empty"
+        #System_state.mode = "Regular"
         
         for site in System_state.adsorption_sites:
             if System_state.grid_crystal[site].site_events:
