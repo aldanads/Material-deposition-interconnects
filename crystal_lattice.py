@@ -47,6 +47,7 @@ class Crystal_Lattice():
         use_parallel = crystal_features[4]
         self.facets_type = crystal_features[5]
         self.defect_specie = crystal_features[6]
+        # self.affected_site = crystal_features[7]
         self.mode = crystal_features[7]
         self.radius_neighbors = crystal_features[8]
         self.sites_generation_layer = crystal_features[9]
@@ -85,7 +86,8 @@ class Crystal_Lattice():
         #Transition rate for adsortion of chemical species
         if self.experiment != 'ECM memristor':
             self.transition_rate_adsorption(experimental_conditions[0:3])
-            self.E_min_lim_superbasin = self.Act_E_gen * 0.9 # Don't create superbasin that include the deposition process
+            # self.E_min_lim_superbasin = self.Act_E_gen * 0.9 # Don't create superbasin that include the deposition process
+            self.E_min_lim_superbasin = 0.25 # Don't create superbasin that include the deposition process
             # Wulff shape and edge types for this kind of material
             self.Wulff_Shape(api_key)
             self.create_edges(self.facets_type)
