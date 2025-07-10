@@ -54,7 +54,7 @@ def main():
         System_state.plot_crystal(45,45,paths['data'],0)    
         j = 0
         
-        snapshoots_steps = int(5e2)
+        snapshoots_steps = int(1e3)
         starting_time = time.time()
     # =============================================================================
     #     Deposition
@@ -124,7 +124,7 @@ def main():
     # =============================================================================
         elif System_state.experiment == 'annealing':
             i = 0
-            total_steps = int(2.5e6)
+            total_steps = int(5e6)
             nothing_happen = 0
             # total_steps = int(10000)
             System_state.measurements_crystal()
@@ -164,6 +164,11 @@ def main():
     # =============================================================================
                 
                 if i%snapshoots_steps== 0:
+                    
+                    System_state.sites_occupied = list(set(System_state.sites_occupied))
+                    
+                    print(len(System_state.sites_occupied))
+                    
                     System_state.add_time()
                     j+=1
                     System_state.measurements_crystal()
@@ -191,6 +196,7 @@ def main():
                 list_sites_occu.append(len(System_state.sites_occupied))
                 
                 if i%snapshoots_steps== 0:
+
                     System_state.add_time()
                     j+=1
                     # System_state.measurements_crystal()

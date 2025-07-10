@@ -59,7 +59,7 @@ class Superbasin():
         self.absorbing_states_transitions = []
         aux_transitions = []
         last_transition = None
-
+        
         while stack:
             idx = stack.pop()
 
@@ -86,7 +86,7 @@ class Superbasin():
                     for transition in site.site_events:
                         # Visit all the transitions from a transient state, even those
                         # with larger Act. Energy than E_min
-                        if transition[1] not in visited:
+                        if transition[1] not in visited and transition[1] not in stack:
                             stack.append(transition[1])
                 
                 # Control of the states visited
@@ -226,14 +226,14 @@ class Superbasin():
         
         # Check for poor conditioning 
         cond_number = np.linalg.cond(I_reg)
-        print('Conditioning number: ', cond_number)
+        #print('Conditioning number: ', cond_number)
         if cond_number > 1e10: # In this case, the matrix is almost singular --> Large errors
-            print(f"Matrix is poorly conditioned (cond = {cond_number}). Adjust regularization or inspect T_transient.")
+            #print(f"Matrix is poorly conditioned (cond = {cond_number}). Adjust regularization or inspect T_transient.")
             return False
         
         # Check for NaN or infinity values
         if np.any(np.isnan(I_reg)) or np.any(np.isinf(I_reg)):
-            raise ValueError("I_reg = I - T_transient contains NaN or infinity values.")
+            #raise ValueError("I_reg = I - T_transient contains NaN or infinity values.")
             return False
         
             # Regularize the matrix
