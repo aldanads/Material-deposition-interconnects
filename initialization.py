@@ -38,7 +38,7 @@ def initialization(n_sim,save_data,lammps_file):
         if platform.system() == 'Windows': # When running in laptop
             dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Control of fcc metal morphology via substrate interaction\Simulations\Test')
         elif platform.system() == 'Linux': # HPC works on Linux
-            dst = Path(r'/FS1\Docs2\samuel.delgado\My Documents\Publications\Control of fcc metal morphology via substrate interaction\Simulations\Test')
+            dst = Path(r'/sfiwork/samuel.delgado/Mapping/5nm/Ag/homoepitaxial_3')
             
         paths,Results = save_simulation(files_copy,dst,n_sim) # Create folders and python files
         
@@ -78,7 +78,7 @@ def initialization(n_sim,save_data,lammps_file):
 #         
 # =============================================================================
         material_selection = {"Ni":"mp-23","Cu":"mp-30", "Pd": "mp-2","Ag":"mp-124","Pt":"mp-126","Au":"mp-81", "PbZrO3":"mp-1068577"}
-        id_material_Material_Project = material_selection['Au']
+        id_material_Material_Project = material_selection['Pt']
         crystal_size = (50,50,50) # (angstrom (Å))
         orientation = ['001','111']
         use_parallel = None
@@ -311,6 +311,7 @@ def initialization(n_sim,save_data,lammps_file):
         for site in System_state.adsorption_sites:
             if System_state.grid_crystal[site].site_events:
                 System_state.grid_crystal[site].site_events[0][0] = System_state.TR_gen
+                System_state.grid_crystal[site].site_events[0][-1] = System_state.Act_E_gen
 
         
     elif experiment == 'ECM memristor':
