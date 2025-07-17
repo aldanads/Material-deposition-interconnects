@@ -1207,6 +1207,51 @@ class Crystal_Lattice():
                         "simulation_setup": metadata_simulation_setup
                     }, metadata_file, indent=4)
                     
+                    
+    def plot_islands(self,path = '',i = 0):
+        
+        visited = set()
+        sites_occupied_cart = []
+        species_ids = []
+        
+        # Assign unique species ID per island
+        for island in self.islands_list:
+            for id_cluster, cluster in enumerate(island.cluster_list,start = 1):
+                for site in cluster:
+                    visited.add(site)
+                    sites_occupied_cart.append(self.idx_to_cart(site))
+                    species_ids.append(id_cluster)
+
+        # Assign another species ID (e.g., island_id + 1) for remaining unclustered atoms
+        remainder_id = id_cluster + 1
+        for site in self.sites_occupied:
+            if site not in visited:
+                visited.add(site)
+                sites_occupied_cart.append(self.idx_to_cart(site))
+                species_ids.append(remainder_id)
+                
+        # species_mapping = {self.chemical_specie: 1}  # Example species mapping
+        # sites_occupied_cart = [(self.idx_to_cart(site)) for site in self.sites_occupied]
+        # species_ids = [species_mapping.get(self.grid_crystal[site].chemical_specie) for site in self.sites_occupied]
+        # Define particle IDs
+        particle_ids = list(range(1, len(sites_occupied_cart) + 1))  # Unique IDs for each particle
+        
+
+        base_path = Path(path)
+        dump_file_path = base_path / f"{i}.dump"
+        # Write the LAMMPS dump file
+        with open(dump_file_path, 'w') as dump_file:
+            dump_file.write(f"ITEM: TIMESTEP\n{self.time:.10f}\n")
+            dump_file.write("ITEM: NUMBER OF ATOMS\n")
+            dump_file.write(f"{len(sites_occupied_cart)}\n")
+            dump_file.write("ITEM: BOX BOUNDS (Angstrom)\n")
+            dump_file.write(f"0.0 {self.crystal_size[0]}\n")
+            dump_file.write(f"0.0 {self.crystal_size[1]}\n")
+            dump_file.write(f"0.0 {self.crystal_size[2]}\n")
+            dump_file.write("ITEM: ATOMS id type x y z\n")
+            for pid, sid, pos in zip(particle_ids, species_ids, sites_occupied_cart):
+                dump_file.write(f"{pid} {sid} {pos[0]} {pos[1]} {pos[2]}\n")
+                    
 
         
     def plot_crystal_surface(self):
