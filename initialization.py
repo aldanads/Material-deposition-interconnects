@@ -84,7 +84,7 @@ def initialization(n_sim,save_data,lammps_file):
         orientation = ['001','111']
         use_parallel = None
         facets_type = [(1,1,1),(1,0,0)]
-        defect_specie = 'Empty'
+        affected_site = 'Empty'
         mode = ['regular']
         radius_neighbors = 3
         sites_generation_layer = ['bottom_layer','top_layer']
@@ -113,7 +113,7 @@ def initialization(n_sim,save_data,lammps_file):
             
         crystal_features = [id_material_Material_Project,crystal_size,orientation[1],
                             api_key,use_parallel,
-                            facets_type,defect_specie,mode[0],radius_neighbors,sites_generation_layer[0]]
+                            facets_type,affected_site,mode[0],radius_neighbors,sites_generation_layer[0]]
         
 # =============================================================================
 #             Superbasin parameters
@@ -271,7 +271,6 @@ def initialization(n_sim,save_data,lammps_file):
     elif experiment == 'annealing':
         
         script_directory = Path(__file__).parent
-        #path = r'/sfihome/samuel.delgado/Copper_deposition/Varying_substrate/annealing/TaN/T500/'
         filename = script_directory / 'variables_AsDeposited.pkl'
         
         # Open the file in binary mode
@@ -300,13 +299,6 @@ def initialization(n_sim,save_data,lammps_file):
         #System_state.sites_generation_layer = 'bottom_layer'
         #System_state.facets_type = [(1,1,1),(1,0,0)]
         
-        """
-        Adapt variables in System_state to the most updated code:
-            self.affected_site
-            self.mode
-        """
-        #System_state.affected_site = "Empty"
-        #System_state.mode = "Regular"
         
         for site in System_state.adsorption_sites:
             if System_state.grid_crystal[site].site_events:
@@ -338,8 +330,8 @@ def initialization(n_sim,save_data,lammps_file):
         orientation = ['001']
         use_parallel = None
         facets_type = None
-        defect_species = ['Empty','O']
-        defect_specie = defect_species[0]
+        affected_sites = ['Empty','O']
+        affected_site = affected_sites[0]
         interstitial_specie = 'Ag'
 
         mode = ['interstitial', 'vacancy']
@@ -367,7 +359,7 @@ def initialization(n_sim,save_data,lammps_file):
 
         crystal_features = [id_material_Material_Project,crystal_size,orientation[0],
                             api_key,use_parallel,
-                            facets_type,defect_specie,mode[0],radius_neighbors,sites_generation_layer[1]]
+                            facets_type,affected_site,mode[0],radius_neighbors,sites_generation_layer[1]]
 
         
         # =============================================================================
