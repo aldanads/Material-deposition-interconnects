@@ -37,7 +37,8 @@ from pathlib import Path
 
 class Crystal_Lattice():
     
-    def __init__(self,crystal_features,experimental_conditions,Act_E_list,lammps_file,superbasin_parameters,grid_crystal = None):
+    def __init__(self,crystal_features,experimental_conditions,Act_E_list,
+                 lammps_file,superbasin_parameters,**kwargs):
         
         # Crystal features
         self.id_material = crystal_features[0]
@@ -47,10 +48,10 @@ class Crystal_Lattice():
         use_parallel = crystal_features[4]
         self.facets_type = crystal_features[5]
         self.defect_specie = crystal_features[6]
-        # self.affected_site = crystal_features[7]
         self.mode = crystal_features[7]
         self.radius_neighbors = crystal_features[8]
         self.sites_generation_layer = crystal_features[9]
+        self.interstitial_specie = kwargs.get('interstitial_specie', None)
         
         # Deposition
         self.sticking_coefficient = experimental_conditions[0]
@@ -73,12 +74,8 @@ class Crystal_Lattice():
         # Crystal_grid generation
         # self.lattice_model_2(api_key, mode, defect_specie, self.radius_neighbors)
         self.lattice_model(api_key, self.mode, self.defect_specie, self.radius_neighbors)
+        grid_crystal = kwargs.get('grid_crystal', None)
         self.crystal_grid(grid_crystal,self.radius_neighbors,self.mode,self.defect_specie,use_parallel)
-        
-        # for idx,site in self.grid_crystal.items():
-            # print(site.site_events)
-            
-        # exit()
 
         self.sites_occupied = [] # Sites occupy be a chemical specie
         self.adsorption_sites = [] # Sites availables for deposition or migration
@@ -113,6 +110,13 @@ class Crystal_Lattice():
 
         self.lammps_file = lammps_file
         
+    # Methods to check if optional parameters were provided
+    def has_grid(self):
+        return self.grid_crystal is not None
+    
+    def has_interstitial(self):
+        return self.interstitial_specie is not None
+        
     def lattice_model(self, api_key, mode, defect_specie=None, radius_neighbors=None):
         """
         Generate a lattice model based on the specified mode:
@@ -135,7 +139,7 @@ class Crystal_Lattice():
             if mode == 'interstitial':
                 chgcar = mpr.get_charge_density_from_material_id(self.id_material) #Download charge density from MP
                 cig = ChargeInterstitialGenerator() # Defect generator based on charge density
-                defects = cig.generate(chgcar, insert_species=[defect_specie]) # Generate interstitial specie
+                defects = cig.generate(chgcar, insert_species=[self.interstitial_specie]) # Generate interstitial specie
                 structure = next(defects).defect_structure  # Select one defect-modified structure
         
         
@@ -149,7 +153,7 @@ class Crystal_Lattice():
         if mode == 'vacancy':
             self.chemical_specie = "V_"+defect_specie
         elif mode == 'interstitial':
-            self.chemical_specie = defect_specie 
+            self.chemical_specie = self.interstitial_specie 
         else:
             self.chemical_specie = self.structure_basic.composition.reduced_formula
             
@@ -173,7 +177,7 @@ class Crystal_Lattice():
             self.structure = Structure(structure_with_interstitial.lattice, [], [])
             
             for site in structure_with_interstitial:
-                if site.specie.symbol == defect_specie:
+                if site.specie.symbol == self.interstitial_specie:
                     self.structure.append(site.specie, site.frac_coords)
          
         elif mode == 'vacancy':
@@ -920,8 +924,10 @@ class Crystal_Lattice():
             
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(chosen_event[1],update_specie_events,update_supp_av)
+
             # Remove particle
             update_specie_events,update_supp_av = self.remove_specie_site(chosen_event[-1],update_specie_events,update_supp_av)
+
 
             # Update sites availables, the support to each site and available migrations
             self.update_sites(update_specie_events,update_supp_av)
@@ -961,7 +967,7 @@ class Crystal_Lattice():
             for idx in update_supp_av:
                 self.grid_crystal[idx].supported_by(self.grid_crystal,self.wulff_facets,
                                                     self.dir_edge_facets,self.chemical_specie,self.defect_specie,
-                                                    self.domain_height)
+                                                    self.domain_height,self.sites_generation_layer)
             self.available_generation_sites(self.sites_generation_layer,update_supp_av)
         
         if update_specie_events: 
@@ -1011,6 +1017,8 @@ class Crystal_Lattice():
         self.grid_crystal[idx].introduce_specie(self.chemical_specie)
         # Track sites occupied
         self.sites_occupied.append(idx) 
+        
+        # self.sites_occupied = list(set(self.sites_occupied))
 
         # Track sites available
         update_specie_events.add(idx)

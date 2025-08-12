@@ -26,6 +26,7 @@ def initialization(n_sim,save_data,lammps_file):
     
     #seed = 1
     # Random seed as time
+    # rng = np.random.default_rng() # Random Number Generator (RNG) object
     rng = np.random.default_rng() # Random Number Generator (RNG) object
 
     # Default resolution for figures
@@ -36,7 +37,7 @@ def initialization(n_sim,save_data,lammps_file):
                       'balanced_tree.py','analysis.py','superbasin.py','activation_energies_deposition.json']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Control of fcc metal morphology via substrate interaction\Simulations\Test')
+            dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Memristor ECM\Simulations\Tests')
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = Path(r'/sfiwork/samuel.delgado/Mapping/5nm/Ag/homoepitaxial_3')
             
@@ -47,7 +48,7 @@ def initialization(n_sim,save_data,lammps_file):
         Results = []
         
     experiments = ['deposition','annealing','ECM memristor']
-    experiment = experiments[1]
+    experiment = experiments[2]
 
     if experiment == 'deposition':         
 # =============================================================================
@@ -78,7 +79,7 @@ def initialization(n_sim,save_data,lammps_file):
 #         
 # =============================================================================
         material_selection = {"Ni":"mp-23","Cu":"mp-30", "Pd": "mp-2","Ag":"mp-124","Pt":"mp-126","Au":"mp-81", "PbZrO3":"mp-1068577"}
-        id_material_Material_Project = material_selection['Pt']
+        id_material_Material_Project = material_selection['Au']
         crystal_size = (50,50,50) # (angstrom (Å))
         orientation = ['001','111']
         use_parallel = None
@@ -177,16 +178,16 @@ def initialization(n_sim,save_data,lammps_file):
                             if isinstance(act_energy, (int, float)):
                                 E_dataset.append(act_energy)
         
-        # E_mig_sub = 0.5
-        E_mig_sub = E_dataset[0] # (eV)
-        E_mig_upward_subs_layer111 = E_dataset[1] #* (0.1 + 0.2 * n_sim)
-        E_mig_downward_layer111_subs = E_dataset[2] #* (1.6 - 0.2 * n_sim)
-        E_mig_upward_layer1_layer2_111 = E_dataset[3] #* (0.1 + 0.2 * n_sim)
-        E_mig_downward_layer2_layer1_111 = E_dataset[4] #* (1.6 - 0.2 * n_sim)
-        E_mig_upward_subs_layer100 = E_dataset[5] #* (0.1 + 0.2 * n_sim)
-        E_mig_downward_layer100_subs = E_dataset[6] #* (1.6 - 0.2 * n_sim)
+        E_mig_sub = 0.5
+        #E_mig_sub = E_dataset[0] # (eV)
+        E_mig_upward_subs_layer111 = E_dataset[1] * (0.1 + 0.2 * n_sim)
+        E_mig_downward_layer111_subs = E_dataset[2] * (1.6 - 0.2 * n_sim)
+        E_mig_upward_layer1_layer2_111 = E_dataset[3] * (0.1 + 0.2 * n_sim)
+        E_mig_downward_layer2_layer1_111 = E_dataset[4] * (1.6 - 0.2 * n_sim)
+        E_mig_upward_subs_layer100 = E_dataset[5] * (0.1 + 0.2 * n_sim)
+        E_mig_downward_layer100_subs = E_dataset[6] * (1.6 - 0.2 * n_sim)
         E_mig_111_terrace_Cu = E_dataset[7]
-        E_mig_100_terrace_Cu = E_dataset[8] #* (1.6 - 0.2 * n_sim)
+        E_mig_100_terrace_Cu = E_dataset[8] * (1.6 - 0.2 * n_sim)
         E_mig_edge_100 = E_dataset[9]
         E_mig_edge_111 = E_dataset[10]
 
@@ -200,7 +201,7 @@ def initialization(n_sim,save_data,lammps_file):
         # =============================================================================
 
         # Binding energy | Desorption energy: https://doi.org/10.1039/D1SC04708F
-        binding_energy = E_dataset[-2] #* (0.1 + 0.2 * n_sim)
+        binding_energy = E_dataset[-2] * (0.1 + 0.2 * n_sim)
 
              
 
@@ -295,7 +296,6 @@ def initialization(n_sim,save_data,lammps_file):
         System_state.E_min_lim_superbasin = 0.25
         #System_state.n_search_superbasin = 25
         #System_state.time_step_limits = 1e-10
-        #System_state.E_min_lim_superbasin = 0.20
         #System_state.domain_height = System_state.crystal_size[2]
         #System_state.sites_generation_layer = 'bottom_layer'
         #System_state.facets_type = [(1,1,1),(1,0,0)]
@@ -332,14 +332,16 @@ def initialization(n_sim,save_data,lammps_file):
         # =============================================================================
         material_selection = {"CeO2":"mp-20194", "ZrPbO3":"mp-1068577"}
         technologies = ['ECM','PZT']
-        techonology = technologies[1]
-        id_material_Material_Project = material_selection["ZrPbO3"]
+        techonology = technologies[0]
+        id_material_Material_Project = material_selection["CeO2"]
         crystal_size = (50,50,50) # (angstrom (Å))
         orientation = ['001']
         use_parallel = None
         facets_type = None
-        defect_species = ['Ag','O']
-        defect_specie = defect_species[1]
+        defect_species = ['Empty','O']
+        defect_specie = defect_species[0]
+        interstitial_specie = 'Ag'
+
         mode = ['interstitial', 'vacancy']
         radius_neighbors = 4
         sites_generation_layer = ['bottom_layer','top_layer']
@@ -365,7 +367,7 @@ def initialization(n_sim,save_data,lammps_file):
 
         crystal_features = [id_material_Material_Project,crystal_size,orientation[0],
                             api_key,use_parallel,
-                            facets_type,defect_specie,mode[1],radius_neighbors,sites_generation_layer[1]]
+                            facets_type,defect_specie,mode[0],radius_neighbors,sites_generation_layer[1]]
 
         
         # =============================================================================
@@ -391,7 +393,7 @@ def initialization(n_sim,save_data,lammps_file):
         E_dataset = []
         for defect in data[techonology]:
             # Search the selected element we retrieved from Materials Project
-            if defect['defect_specie'] == defect_specie:
+            if defect['specie'] == interstitial_specie:
 
                 #Search the activation energies
                 for key,activation_energies in defect.items():
@@ -419,9 +421,9 @@ def initialization(n_sim,save_data,lammps_file):
         
         filename = 'grid_crystal'
         System_state = initialize_grid_crystal(filename,crystal_features,experimental_conditions,Act_E_list, 
-              lammps_file,superbasin_parameters,save_data)  
+              lammps_file,superbasin_parameters,save_data, interstitial_specie)  
         
-        P = 0.1
+        P = 0.0
         System_state.defect_gen(rng,P)
         
         # This timestep_limits will depend on the V/s ratio
@@ -433,7 +435,7 @@ def initialization(n_sim,save_data,lammps_file):
     #     Initialize the crystal grid structure - nodes with empty spaces
     # =============================================================================    
 def initialize_grid_crystal(filename,crystal_features,experimental_conditions,Act_E_list, 
-    lammps_file,superbasin_parameters,save_data):
+    lammps_file,superbasin_parameters,save_data, interstitial_specie = None):
       
         # If grid_crystal exists: we loaded
         # Otherwise: we create it (very expensive for larger systems ~100 anstrongs)
@@ -444,14 +446,31 @@ def initialize_grid_crystal(filename,crystal_features,experimental_conditions,Ac
         dat_file_with_ext = dat_file.with_suffix('.dat')
         pkl_file_with_ext = dat_file.with_suffix('.pkl')
         
+        # Prepare keyword arguments
+        crystal_kwargs = {}
+        
+        # Add interstitial_specie if provided
+        if interstitial_specie is not None:
+            crystal_kwargs['interstitial_specie'] = interstitial_specie
+        
         if dat_file_with_ext.exists():
             print('Loading grid_crystal.dat')
             # Load from .dat
             dat_file = current_directory / f"{filename}"
             with shelve.open(dat_file) as my_shelf:
                 grid_crystal = my_shelf.get(filename)
+                
+            # Add grid_crystal to kwargs
+            crystal_kwargs['grid_crystal'] = grid_crystal
             
-            System_state = Crystal_Lattice(crystal_features,experimental_conditions,Act_E_list,lammps_file,superbasin_parameters,grid_crystal)
+            System_state = Crystal_Lattice(
+                crystal_features,
+                experimental_conditions,
+                Act_E_list,
+                lammps_file,
+                superbasin_parameters,
+                **crystal_kwargs
+                )
 
         elif pkl_file_with_ext.exists():
             print('Loading grid_crystal.pkl')
@@ -461,13 +480,30 @@ def initialize_grid_crystal(filename,crystal_features,experimental_conditions,Ac
                 data = pickle.load(file)
             grid_crystal = data.get(filename)
             
-            System_state = Crystal_Lattice(crystal_features,experimental_conditions,Act_E_list,lammps_file,superbasin_parameters,grid_crystal)
+            # Add grid_crystal to kwargs
+            crystal_kwargs['grid_crystal'] = grid_crystal
+
+            System_state = Crystal_Lattice(
+                crystal_features,
+                experimental_conditions,
+                Act_E_list,
+                lammps_file,
+                superbasin_parameters,
+                **crystal_kwargs
+                )
 
             
         else:
             # Create new grid_crystal
             print('Creating grid_crystal')
-            System_state = Crystal_Lattice(crystal_features,experimental_conditions,Act_E_list,lammps_file,superbasin_parameters)
+            System_state = Crystal_Lattice(
+                crystal_features,
+                experimental_conditions,
+                Act_E_list,
+                lammps_file,
+                superbasin_parameters,
+                **crystal_kwargs # This will only contain interstitial_specie if provided
+                )
             
             # Save the newly created data
             if save_data:
@@ -487,7 +523,7 @@ def search_superbasin(System_state):
     sites_occupied = System_state.sites_occupied[:] 
 
     start_time = time.time()
-
+    
     for idx in sites_occupied:
         for event in System_state.grid_crystal[idx].site_events:
             if (idx not in System_state.superbasin_dict) and (event[3] <= System_state.E_min):
@@ -495,6 +531,7 @@ def search_superbasin(System_state):
                 if superbasin.valid:    
                     System_state.superbasin_dict.update({idx: superbasin})
     
+
     # Record the end time
     end_time = time.time()
     # Calculate the elapsed time
@@ -503,7 +540,7 @@ def search_superbasin(System_state):
     if elapsed_time > 300 and System_state.E_min_lim_superbasin > System_state.energy_step:
         System_state.E_min -= System_state.energy_step
     # print(f"Elapsed time superbasin: {elapsed_time} seconds")    
-    print("Superbasins generated: ",len(System_state.superbasin_dict))
+    #print("Superbasins generated: ",len(System_state.superbasin_dict))
         
 
 def save_simulation(files_copy,dst,n_sim):

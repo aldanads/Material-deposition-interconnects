@@ -40,7 +40,7 @@ def KMC(System_state,rng):
     sumTR = update_data(TR_tree)
     
 
-    if sumTR == None: return System_state,time_step # Exit if there is not possible event
+    if sumTR == None: return System_state,time_step, None # Exit if there is not possible event
     # When we only have one node in the tree, it returns a tuple
     if type(sumTR) is tuple: sumTR = sumTR[0]
     # We search in our binary tree the event that happen

@@ -90,10 +90,12 @@ class Site():
 # =============================================================================
 #         Occupied sites supporting this node
 # =============================================================================    
-    def supported_by(self,grid_crystal,wulff_facets,dir_edge_facets,chemical_specie,affected_site,domain_height):
+    def supported_by(self,grid_crystal,wulff_facets,dir_edge_facets,chemical_specie,affected_site,domain_height,sites_generation_layer):
         
         # Initialize supp_by as an empty list
         self.supp_by = []
+        
+        self.sites_generation_layer = sites_generation_layer
         
         # Position close to 0 are supported by the substrate
         tol = 1e-6
@@ -133,7 +135,7 @@ class Site():
                 self.energy_site = self.cache_clustering_energy[cache_key]
                 return
             
-            if 'bottom_layer' in self.supp_by:
+            if self.sites_generation_layer in self.supp_by:
                 self.energy_site = self.Act_E_list[-1][len(self.supp_by)] + self.Act_E_list[-2]
             else:
                 
@@ -153,13 +155,13 @@ class Site():
 
 
             
-            if 'bottom_layer' in supp_by_destiny and idx_origin in supp_by_destiny:
+            if self.sites_generation_layer in supp_by_destiny and idx_origin in supp_by_destiny:
                 energy_site = self.Act_E_list[-1][len(supp_by_destiny)-1] + self.Act_E_list[-2]
-            elif 'bottom_layer' in supp_by_destiny and idx_origin not in supp_by_destiny:
+            elif self.sites_generation_layer in supp_by_destiny and idx_origin not in supp_by_destiny:
                 energy_site = self.Act_E_list[-1][len(supp_by_destiny)] + self.Act_E_list[-2]
-            elif 'bottom_layer' not in supp_by_destiny and idx_origin in supp_by_destiny:
+            elif self.sites_generation_layer not in supp_by_destiny and idx_origin in supp_by_destiny:
                 energy_site = self.Act_E_list[-1][len(supp_by_destiny)]
-            elif 'bottom_layer' not in supp_by_destiny and idx_origin not in supp_by_destiny:
+            elif self.sites_generation_layer not in supp_by_destiny and idx_origin not in supp_by_destiny:
                 energy_site = self.Act_E_list[-1][len(supp_by_destiny)+1]
             
             # Store the result in the cache
@@ -201,12 +203,12 @@ class Site():
     
             # Plane migrations
             for site_idx, num_event in self.migration_paths['Plane']:
-                if site_idx not in self.supp_by and ('bottom_layer' in grid_crystal[site_idx].supp_by or len(grid_crystal[site_idx].supp_by) > 2):
+                if site_idx not in self.supp_by and (self.sites_generation_layer in grid_crystal[site_idx].supp_by or len(grid_crystal[site_idx].supp_by) > 2):
                     energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                     energy_change = max(energy_site_destiny - self.energy_site, 0)
                     
                     # Migrating on the substrate
-                    if 'bottom_layer' in self.supp_by:
+                    if self.sites_generation_layer in self.supp_by:
                         new_site_events.append([site_idx, num_event, self.Act_E_list[0] + energy_change])
                         
                     # Migrating on the film (111)
@@ -241,10 +243,10 @@ class Site():
                     energy_change = max(energy_site_destiny - self.energy_site, 0)
                    
                     # Migrating upward from the substrate
-                    if 'bottom_layer' in self.supp_by and grid_crystal[site_idx].wulff_facet == facets_type[0]:
+                    if self.sites_generation_layer in self.supp_by and grid_crystal[site_idx].wulff_facet == facets_type[0]:
                         new_site_events.append([site_idx, num_event, self.Act_E_list[1] + energy_change])
                     
-                    elif 'bottom_layer' in self.supp_by and grid_crystal[site_idx].wulff_facet == facets_type[0]:
+                    elif self.sites_generation_layer in self.supp_by and grid_crystal[site_idx].wulff_facet == facets_type[0]:
                         new_site_events.append([site_idx, num_event, self.Act_E_list[5] + energy_change])
                         
                     # Migrating upward from the film (111)
@@ -261,15 +263,15 @@ class Site():
     
                     # First nearest neighbors: 1 jump downward
                     # Supported by at least 2 particles (excluding this site)
-                if site_idx not in self.supp_by and ('bottom_layer' in grid_crystal[site_idx].supp_by or len(grid_crystal[site_idx].supp_by) > 1):
+                if site_idx not in self.supp_by and (self.sites_generation_layer in grid_crystal[site_idx].supp_by or len(grid_crystal[site_idx].supp_by) > 1):
                     energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                     energy_change = max(energy_site_destiny - self.energy_site, 0)
                     
                     # From layer 1 to substrate
-                    if self.wulff_facet == facets_type[0] and 'bottom_layer' in grid_crystal[site_idx].supp_by:
+                    if self.wulff_facet == facets_type[0] and self.sites_generation_layer in grid_crystal[site_idx].supp_by:
                         new_site_events.append([site_idx, num_event, self.Act_E_list[2] + energy_change])
                     
-                    elif self.wulff_facet == facets_type[1] and 'bottom_layer' in grid_crystal[site_idx].supp_by:
+                    elif self.wulff_facet == facets_type[1] and self.sites_generation_layer in grid_crystal[site_idx].supp_by:
                         new_site_events.append([site_idx, num_event, self.Act_E_list[6] + energy_change])
                     
                     # Migrating downward from the film (111)
@@ -329,7 +331,7 @@ class Site():
             
     def detect_planes_test(self,System_state):
         
-        atom_coordinates = np.array([System_state.grid_crystal[idx].position for idx in self.supp_by if idx != 'bottom_layer'])
+        atom_coordinates = np.array([System_state.grid_crystal[idx].position for idx in self.supp_by if idx != self.sites_generation_layer])
 
         self.miller_index = System_state.structure.lattice.get_miller_index_from_coords(atom_coordinates, coords_are_cartesian=True, round_dp=0, verbose=True)
                 
@@ -343,7 +345,7 @@ class Site():
 
     def detect_planes(self,grid_crystal,wulff_facets):
         
-        atom_coordinates = np.array([grid_crystal[idx].position for idx in self.supp_by if idx != 'bottom_layer' and idx != 'top_layer'])
+        atom_coordinates = np.array([grid_crystal[idx].position for idx in self.supp_by if idx != self.sites_generation_layer])
         # atom_coordinates = tuple([grid_crystal[idx].position for idx in self.supp_by if idx != 'Substrate'])
         # Order the coordinates according to the first value, then the second, etc.
         # We are ordering the row, not the elements of the coordinates (x,y,z)
@@ -352,7 +354,7 @@ class Site():
         cache_key = self.supp_by
         
         # Check if the result is already cached
-        if 'bottom_layer' in self.supp_by:
+        if self.sites_generation_layer in self.supp_by:
             self.wulff_facet = (1,1,1)
             return
         
@@ -406,7 +408,7 @@ class Site():
         bottom_support = all(site_idx in self.supp_by for site_idx, num_event in self.migration_paths['Down'])
             
         # To be an edge it must be support by the substrate or the atoms from the down layer
-        if 'bottom_layer' in self.supp_by or bottom_support:
+        if self.sites_generation_layer in self.supp_by or bottom_support:
             # Check for each migration direction the edges that are parallel
             for num_event,site_idx in self.mig_paths_plane.items():
                 edges = dir_edge_facets[num_event]
