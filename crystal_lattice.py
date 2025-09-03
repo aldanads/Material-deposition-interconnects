@@ -394,7 +394,7 @@ class Crystal_Lattice():
                         self.grid_crystal, neighbors_idx, neighbors_positions,
                         self.crystal_size, self.event_labels, idx
                         )
-                
+                    
                     
             end_time = time.perf_counter()
             elapsed_time = end_time - start_time
@@ -893,6 +893,12 @@ class Crystal_Lattice():
 # =============================================================================
         if chosen_event[2] <= (self.num_event - 2): # 12 migration possibilities [0-11] and [12] for migrating from superbasin
             
+            if chosen_event[1] == (10, 36, 40):
+                print("Processes method:")
+                print("chosen_event", chosen_event)
+                print("Supp_by (38, 24, 40)",self.grid_crystal[(38, 24, 40)].supp_by)
+                print(self.grid_crystal[(10, 36, 40)].chemical_specie)
+                print('(10, 36, 40) is in sites_occupied?', (10, 36, 40) in self.sites_occupied)
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(chosen_event[1],update_specie_events,update_supp_av)
 
@@ -986,6 +992,7 @@ class Crystal_Lattice():
         
         # Chemical specie deposited
         self.grid_crystal[idx].introduce_specie(self.chemical_specie)
+        
         # Track sites occupied
         self.sites_occupied.append(idx) 
         
@@ -1007,7 +1014,7 @@ class Crystal_Lattice():
             # Extend update_specie_events with sites that are not 'Substrate'
             update_specie_events.update(
                 idx_site for idx_site in self.grid_crystal[idx_supp_site].supp_by 
-                if idx_site != self.sites_generation_layer and self.grid_crystal[idx_site].chemical_specie != self.affected_site
+                if isinstance(idx_site, tuple) and self.grid_crystal[idx_site].chemical_specie != self.affected_site
                 )
               # Need to check if this is empty or not because we haven't updated yet self.grid_crystal[idx_supp_site].supp_by
               # We don't want to update_specie_events of ghost particles that are "supporting" something
@@ -1029,7 +1036,7 @@ class Crystal_Lattice():
         # Track sites occupied
 
         self.sites_occupied.remove(idx) 
-   
+          
         # Track sites available
         update_specie_events.discard(idx)
         
@@ -1046,7 +1053,7 @@ class Crystal_Lattice():
             # Extend update_specie_events with sites that are not 'bottom_layer'
             update_specie_events.update(
                 {idx_site for idx_site in self.grid_crystal[idx_supp_site].supp_by 
-                 if idx_site != self.sites_generation_layer and self.grid_crystal[idx_site].chemical_specie != self.affected_site} 
+                 if isinstance(idx_site, tuple) and self.grid_crystal[idx_site].chemical_specie != self.affected_site} 
                 ) # Need to check if this is empty or not because we haven't updated yet self.grid_crystal[idx_supp_site].supp_by
                   # We don't want to update_specie_events of ghost particles that are "supporting" something
                   # Case: The support of the particle we have just eliminated (idx) hasn't been removed yet from self.grid_crystal[idx_supp_site].supp_by

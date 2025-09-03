@@ -66,7 +66,7 @@ class Site():
                 min_dist, min_dist_idx = min(
                     ((np.linalg.norm(np.array(site.position) - np.array(pos)), idx) 
                      for idx, site in grid_crystal.items() 
-                     if round(site.position[2],3) == round(pos[2],3)),
+                     if np.isclose(site.position[2], pos[2], atol=1e-9, rtol=1e-9)),
                      key=lambda x: x[0]
                 )
                 
@@ -292,6 +292,7 @@ class Site():
             # Plane migrations
             for site_idx, num_event in self.migration_paths['Plane']:
                 if site_idx not in self.supp_by:
+                    
                     # Obtain energy difference between sites
                     energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                     energy_change = max(energy_site_destiny - self.energy_site, 0)

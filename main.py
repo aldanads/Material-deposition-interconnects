@@ -193,6 +193,7 @@ for n_sim in range(1,2):
             
             list_sites_occu.append(len(System_state.sites_occupied))
             
+            
             if i%snapshoots_steps== 0:
 
                 System_state.add_time()

@@ -95,10 +95,11 @@ class Superbasin():
             # Virtual migrations to calculate activation energies
             if stack:
                 System_state.processes((transition[0], stack[-1], transition[2], idx))
-                
+              
         # Return to the original state
-        if last_transition:
+        if last_transition:            
             System_state.processes((transition[0], start_idx, transition[2], idx)) 
+            
 
         # Construct the transitions to the absorbing states
         for absorbing_state in self.absorbing_states: 

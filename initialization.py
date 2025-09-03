@@ -24,9 +24,8 @@ import time
 
 def initialization(n_sim,save_data,lammps_file):
     
-    #seed = 1
+    # seed = 1
     # Random seed as time
-    # rng = np.random.default_rng() # Random Number Generator (RNG) object
     rng = np.random.default_rng() # Random Number Generator (RNG) object
 
     # Default resolution for figures
