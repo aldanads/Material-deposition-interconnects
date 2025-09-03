@@ -893,12 +893,6 @@ class Crystal_Lattice():
 # =============================================================================
         if chosen_event[2] <= (self.num_event - 2): # 12 migration possibilities [0-11] and [12] for migrating from superbasin
             
-            if chosen_event[1] == (10, 36, 40):
-                print("Processes method:")
-                print("chosen_event", chosen_event)
-                print("Supp_by (38, 24, 40)",self.grid_crystal[(38, 24, 40)].supp_by)
-                print(self.grid_crystal[(10, 36, 40)].chemical_specie)
-                print('(10, 36, 40) is in sites_occupied?', (10, 36, 40) in self.sites_occupied)
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(chosen_event[1],update_specie_events,update_supp_av)
 

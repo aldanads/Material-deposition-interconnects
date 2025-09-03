@@ -224,7 +224,7 @@ def initialization(n_sim,save_data,lammps_file):
                       binding_energy,E_clustering]
         
         
-        filename = 'grid_crystal'
+        filename = 'grid_'+formula
         System_state = initialize_grid_crystal(filename,crystal_features,experimental_conditions,Act_E_list, 
               lammps_file,superbasin_parameters,save_data)  
 
@@ -335,6 +335,8 @@ def initialization(n_sim,save_data,lammps_file):
 
         mode = ['interstitial', 'vacancy']
         radius_neighbors = 4
+        
+        # The no selected layer will behave like an additional particle for the clustering energy
         sites_generation_layer = ['bottom_layer','top_layer']
 
 
@@ -410,7 +412,7 @@ def initialization(n_sim,save_data,lammps_file):
 
         
         
-        filename = 'grid_crystal'
+        filename = 'grid_' + formula
         System_state = initialize_grid_crystal(filename,crystal_features,experimental_conditions,Act_E_list, 
               lammps_file,superbasin_parameters,save_data, interstitial_specie)  
         
@@ -445,7 +447,7 @@ def initialize_grid_crystal(filename,crystal_features,experimental_conditions,Ac
             crystal_kwargs['interstitial_specie'] = interstitial_specie
         
         if dat_file_with_ext.exists():
-            print('Loading grid_crystal.dat')
+            print('Loading ' + filename + ".dat")
             # Load from .dat
             dat_file = current_directory / f"{filename}"
             with shelve.open(dat_file) as my_shelf:
@@ -464,7 +466,7 @@ def initialize_grid_crystal(filename,crystal_features,experimental_conditions,Ac
                 )
 
         elif pkl_file_with_ext.exists():
-            print('Loading grid_crystal.pkl')
+            print('Loading ' + filename + '.pkl')
             # Load from .pkl
             with open(pkl_file_with_ext, 'rb') as file:
                 # Call load method to deserialze
@@ -486,7 +488,7 @@ def initialize_grid_crystal(filename,crystal_features,experimental_conditions,Ac
             
         else:
             # Create new grid_crystal
-            print('Creating grid_crystal')
+            print('Creating ' + filename)
             System_state = Crystal_Lattice(
                 crystal_features,
                 experimental_conditions,
@@ -498,7 +500,7 @@ def initialize_grid_crystal(filename,crystal_features,experimental_conditions,Ac
             
             # Save the newly created data
             if save_data:
-                print('Saving grid_crystal')
+                print('Saving ' + filename)
                 save_variables(current_directory, {filename : System_state.grid_crystal}, filename)
 
         return System_state
