@@ -15,4 +15,3 @@ config.json
 Test_pymatgen.py
 *grid_crystal*
 metadata.json
-PoissonSolver.py

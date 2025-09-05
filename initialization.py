@@ -38,7 +38,7 @@ def initialization(n_sim,save_data,lammps_file):
         if platform.system() == 'Windows': # When running in laptop
             dst = Path(r'\\FS1\Docs2\samuel.delgado\My Documents\Publications\Memristor ECM\Simulations\Tests')
         elif platform.system() == 'Linux': # HPC works on Linux
-            dst = Path(r'/sfiwork/samuel.delgado/Mapping/5nm/Ag/homoepitaxial_3')
+            dst = Path(r'/home/Docs2/samuel.delgado/linuxhome/Documents/Simulators/test')
             
         paths,Results = save_simulation(files_copy,dst,n_sim) # Create folders and python files
         
@@ -224,7 +224,7 @@ def initialization(n_sim,save_data,lammps_file):
                       binding_energy,E_clustering]
         
         
-        filename = 'grid_'+formula
+        filename = 'grid_'+ formula + "_" + str(int(max(crystal_size) / 10)) + "nm"
         System_state = initialize_grid_crystal(filename,crystal_features,experimental_conditions,Act_E_list, 
               lammps_file,superbasin_parameters,save_data)  
 
@@ -317,6 +317,7 @@ def initialization(n_sim,save_data,lammps_file):
         
         experimental_conditions = [sticking_coeff,partial_pressure,T,experiment]
         
+        
         # =============================================================================
         #         Crystal structure
         #         
@@ -362,7 +363,7 @@ def initialization(n_sim,save_data,lammps_file):
                             api_key,use_parallel,
                             facets_type,affected_site,mode[0],radius_neighbors,sites_generation_layer[1]]
 
-        
+
         # =============================================================================
         #             Superbasin parameters
         #     
@@ -372,6 +373,23 @@ def initialization(n_sim,save_data,lammps_file):
         E_min = 0.0
         energy_step = 0.05
         superbasin_parameters = [n_search_superbasin,time_step_limits,E_min,energy_step]
+        
+        # =============================================================================
+        #             Electric field parameters: Required for the Poisson Solver
+        #     
+        # =============================================================================
+        # Initialize Poisson solver on all MPI ranks
+        mesh_file = formula + "_" + str(int(max(crystal_size) / 10)) + "nm" + "_mesh.msh"  # Adjust filename as needed
+        
+        # Parameters for Poisson solver
+        epsilon_r = 23  # Dielectric constant (adjust for your material)
+        e_charge = 1.602e-19  # Elementary charge in Coulombs
+        
+        poisson_solve_frequency = 100  # Solve Poisson every N KMC steps
+        
+        solve_Poisson = True
+        
+        poissonSolver_parameters = [mesh_file,epsilon_r,e_charge,poisson_solve_frequency,solve_Poisson]
         
         
         # =============================================================================
@@ -410,12 +428,25 @@ def initialization(n_sim,save_data,lammps_file):
                       binding_energy_bottom_layer,E_clustering] 
         
 
+        # =============================================================================
+        #             Filename
+        #     
+        # =============================================================================
+        
+        filename = 'grid_' + formula + "_" + str(int(max(crystal_size) / 10)) + "nm"
         
         
-        filename = 'grid_' + formula
+        # =============================================================================
+        #             Crystal structure generation
+        #     
+        # =============================================================================
         System_state = initialize_grid_crystal(filename,crystal_features,experimental_conditions,Act_E_list, 
-              lammps_file,superbasin_parameters,save_data, interstitial_specie)  
-        
+              lammps_file,superbasin_parameters,save_data, interstitial_specie,poissonSolver_parameters) 
+                
+        # =============================================================================
+        #             Initialization of defects
+        #     
+        # =============================================================================
         P = 0.0
         System_state.defect_gen(rng,P)
         
@@ -428,7 +459,7 @@ def initialization(n_sim,save_data,lammps_file):
     #     Initialize the crystal grid structure - nodes with empty spaces
     # =============================================================================    
 def initialize_grid_crystal(filename,crystal_features,experimental_conditions,Act_E_list, 
-    lammps_file,superbasin_parameters,save_data, interstitial_specie = None):
+    lammps_file,superbasin_parameters,save_data, interstitial_specie = None, poissonSolver_parameters = None):
       
         # If grid_crystal exists: we loaded
         # Otherwise: we create it (very expensive for larger systems ~100 anstrongs)
@@ -445,6 +476,9 @@ def initialize_grid_crystal(filename,crystal_features,experimental_conditions,Ac
         # Add interstitial_specie if provided
         if interstitial_specie is not None:
             crystal_kwargs['interstitial_specie'] = interstitial_specie
+            
+        if poissonSolver_parameters is not None:
+            crystal_kwargs['poissonSolver_parameters'] = poissonSolver_parameters
         
         if dat_file_with_ext.exists():
             print('Loading ' + filename + ".dat")

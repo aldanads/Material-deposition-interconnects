@@ -79,6 +79,9 @@ class Crystal_Lattice():
         self.sites_occupied = [] # Sites occupy be a chemical specie
         self.adsorption_sites = [] # Sites availables for deposition or migration
         
+        # Poisson solver parameters
+        self.poissonSolver_parameters = kwargs.get('poissonSolver_parameters', None)
+        
         #Transition rate for adsortion of chemical species
         if self.experiment != 'ECM memristor':
             self.transition_rate_adsorption(experimental_conditions[0:3])
@@ -408,6 +411,21 @@ class Crystal_Lattice():
             for site in self.grid_crystal.values():
                 site.site_events = []
                 site.Act_E_list = self.activation_energies
+                
+    def extract_charges(self):
+        """
+        Extract charge locations and magnitudes from System_state.
+        """
+        charge_locations = []
+        charges = []
+        e_charge = self.poissonSolver_parameters[2]
+        
+        for site in self.sites_occupied:
+            charge_locations.append(self.grid_crystal[site].position)
+            charges.append(1* e_charge)
+            
+        return np.array(charge_locations,dtype=np.float64), np.array(charges, dtype=np.float64)
+            
 
     def get_num_cores(self):
         cores_from_env = (os.environ.get('SLURM_CPUS_PER_TASK') or 

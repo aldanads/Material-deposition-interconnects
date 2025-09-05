@@ -6,31 +6,6 @@ Created on Mon Jan 15 15:12:23 2024
 """
 
 
-"""
-Profiling - Reference: Grown 0.4 nm in a 2x2nm box
-
-3588847061 function calls (3583118442 primitive calls) in 4531.376 seconds
-
-   Ordered by: internal time
-   List reduced from 3094 to 15 due to restriction <15>
-
-   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
- 82083948  963.713    0.000 1404.471    0.000 Site.py:208(available_migrations)
- 74649433  416.469    0.000 1025.775    0.000 Site.py:89(supported_by)
- 82083948  289.458    0.000  426.047    0.000 Site.py:475(transition_rates)
-328902104  278.530    0.000  278.578    0.000 Site.py:139(calculate_clustering_energy)
- 81337137  215.623    0.000  215.644    0.000 {built-in method numpy.array}
-  3820373  192.869    0.000 3213.572    0.001 crystal_lattice.py:659(update_sites)
-    12054  188.685    0.016  408.147    0.034 superbasin.py:107(transition_matrix)
-514541761  176.782    0.000  176.787    0.000 {built-in method builtins.max}
-576148287  149.388    0.000  149.388    0.000 {method 'append' of 'list' objects}
- 74649433  148.408    0.000  404.024    0.000 Site.py:379(detect_planes)
-  3820122  146.402    0.000  230.872    0.000 crystal_lattice.py:748(remove_specie_site)
-599989208/599983845  122.053    0.000  122.056    0.000 {built-in method builtins.len}
-    12054  115.540    0.010 3761.155    0.312 superbasin.py:43(trans_absorbing_states)
-  3820373  115.057    0.000  164.150    0.000 crystal_lattice.py:322(available_adsorption_sites)
-128842061  112.088    0.000  184.653    0.000 {method 'update' of 'set' objects}
-"""
 
 
 import cProfile
@@ -39,13 +14,17 @@ from initialization import initialization,save_variables,search_superbasin
 from KMC import KMC
 import numpy as np
 import time
+import platform
+
 
 save_data = True
 lammps_file = True
 
 # def main():
 
-for n_sim in range(1,2):
+
+
+for n_sim in range(0,1):
     
     System_state,rng,paths,Results = initialization(n_sim,save_data,lammps_file)
 
@@ -179,42 +158,105 @@ for n_sim in range(1,2):
                     
                 System_state.plot_crystal(45,45,paths['data'],j)
                 
+# =============================================================================
+#     Devices: PZT, memristors  
+#            
+# =============================================================================
+                
     elif System_state.experiment == 'ECM memristor':
+        
+        solve_Poisson = System_state.poissonSolver_parameters[4]
+   
+        # Dolfinx only works in Linux
+        if solve_Poisson and platform.system() == 'Linux':
+            from mpi4py import MPI
+            from PoissonSolver import PoissonSolver
+    
+            comm = MPI.COMM_WORLD
+            rank = comm.Get_rank()
+            
+            mesh_file = System_state.poissonSolver_parameters[0]
+            
+
+            
+            # Initialize Poisson solver on all MPI ranks
+            poisson_solver = PoissonSolver(mesh_file, structure=System_state.structure)
+            poisson_solver.set_boundary_conditions(top_value=0.0, bottom_value=0.0)  # Set appropriate BCs
+    
+            # Parameters for Poisson solver
+            epsilon_r = System_state.poissonSolver_parameters[1]  # Dielectric constant
+            e_charge = System_state.poissonSolver_parameters[2]  # Elementary charge in Coulombs
+            
+            poisson_solve_frequency = System_state.poissonSolver_parameters[3]  # Solve Poisson every N KMC steps
+            
+        else:
+            rank = 0
+        
+
         
         i = 0
         total_steps = int(1e4)
-        list_sites_occu = []
+        # list_sites_occu = []
+        
 
-        # System_state.measurements_crystal()
         while j*snapshoots_steps < total_steps:
             
             i+=1
-            System_state,KMC_time_step, chosen_event = KMC(System_state,rng)
+            # KMC step runs in serial (only on rank 0)
+            if rank == 0:
+                System_state,KMC_time_step, chosen_event = KMC(System_state,rng)
+                #list_sites_occu.append(len(System_state.sites_occupied))
+                
+                # Get charge locations and charges from System_state
+                charge_locations, charges = System_state.extract_charges()
+                
+            else:
+                # Other ranks wait
+                charge_locations = None
+                charges = None
             
-            list_sites_occu.append(len(System_state.sites_occupied))
+            # Broadcast charge information to all MPI ranks
+            charge_locations = comm.bcast(charge_locations, root=0)
+            charges = comm.bcast(charges, root=0)
             
-            
-            if i%snapshoots_steps== 0:
+            if platform.system() == 'Linux' and solve_Poisson and charges is not None and len(charges) > 0 and i%poisson_solve_frequency == 0:
+                try: 
 
-                System_state.add_time()
-                j+=1
-                # System_state.measurements_crystal()
-                print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',System_state.list_time[-1])
-                end_time = time.time()
-                # if save_data:
-                    # Results.measurements_crystal(System_state.list_time[-1],System_state.mass_gained,System_state.fraction_sites_occupied,
-                    #                               System_state.thickness,np.mean(np.array(System_state.terraces)[np.array(System_state.terraces) > 0]),np.std(np.array(System_state.terraces)[np.array(System_state.terraces) > 0]),max(System_state.terraces),
-                    #                               System_state.surf_roughness_RMS,end_time-starting_time)
+                    uh = poisson_solver.solve(charge_locations,charges,epsilon_r)
                     
-                System_state.plot_crystal(45,45,paths['data'],j)
-
-
-    System_state.plot_crystal(45,45)
+                    if rank == 0:
+                        # Update System_state based on electric field
+                        
+                        print(f"Poisson solved at step{i}")
+                    
+                except Exception as e:
+                    if rank == 0:
+                        print(f"Poisson solver failed at step {i}: {e}")
+                 
+            # Continue with serial processing on rank 0
+            if rank == 0:
+                if i%snapshoots_steps== 0:
     
-    # Variables to save
-    variables = {'System_state' : System_state}
-    filename = 'variables'
-    if save_data: save_variables(paths['program'],variables,filename)
+                    System_state.add_time()
+                    j+=1
+                    # System_state.measurements_crystal()
+                    print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',System_state.list_time[-1])
+                    end_time = time.time()
+                    # if save_data:
+                        # Results.measurements_crystal(System_state.list_time[-1],System_state.mass_gained,System_state.fraction_sites_occupied,
+                        #                               System_state.thickness,np.mean(np.array(System_state.terraces)[np.array(System_state.terraces) > 0]),np.std(np.array(System_state.terraces)[np.array(System_state.terraces) > 0]),max(System_state.terraces),
+                        #                               System_state.surf_roughness_RMS,end_time-starting_time)
+                        
+                    System_state.plot_crystal(45,45,paths['data'],j)
+
+
+    if rank == 0:
+      System_state.plot_crystal(45,45)
+    
+      # Variables to save
+      variables = {'System_state' : System_state}
+      filename = 'variables'
+      if save_data: save_variables(paths['program'],variables,filename)
     
     # return System_state
 
