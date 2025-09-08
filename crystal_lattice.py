@@ -67,6 +67,9 @@ class Crystal_Lattice():
         self.E_min = superbasin_parameters[2]
         self.energy_step = superbasin_parameters[3]
         self.superbasin_dict = {}
+        
+        # Poisson solver parameters
+        self.poissonSolver_parameters = kwargs.get('poissonSolver_parameters', None)
 
         self.time = 0
         self.list_time = []
@@ -78,9 +81,6 @@ class Crystal_Lattice():
 
         self.sites_occupied = [] # Sites occupy be a chemical specie
         self.adsorption_sites = [] # Sites availables for deposition or migration
-        
-        # Poisson solver parameters
-        self.poissonSolver_parameters = kwargs.get('poissonSolver_parameters', None)
         
         #Transition rate for adsortion of chemical species
         if self.experiment != 'ECM memristor':
@@ -285,25 +285,56 @@ class Crystal_Lattice():
                 [1/np.sqrt(2), 1/np.sqrt(2), 0],
                 [-1/np.sqrt(3), 1/np.sqrt(3), 1/np.sqrt(3)]
             ])
-            
-    def crystal_grid(self,grid_crystal,radius_neighbors,mode,affected_site,use_parallel=None):
         
-        
-        # Create event lavels to know the possible migration pathways of the atoms
+    def initialize_migration_pathways(self, radius_neighbors):
+        """Initialize migration pathways and event labels for all possible atomic migrations"""
         self.coord_cache = {}
         self.event_labels = {}
+        self.migration_pathways = {}
         i = 0
         for site in self.structure:
-            neighbors = self.structure.get_neighbors(site,radius_neighbors)
+            neighbors = self.structure.get_neighbors(site, radius_neighbors)
             for neighbor in neighbors:
-                key = tuple(self.get_idx_coords(neighbor.coords,self.basis_vectors) 
-                                            - np.array(self.get_idx_coords(site.coords,self.basis_vectors)))
+                key = tuple(self.get_idx_coords(neighbor.coords, self.basis_vectors) 
+                           - np.array(self.get_idx_coords(site.coords, self.basis_vectors)))
                 if key not in self.event_labels:
                     self.event_labels[key] = i
+                    self.migration_pathways[i] = neighbor.coords - site.coords 
                     i += 1
                     
         # Events corresponding to migrations + superbasin migration (+1) + generation (+1)
         self.num_event = len(self.event_labels) + 2
+        
+        
+        solve_Poisson = self.poissonSolver_parameters[4]
+        
+        # The electric field break the symmetry in migration of atoms
+        # Each migration pathway needs their own activation energy
+        if solve_Poisson: #and platform.system() == 'Linux':
+            
+            Act_E_mig = {}
+            Act_E_gen = self.activation_energies[0]
+            Act_E_binding = self.activation_energies[-2]
+            Act_E_CN_contr = self.activation_energies[-1]
+            
+            for key,migration_vector in self.migration_pathways.items():
+                z_component = migration_vector[2]
+                # Migration in plane
+                if np.isclose(z_component, 0.0, atol=1e-9):
+                    Act_E_mig[key] = self.activation_energies[1]
+                # Migration upward
+                elif z_component > 0:
+                    Act_E_mig[key] = self.activation_energies[2]
+                # Migration downward
+                elif z_component < 0:
+                    Act_E_mig[key] = self.activation_energies[3]
+                    
+            self.activation_energies = [Act_E_gen,Act_E_mig,Act_E_binding,Act_E_CN_contr]
+            
+    def crystal_grid(self,grid_crystal,radius_neighbors,mode,affected_site,use_parallel=None):
+        
+        self.initialize_migration_pathways(radius_neighbors)
+
         
         if grid_crystal == None:
             # Set default parallelization based on system size and cores

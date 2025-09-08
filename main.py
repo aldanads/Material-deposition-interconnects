@@ -24,7 +24,7 @@ lammps_file = True
 
 
 
-for n_sim in range(3,4):
+for n_sim in range(4,5):
     
     System_state,rng,paths,Results = initialization(n_sim,save_data,lammps_file)
 

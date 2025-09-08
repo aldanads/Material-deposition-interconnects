@@ -79,7 +79,7 @@ def initialization(n_sim,save_data,lammps_file):
 # =============================================================================
         material_selection = {"Ni":"mp-23","Cu":"mp-30", "Pd": "mp-2","Ag":"mp-124","Pt":"mp-126","Au":"mp-81", "PbZrO3":"mp-1068577"}
         id_material_Material_Project = material_selection['Au']
-        crystal_size = (50,50,50) # (angstrom (Å))
+        crystal_size = (20,20,20) # (angstrom (Å))
         orientation = ['001','111']
         use_parallel = None
         facets_type = [(1,1,1),(1,0,0)]
@@ -326,7 +326,7 @@ def initialization(n_sim,save_data,lammps_file):
         technologies = ['ECM','PZT']
         techonology = technologies[0]
         id_material_Material_Project = material_selection["CeO2"]
-        crystal_size = (50,50,50) # (angstrom (Å))
+        crystal_size = (20,20,20) # (angstrom (Å))
         orientation = ['001']
         use_parallel = None
         facets_type = None
