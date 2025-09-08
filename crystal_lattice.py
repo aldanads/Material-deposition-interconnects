@@ -299,7 +299,8 @@ class Crystal_Lattice():
                            - np.array(self.get_idx_coords(site.coords, self.basis_vectors)))
                 if key not in self.event_labels:
                     self.event_labels[key] = i
-                    self.migration_pathways[i] = neighbor.coords - site.coords 
+                    vector = neighbor.coords - site.coords
+                    self.migration_pathways[i] = vector / np.linalg.norm(vector) 
                     i += 1
                     
         # Events corresponding to migrations + superbasin migration (+1) + generation (+1)
