@@ -24,7 +24,7 @@ lammps_file = True
 
 
 
-for n_sim in range(0,1):
+for n_sim in range(3,4):
     
     System_state,rng,paths,Results = initialization(n_sim,save_data,lammps_file)
 
@@ -189,6 +189,7 @@ for n_sim in range(0,1):
             
             poisson_solve_frequency = System_state.poissonSolver_parameters[3]  # Solve Poisson every N KMC steps
             
+            
         else:
             rank = 0
         
@@ -224,21 +225,26 @@ for n_sim in range(0,1):
 
                     uh = poisson_solver.solve(charge_locations,charges,epsilon_r)
                     
+                    poisson_solver.save_potential(uh,j+1, paths["results"] / "Electric_potential_results")
+                    
                     if rank == 0:
                         # Update System_state based on electric field
                         
-                        print(f"Poisson solved at step{i}")
+                        print(f"Poisson solved at step {i}")
                     
                 except Exception as e:
                     if rank == 0:
                         print(f"Poisson solver failed at step {i}: {e}")
                  
-            # Continue with serial processing on rank 0
-            if rank == 0:
-                if i%snapshoots_steps== 0:
-    
+
+            if i%snapshoots_steps== 0:
+            
+                j+=1
+                # Continue with serial processing on rank 0
+                if rank == 0:
                     System_state.add_time()
-                    j+=1
+
+                    
                     # System_state.measurements_crystal()
                     print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',System_state.list_time[-1])
                     end_time = time.time()
@@ -248,6 +254,10 @@ for n_sim in range(0,1):
                         #                               System_state.surf_roughness_RMS,end_time-starting_time)
                         
                     System_state.plot_crystal(45,45,paths['data'],j)
+                    
+                    
+                    
+                      
 
 
     if rank == 0:
@@ -257,6 +267,9 @@ for n_sim in range(0,1):
       variables = {'System_state' : System_state}
       filename = 'variables'
       if save_data: save_variables(paths['program'],variables,filename)
+    
+        
+
     
     # return System_state
 

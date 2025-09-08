@@ -423,23 +423,29 @@ class PoissonSolver():
       return E_values * 1e10 # Units: V/m
         
         
-    def save_solution(self, uh, output_folder="results", filename="solution.vtu"):
+    def save_potential(self, uh, time_step, output_folder="Electric_potential_results", base_filename="E_potential", save_CSV = False):
     
       """
-      Save the solution to a file in VTK format.
+      Save the electric potential at each time step
       """
       results_folder = Path(output_folder)
       results_folder.mkdir(exist_ok=True, parents=True)
       
-      filename = results_folder / filename
-      with VTXWriter(self.domain.comm, filename, uh) as vtx:
-        vtx.write(0.0)
+      # Name for ParaView
+      uh.name = "ElectricPotential"
+      
+      #Save electric field with time step and time value
+      filename = results_folder / f"{base_filename}_{time_step:04d}.bp"
+      with VTXWriter(self.domain.comm, filename, [uh]) as vtx:
+        vtx.write(time_step)
         
-      # Save mesh coordinates and function values to CSV
-      mesh_coordinates = self.domain.geometry.x
-      function_values = uh.x.array
-      data =  np.column_stack((mesh_coordinates, function_values))
-      np.savetxt(results_folder / "fundamentals.csv", data, delimiter=",", header="x,y,z,value", comments="")
+      
+      if save_CSV == True:
+        # Save mesh coordinates and function values to CSV
+        mesh_coordinates = self.domain.geometry.x
+        function_values = uh.x.array
+        data =  np.column_stack((mesh_coordinates, function_values))
+        np.savetxt(results_folder / "fundamentals.csv", data, delimiter=",", header="x,y,z,value", comments="")
       
         
         
