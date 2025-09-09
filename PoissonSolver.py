@@ -9,7 +9,9 @@ from mpi4py import MPI
 
 import ufl
 import numpy as np
+import json
 from pathlib import Path
+
 from dolfinx import mesh, fem, default_scalar_type, io, geometry
 from dolfinx.fem import functionspace
 from dolfinx.fem.petsc import LinearProblem
@@ -83,6 +85,11 @@ class PoissonSolver():
         self.bcs = []
         
         self.previous_solution = None
+        
+        # vtx_writer to save the solution
+        self.xdmf_writer = None
+        self.path_results_folder = kwargs.get("path_results", "")
+        self._setup_time_series_output(output_folder="Electric_potential_results")
         
     def _load_mesh(self):
         """
@@ -421,23 +428,28 @@ class PoissonSolver():
       E_values = E_field.eval(points_on_proc, cells) # Units: V/A
       
       return E_values * 1e10 # Units: V/m
-        
-        
-    def save_potential(self, uh, time_step, output_folder="Electric_potential_results", base_filename="E_potential", save_CSV = False):
-    
-      """
-      Save the electric potential at each time step
-      """
-      results_folder = Path(output_folder)
+      
+      
+    def _setup_time_series_output(self,output_folder="Electric_potential_results"):
+      """Call this at the beginning"""
+      results_folder = self.path_results_folder / output_folder
       results_folder.mkdir(exist_ok=True, parents=True)
+      
+      self.filename = results_folder / "E_potential"
+      
+      self.timestep_info = []
+        
+        
+    def save_potential(self, uh, time_value, time_step, save_CSV = False):
       
       # Name for ParaView
       uh.name = "ElectricPotential"
       
-      #Save electric field with time step and time value
-      filename = results_folder / f"{base_filename}_{time_step:04d}.bp"
-      with VTXWriter(self.domain.comm, filename, [uh]) as vtx:
-        vtx.write(time_step)
+      filename = f"{self.filename}_{time_step:04d}.vtu" 
+      
+      with io.VTKFile(self.domain.comm,filename,"w") as vtk:
+        vtk.write_function(uh)
+        
         
       
       if save_CSV == True:
@@ -446,7 +458,6 @@ class PoissonSolver():
         function_values = uh.x.array
         data =  np.column_stack((mesh_coordinates, function_values))
         np.savetxt(results_folder / "fundamentals.csv", data, delimiter=",", header="x,y,z,value", comments="")
-      
         
         
-
+        

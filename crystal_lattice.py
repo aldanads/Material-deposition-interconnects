@@ -322,7 +322,7 @@ class Crystal_Lattice():
                 z_component = migration_vector[2]
                 # Migration in plane
                 if np.isclose(z_component, 0.0, atol=1e-9):
-                    Act_E_mig[key] = self.activation_energies[1]
+                    Act_E_mig[key] = self.activation_energies[1] 
                 # Migration upward
                 elif z_component > 0:
                     Act_E_mig[key] = self.activation_energies[2]

@@ -326,7 +326,7 @@ def initialization(n_sim,save_data,lammps_file):
         technologies = ['ECM','PZT']
         techonology = technologies[0]
         id_material_Material_Project = material_selection["CeO2"]
-        crystal_size = (20,20,20) # (angstrom (Å))
+        crystal_size = (50,50,50) # (angstrom (Å))
         orientation = ['001']
         use_parallel = None
         facets_type = None
@@ -385,7 +385,7 @@ def initialization(n_sim,save_data,lammps_file):
         epsilon_r = 23  # Dielectric constant (adjust for your material)
         e_charge = 1.602e-19  # Elementary charge in Coulombs
         
-        poisson_solve_frequency = 100  # Solve Poisson every N KMC steps
+        poisson_solve_frequency = int(2e2)  # Solve Poisson every N KMC steps
         
         solve_Poisson = True
         

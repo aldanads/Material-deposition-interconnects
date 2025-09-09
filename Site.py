@@ -288,6 +288,7 @@ class Site():
         else:
             
             new_site_events = []
+            Act_E_mig = self.Act_E_list[1]
     
             # Plane migrations
             for site_idx, num_event in self.migration_paths['Plane']:
@@ -297,8 +298,7 @@ class Site():
                     energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                     energy_change = max(energy_site_destiny - self.energy_site, 0)
                     
-                    new_site_events.append([site_idx, num_event, self.Act_E_list[1] + energy_change])
-                    
+                    new_site_events.append([site_idx, num_event, Act_E_mig[num_event] + energy_change])
             # Upward migrations
             for site_idx, num_event in self.migration_paths['Up']:
                 if site_idx not in self.supp_by:
@@ -306,8 +306,8 @@ class Site():
                     energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                     energy_change = max(energy_site_destiny - self.energy_site, 0)
 
-                    new_site_events.append([site_idx, num_event, self.Act_E_list[2] + energy_change])
-            
+                    new_site_events.append([site_idx, num_event, Act_E_mig[num_event] + energy_change])
+
             # Downward migrations
             for site_idx, num_event in self.migration_paths['Down']:
                 if site_idx not in self.supp_by:
@@ -315,8 +315,7 @@ class Site():
                     energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                     energy_change = max(energy_site_destiny - self.energy_site, 0)
                     
-                    new_site_events.append([site_idx, num_event, self.Act_E_list[3] + energy_change])
-
+                    new_site_events.append([site_idx, num_event, Act_E_mig[num_event] + energy_change])
             self.site_events = new_site_events
 
         

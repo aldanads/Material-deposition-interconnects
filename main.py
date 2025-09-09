@@ -33,7 +33,7 @@ for n_sim in range(4,5):
     System_state.plot_crystal(45,45,paths['data'],0)    
     j = 0
     
-    snapshoots_steps = int(1e2)
+    snapshoots_steps = int(2e2)
     starting_time = time.time()
 # =============================================================================
 #     Deposition
@@ -180,7 +180,7 @@ for n_sim in range(4,5):
 
             
             # Initialize Poisson solver on all MPI ranks
-            poisson_solver = PoissonSolver(mesh_file, structure=System_state.structure)
+            poisson_solver = PoissonSolver(mesh_file, structure=System_state.structure,path_results = paths["results"])
             poisson_solver.set_boundary_conditions(top_value=0.0, bottom_value=0.0)  # Set appropriate BCs
     
             # Parameters for Poisson solver
@@ -192,6 +192,7 @@ for n_sim in range(4,5):
             
         else:
             rank = 0
+            comm = None
         
 
         
@@ -217,15 +218,16 @@ for n_sim in range(4,5):
                 charges = None
             
             # Broadcast charge information to all MPI ranks
-            charge_locations = comm.bcast(charge_locations, root=0)
-            charges = comm.bcast(charges, root=0)
-            
+            if comm != None:
+                charge_locations = comm.bcast(charge_locations, root=0)
+                charges = comm.bcast(charges, root=0)
+                
             if platform.system() == 'Linux' and solve_Poisson and charges is not None and len(charges) > 0 and i%poisson_solve_frequency == 0:
                 try: 
 
                     uh = poisson_solver.solve(charge_locations,charges,epsilon_r)
                     
-                    poisson_solver.save_potential(uh,j+1, paths["results"] / "Electric_potential_results")
+                    poisson_solver.save_potential(uh,System_state.time,j+1)
                     
                     if rank == 0:
                         # Update System_state based on electric field
@@ -256,8 +258,7 @@ for n_sim in range(4,5):
                     System_state.plot_crystal(45,45,paths['data'],j)
                     
                     
-                    
-                      
+                          
 
 
     if rank == 0:
