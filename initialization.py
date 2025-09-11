@@ -98,7 +98,7 @@ def initialization(n_sim,save_data,lammps_file):
             config = json.load(config_file)
             api_key = config['api_key']
         
-        mpr = MPRester(api_key)
+
         # Retrieve material data
         with MPRester(api_key) as mpr:
             # Retrieve material summary information
@@ -350,7 +350,7 @@ def initialization(n_sim,save_data,lammps_file):
             config = json.load(config_file)
             api_key = config['api_key']
         
-        mpr = MPRester(api_key)
+
         # Retrieve material data
         with MPRester(api_key) as mpr:
             # Retrieve material summary information
@@ -382,14 +382,48 @@ def initialization(n_sim,save_data,lammps_file):
         mesh_file = formula + "_" + str(int(max(crystal_size) / 10)) + "nm" + "_mesh.msh"  # Adjust filename as needed
         
         # Parameters for Poisson solver
-        epsilon_r = 23  # Dielectric constant (adjust for your material)
-        e_charge = 1.602e-19  # Elementary charge in Coulombs
-        
-        poisson_solve_frequency = int(2e2)  # Solve Poisson every N KMC steps
+
+
+        active_dipoles = 4
+        poisson_solve_frequency = int(1e0)  # Solve Poisson every N KMC steps
         
         solve_Poisson = True
+        save_Poisson = False
         
-        poissonSolver_parameters = [mesh_file,epsilon_r,e_charge,poisson_solve_frequency,solve_Poisson]
+
+        
+        # Extract data from Materials Project
+        with MPRester(api_key) as mpr:
+            # Get the material with chemenv data specifically: chemical environment: valence, local symmetry
+            material_data = mpr.materials.chemenv.search(material_ids=[id_material_Material_Project])
+            dielectric_data = mpr.materials.dielectric.search(material_ids=[id_material_Material_Project])
+        
+        chem_env_symmetry = material_data[0].chemenv_name[0]
+        metal_valence = material_data[0].valences[0]
+        
+        # Bond lengths
+        central_atom = material_data[0].mol_from_site_environments[0][0]
+        d_metal_O = central_atom.distance(material_data[0].mol_from_site_environments[0][1])
+        
+        # Dielectric constant
+        epsilon_r = dielectric_data[0].e_total
+        try:
+            if dielectric_data and len(dielectric_data) > 0 and hasattr(dielectric_data[0], 'e_total'):
+                epsilon_r = dielectric_data[0].e_total
+            else:
+                warnings.warn("No dielectric data available for this material. Using manual-introduced value.")
+                epsilon_r = 23
+        except (IndexError, AttributeError) as e:
+            warnings.warn(f"Could not extract dielectric constant: {e}. Using manual-introduced value.")
+            epsilon_r = 23
+            
+            
+
+        poissonSolver_parameters = {'mesh_file':mesh_file,
+                                    'epsilon_r':epsilon_r,'chem_env_symmetry':chem_env_symmetry,'metal_valence':metal_valence,'d_metal_O':d_metal_O,'active_dipoles':active_dipoles,
+                                    'poisson_solve_frequency':poisson_solve_frequency,'solve_Poisson':solve_Poisson,'save_Poisson':save_Poisson
+        
+        }
         
         
         # =============================================================================
@@ -448,7 +482,8 @@ def initialization(n_sim,save_data,lammps_file):
         #     
         # =============================================================================
         P = 0.0
-        System_state.defect_gen(rng,P)
+        #System_state.defect_gen(rng,P)
+        System_state.deposition_specie(0,rng,test = 1)
         
         # This timestep_limits will depend on the V/s ratio
         System_state.timestep_limits = float('inf')

@@ -28,7 +28,7 @@ from scipy.constants import epsilon_0
 
 class PoissonSolver():
     
-    def __init__(self,mesh_file, structure = None, **kwargs):
+    def __init__(self,mesh_file,poissonSolver_parameters, structure = None, **kwargs):
         
         """
         Initialize the Poisson solver with a mesh file and the structure.
@@ -59,6 +59,10 @@ class PoissonSolver():
         self.mesh_size = kwargs.get("mesh_size",2.0)
         self.epsilon_gc = kwargs.get("epsilon_gaussian_charge",2)
         
+        # Poisson parameters
+        self.poissonSolver_parameters = poissonSolver_parameters
+        self._calculate_dipole_moment()
+        
         """
         Generate a mesh if the mesh file does not exist.
         """
@@ -72,6 +76,7 @@ class PoissonSolver():
             
         # Load the mesh
         self.domain, self.cell_markers, self.facet_markers = self._load_mesh()
+
         # Example: V ('Lagrange',1) are functions defined in domain, continuous (because Lagrange elements enforce continuity) and degree 1
         self.V = functionspace(self.domain, ('Lagrange',1))
         # Create vector function space for electric field evaluation
@@ -84,6 +89,7 @@ class PoissonSolver():
         self.domain.topology.create_connectivity(self.fdim,self.tdim) # Create connectivity between facets and cells
         self.bcs = []
         
+        # Initialize the previous solution for recurrent solution of the Poisson equation
         self.previous_solution = None
         
         # vtx_writer to save the solution
@@ -91,11 +97,23 @@ class PoissonSolver():
         self.path_results_folder = kwargs.get("path_results", "")
         self._setup_time_series_output(output_folder="Electric_potential_results")
         
+        
+        
+        
+        
     def _load_mesh(self):
         """
         Load the mesh from the gmsh file.
         """
-        return gmshio.read_from_msh(str(self.mesh_file), MPI.COMM_WORLD, self.gmsh_model_rank, gdim=self.gdim)
+        
+        # All processes load the mesh
+        domain, cell_markers, facet_markers = gmshio.read_from_msh(
+        str(self.mesh_file), MPI.COMM_WORLD, self.gmsh_model_rank, gdim=self.gdim
+        )
+        
+        # Synchronization point for debugging
+        MPI.COMM_WORLD.Barrier()
+        return domain, cell_markers, facet_markers
         
     def generate_mesh(self, structure):
         """
@@ -301,7 +319,7 @@ class PoissonSolver():
         
         
         
-    def solve(self, charge_locations, charges, epsilon_r, charge_err_tol = 2):
+    def solve(self, charge_locations, charges, charge_err_tol = 2):
         """
         Solve the Poisson equation with the given charge locations and magnitudes.
         """
@@ -334,6 +352,7 @@ class PoissonSolver():
         
         L = V * m
         """
+        epsilon_r = self.poissonSolver_parameters['epsilon_r']
         L = (rho / (epsilon_0 * epsilon_r)) * v * ufl.dx
         
         # Assemble matrix and vector
@@ -391,43 +410,95 @@ class PoissonSolver():
       # Compute gradient expression (E = -?V)
       E_expr =  -ufl.grad(uh)
       
-      # For electric field, we need to compute the gradient
-      # Create a vector function to store the gradient
-      E_field = fem.Function(self.V_vec)
       
-      # Create expression for evaluation at points
-      expr = fem.Expression(E_expr, self.V_vec.element.interpolation_points())
-      
-      E_field.interpolate(expr)
+      if not hasattr(self,'_E_field_cache') or self._last_uh_id != id(uh):
+        # For electric field, we need to compute the gradient
+        # Create a vector function to store the gradient
+        self._E_field_cache = fem.Function(self.V_vec)
+        # Create expression for evaluation at points
+        expr = fem.Expression(E_expr, self.V_vec.element.interpolation_points()) 
+        self._E_field_cache.interpolate(expr)
+        self._last_uh_id = id(uh)
+        
+      E_field = self._E_field_cache
       
       # Convert points to numpy array with correct dtype
       points_array = np.asarray(points,dtype=np.float64)
       if points_array.ndim == 1:
         points_array = points_array.reshape(1, -1)
         
-      # Find the correct cell for each point
-      bb_tree = geometry.bb_tree(self.domain, self.domain.topology.dim)
+      if not hasattr(self, '_bb_tree_cache'):
+        # Find the correct cell for each point
+        bb_tree = geometry.bb_tree(self.domain, self.domain.topology.dim)
+        
       # Find cells whose bounding-box collide with the points
       cell_candidates = geometry.compute_collisions_points(bb_tree,points_array)
       # Choose one of the cells that contains the point
       colliding_cells = geometry.compute_colliding_cells(self.domain, cell_candidates, points_array)
       
+      # Initialize result array for all points
+      num_points = len(points_array)
+      E_values_global = np.zeros((num_points, 3), dtype=np.float64)
+      
       # Collect points and corresponding cells
-      cells = []
+      local_cells = []
       points_on_proc = []
+      local_idx = []
       
       for i, point in enumerate(points_array):
         
         if len(colliding_cells.links(i)) > 0:
           points_on_proc.append(point)
-          cells.append(colliding_cells.links(i)[0])
+          local_cells.append(colliding_cells.links(i)[0])
+          local_idx.append(i)
         
-
-      points_on_proc = np.array(points_on_proc, dtype = np.float64)
-      # Evaluate expression at all points at once
-      E_values = E_field.eval(points_on_proc, cells) # Units: V/A
+      if len(points_on_proc) > 0:
+        points_on_proc = np.array(points_on_proc, dtype = np.float64)
+        # Evaluate expression at all points at once
+        E_local = E_field.eval(points_on_proc, local_cells) # Units: V/≈
+        
+        for j, global_idx in enumerate(local_idx):
+          E_values_global[global_idx] = E_local[j]
+          
+      # Communicate results across all MPI processes
+      # Each point is evaluated by exactly one process, so we sum the results
+      E_values_global = MPI.COMM_WORLD.allreduce(E_values_global, op=MPI.SUM)
+             
+      return E_values_global * 1e10 * self.bond_polarization_factor # Units: V/m
       
-      return E_values * 1e10 # Units: V/m
+
+      
+    def _calculate_dipole_moment(self):
+    
+      """
+      Padovani, A., Larcher, L., Pirrotta, O., Vandelli, L., & Bersuker, G. (2015). 
+      Microscopic modeling of HfO x RRAM operations: From forming to switching. 
+      IEEE Transactions on electron devices, 62(6), 1998-2006.
+    
+      McPherson, J. W., & Mogul, H. C. (1998). Underlying physics of the thermochemical 
+      E model in describing low-field time-dependent dielectric       
+      breakdown in SiO 2 thin films. Journal of Applied Physics, 84(3), 1513-1523.
+      
+      
+      
+      ************* Formula for dielectric moment: *******************
+      McPherson, J., J. Y. Kim, A. Shanware, and H. Mogul. "Thermochemical description 
+      of dielectric breakdown in high dielectric constant              
+      materials." Applied Physics Letters 82, no. 13 (2003): 2121-2123.
+      """
+      # Dipole moment: Units (e≈); 1D = Debye	ò 0.2081943 e∑≈ (large dipole moment is around 11D)
+      # Dipole moment: Units (enm)
+      L = {'Tetrahedron': 1/3, 'Octahedron': 1, 'Trigonal': np.sqrt(2/3), 'Cube': np.sqrt(1/3), 'Disheptahedral': np.sqrt(2/3), 'Cuboctahedral': np.sqrt(1/3)}
+      
+      metal_valence = self.poissonSolver_parameters['metal_valence'] # Metal valence
+      d_metal_O = self.poissonSolver_parameters['d_metal_O'] #Units: ≈
+      chem_env_symmetry = self.poissonSolver_parameters['chem_env_symmetry'] # Symmetry in the local environment (molecule)
+      active_dipoles = self.poissonSolver_parameters['active_dipoles']
+      epsilon_r = self.poissonSolver_parameters['epsilon_r']
+      
+      dipole_moment = active_dipoles * (metal_valence / 2) * d_metal_O * L[chem_env_symmetry]
+      
+      self.bond_polarization_factor = ((2+epsilon_r) / 3) * dipole_moment
       
       
     def _setup_time_series_output(self,output_folder="Electric_potential_results"):

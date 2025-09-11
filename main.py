@@ -33,7 +33,7 @@ for n_sim in range(4,5):
     System_state.plot_crystal(45,45,paths['data'],0)    
     j = 0
     
-    snapshoots_steps = int(2e2)
+    snapshoots_steps = int(1e0)
     starting_time = time.time()
 # =============================================================================
 #     Deposition
@@ -165,7 +165,8 @@ for n_sim in range(4,5):
                 
     elif System_state.experiment == 'ECM memristor':
         
-        solve_Poisson = System_state.poissonSolver_parameters[4]
+        solve_Poisson = System_state.poissonSolver_parameters['solve_Poisson']
+        save_Poisson = System_state.poissonSolver_parameters['save_Poisson']
    
         # Dolfinx only works in Linux
         if solve_Poisson and platform.system() == 'Linux':
@@ -175,19 +176,13 @@ for n_sim in range(4,5):
             comm = MPI.COMM_WORLD
             rank = comm.Get_rank()
             
-            mesh_file = System_state.poissonSolver_parameters[0]
-            
-
+            mesh_file = System_state.poissonSolver_parameters['mesh_file']
             
             # Initialize Poisson solver on all MPI ranks
-            poisson_solver = PoissonSolver(mesh_file, structure=System_state.structure,path_results = paths["results"])
+            poisson_solver = PoissonSolver(mesh_file,System_state.poissonSolver_parameters, structure=System_state.structure,path_results = paths["results"])
             poisson_solver.set_boundary_conditions(top_value=0.0, bottom_value=0.0)  # Set appropriate BCs
-    
-            # Parameters for Poisson solver
-            epsilon_r = System_state.poissonSolver_parameters[1]  # Dielectric constant
-            e_charge = System_state.poissonSolver_parameters[2]  # Elementary charge in Coulombs
             
-            poisson_solve_frequency = System_state.poissonSolver_parameters[3]  # Solve Poisson every N KMC steps
+            poisson_solve_frequency = System_state.poissonSolver_parameters['poisson_solve_frequency']  # Solve Poisson every N KMC steps
             
             
         else:
@@ -197,7 +192,8 @@ for n_sim in range(4,5):
 
         
         i = 0
-        total_steps = int(1e4)
+        #total_steps = int(1e4)
+        total_steps = int(1e1)
         # list_sites_occu = []
         
 
@@ -218,15 +214,22 @@ for n_sim in range(4,5):
                 charges = None
             
             # Broadcast charge information to all MPI ranks
-            if comm != None:
+            if comm is not None:
                 charge_locations = comm.bcast(charge_locations, root=0)
                 charges = comm.bcast(charges, root=0)
                 
-            if platform.system() == 'Linux' and solve_Poisson and charges is not None and len(charges) > 0 and i%poisson_solve_frequency == 0:
+            if solve_Poisson and platform.system() == 'Linux': 
+            
+              should_solve_poisson = (charges is not None and len(charges) > 0 and i%poisson_solve_frequency == 0)
+              
+              if should_solve_poisson:
                 try: 
-
-                    uh = poisson_solver.solve(charge_locations,charges,epsilon_r)
+                    uh = poisson_solver.solve(charge_locations,charges)
+                    E_loc_field = poisson_solver.evaluate_electric_field_at_points(uh,charge_locations)
                     
+                    print('Charge locations:', charge_locations)
+                    print('Local field: ', E_loc_field)
+        
                     poisson_solver.save_potential(uh,System_state.time,j+1)
                     
                     if rank == 0:
@@ -237,6 +240,10 @@ for n_sim in range(4,5):
                 except Exception as e:
                     if rank == 0:
                         print(f"Poisson solver failed at step {i}: {e}")
+                        
+            # Synchronize before continuing
+            if comm is not None:
+              comm.Barrier()
                  
 
             if i%snapshoots_steps== 0:
@@ -246,7 +253,6 @@ for n_sim in range(4,5):
                 if rank == 0:
                     System_state.add_time()
 
-                    
                     # System_state.measurements_crystal()
                     print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',System_state.list_time[-1])
                     end_time = time.time()

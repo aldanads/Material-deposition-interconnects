@@ -307,7 +307,7 @@ class Crystal_Lattice():
         self.num_event = len(self.event_labels) + 2
         
         
-        solve_Poisson = self.poissonSolver_parameters[4]
+        solve_Poisson = self.poissonSolver_parameters['solve_Poisson']
         
         # The electric field break the symmetry in migration of atoms
         # Each migration pathway needs their own activation energy
@@ -450,11 +450,10 @@ class Crystal_Lattice():
         """
         charge_locations = []
         charges = []
-        e_charge = self.poissonSolver_parameters[2]
         
         for site in self.sites_occupied:
             charge_locations.append(self.grid_crystal[site].position)
-            charges.append(1* e_charge)
+            charges.append(1* constants.e)
             
         return np.array(charge_locations,dtype=np.float64), np.array(charges, dtype=np.float64)
             
@@ -724,8 +723,11 @@ class Crystal_Lattice():
         # Single particle in a determined place
         elif test == 1:
             
-            if self.latt_orientation == '001': idx = (3,2,-2)
-            elif self.latt_orientation == '111': idx = (1,11,-12)
+            for idx,site in self.grid_crystal.items():
+              if ((self.crystal_size[0] * 0.45 < site.position[0] < self.crystal_size[0] * 0.55) 
+                and (self.crystal_size[1] * 0.45 < site.position[1] < self.crystal_size[1] * 0.55)
+                and (self.crystal_size[2] * 0.45 < site.position[2] < self.crystal_size[2] * 0.55)): 
+                break 
                 
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
