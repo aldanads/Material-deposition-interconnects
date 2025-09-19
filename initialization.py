@@ -24,9 +24,9 @@ import time
 
 def initialization(n_sim,save_data,lammps_file):
     
-    # seed = 1
+    seed = 1
     # Random seed as time
-    rng = np.random.default_rng() # Random Number Generator (RNG) object
+    rng = np.random.default_rng(seed) # Random Number Generator (RNG) object
 
     # Default resolution for figures
     plt.rcParams["figure.dpi"] = 100 # Default value of dpi = 300
@@ -382,8 +382,6 @@ def initialization(n_sim,save_data,lammps_file):
         mesh_file = formula + "_" + str(int(max(crystal_size) / 10)) + "nm" + "_mesh.msh"  # Adjust filename as needed
         
         # Parameters for Poisson solver
-
-
         active_dipoles = 4
         poisson_solve_frequency = int(1e0)  # Solve Poisson every N KMC steps
         

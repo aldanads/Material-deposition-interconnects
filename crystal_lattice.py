@@ -451,9 +451,19 @@ class Crystal_Lattice():
         charge_locations = []
         charges = []
         
+        """
+        The device is globally neutral. Charged ions + electrons
+        The cloud of electrons forms a screening for the electric field
+        
+        Debye length:
+        There is a distance from a charged particle beyond which its electrostatic influence 
+        is effectively blocked due to the redistribution of neighboring charges
+        """
+        screening_factor = 0.018
+        
         for site in self.sites_occupied:
             charge_locations.append(self.grid_crystal[site].position)
-            charges.append(1* constants.e)
+            charges.append(1* constants.e * screening_factor)
             
         return np.array(charge_locations,dtype=np.float64), np.array(charges, dtype=np.float64)
             
@@ -743,37 +753,23 @@ class Crystal_Lattice():
         # Single particle introduced and removed
         elif test == 2:
             
-            if self.latt_orientation == '001': idx = (3,2,-2)
-            elif self.latt_orientation == '111': idx = (1,11,-12)
+            for idx,site in self.grid_crystal.items():
+              if ((self.crystal_size[0] * 0.45 < site.position[0] < self.crystal_size[0] * 0.55) 
+                and (self.crystal_size[1] * 0.45 < site.position[1] < self.crystal_size[1] * 0.55)
+                and (self.crystal_size[2] * 0.45 < site.position[2] < self.crystal_size[2] * 0.55)): 
+                break
             
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
             # Update sites availables, the support to each site and available migrations
             self.update_sites(update_specie_events,update_supp_av)
-                 
-            print('Particle in position: ',idx, ' is a ', self.grid_crystal[idx].chemical_specie)
-            print('Neighbors of that particle: ', self.grid_crystal[idx].nearest_neighbors_idx)
-            print('Neighbors are supported by: ')
-            for idx_3 in self.grid_crystal[idx].nearest_neighbors_idx:
-                print(self.grid_crystal[idx_3].supp_by)
-                
-            print('Sites occupied: ', self.sites_occupied)
-            print('Number of sites availables: ', len(self.adsorption_sites))
-            print('Possible events: ', self.grid_crystal[idx].site_events)
-            # Remove particle
-            update_specie_events,update_supp_av = self.remove_specie_site(idx,update_specie_events,update_supp_av)
+            
+            neighbor = self.grid_crystal[idx].migration_paths['Plane'][0]
+            # Introduce specie in the neighbor site
+            update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
             # Update sites availables, the support to each site and available migrations
             self.update_sites(update_specie_events,update_supp_av)
                  
-            print('Particle in position: ',idx, ' is a ', self.grid_crystal[idx].chemical_specie)
-            print('Neighbors of that particle: ', self.grid_crystal[idx].nearest_neighbors_idx)
-            print('Neighbors are supported by: ')
-            for idx_3 in self.grid_crystal[idx].nearest_neighbors_idx:
-                print(self.grid_crystal[idx_3].supp_by)
-                
-            print('Sites occupied: ', self.sites_occupied)
-            print('Number of sites availables: ', len(self.adsorption_sites))
-            print('Possible events: ', self.grid_crystal[idx].site_events)
 
         # Introduce two adjacent particles
         elif test == 3:

@@ -223,23 +223,52 @@ for n_sim in range(4,5):
               should_solve_poisson = (charges is not None and len(charges) > 0 and i%poisson_solve_frequency == 0)
               
               if should_solve_poisson:
-                try: 
-                    uh = poisson_solver.solve(charge_locations,charges)
-                    E_loc_field = poisson_solver.evaluate_electric_field_at_points(uh,charge_locations)
+                #try: 
+                
                     
-                    print('Charge locations:', charge_locations)
-                    print('Local field: ', E_loc_field)
+                    
+                    #uh = poisson_solver.solve(charge_locations,charges)
+                    run_start_time = MPI.Wtime()
+                    uh = poisson_solver.test_point_charge_analytical(charge_locations,charges)
+                    run_time = MPI.Wtime() - run_start_time
+                    
+                    if rank == 0: print(f'Run time to solve Poisson: {run_time}')
+                    """
+                    Testing electric field
+                    
+                    original_points = charge_locations[0]
+                    
+                    # Create shifted points
+                    shift = System_state.basis_vectors[2][2] * 1  # or whatever shift value you want
+                    above_points = original_points + [0, 0, shift * 2]
+                    below_points = original_points - [0, 0, shift * 2]
+                    
+                    
+                    # Combine all points into a single 2D array
+                    #charge_locations = np.vstack([original_points, above_points, below_points,original_points_2,above_points_2,below_points_2])
+                    test_points = np.vstack([original_points, above_points, below_points])
+                   
+                    Finish testing
+                    """
+                    
+                    #E_loc_field = poisson_solver.evaluate_electric_field_at_points(uh,charge_locations)
         
                     poisson_solver.save_potential(uh,System_state.time,j+1)
                     
                     if rank == 0:
-                        # Update System_state based on electric field
-                        
-                        print(f"Poisson solved at step {i}")
                     
-                except Exception as e:
-                    if rank == 0:
-                        print(f"Poisson solver failed at step {i}: {e}")
+                    
+                      #print('Charge locations:', charge_locations)
+                      #print('Local field: ', E_loc_field)
+                    
+                      
+                      # Update System_state based on electric field
+                        
+                      print(f"Poisson solved at step {i}")
+                    
+                #except Exception as e:
+                #    if rank == 0:
+                #        print(f"Poisson solver failed at step {i}: {e}")
                         
             # Synchronize before continuing
             if comm is not None:

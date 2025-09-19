@@ -24,7 +24,7 @@ from dolfinx.fem.petsc import assemble_matrix, assemble_vector
 from dolfinx import la
 import petsc4py.PETSc as PETSc
 
-from scipy.constants import epsilon_0
+from scipy.constants import epsilon_0,e
 
 class PoissonSolver():
     
@@ -56,27 +56,49 @@ class PoissonSolver():
         self.gmsh_model_rank = kwargs.get("gmsh_model_rank", 0)
         self.gdim = kwargs.get("gdim",3)
         self.padding = kwargs.get("bounding_box_padding",5.0)
-        self.mesh_size = kwargs.get("mesh_size",2.0)
-        self.epsilon_gc = kwargs.get("epsilon_gaussian_charge",2)
+        self.mesh_size = kwargs.get("mesh_size",0.8) #(�)
+        self.epsilon_gc = kwargs.get("epsilon_gaussian_charge",1) #(�)
+        # Set parameters for mesh refinement
+        self.active_mesh_refinement = kwargs.get("activate_mesh_refinement",True)
+        if self.active_mesh_refinement:
+          self.fine_mesh_size = kwargs.get("fine_mesh_size",0.5) #(�)
+          self.refinement_radius = kwargs.get("refinement_radius",1) #(�)
         
         # Poisson parameters
         self.poissonSolver_parameters = poissonSolver_parameters
         self._calculate_dipole_moment()
         
+        mesh_folder = Path("mesh")
+        self.mesh_file = mesh_folder / mesh_file
         """
         Generate a mesh if the mesh file does not exist.
         """
-        mesh_folder = Path("mesh")
-        mesh_folder.mkdir(parents=True, exist_ok=True)  # Create 'mesh' folder if it doesn't exist
-        self.mesh_file = mesh_folder / mesh_file
+        if MPI.COMM_WORLD.rank == 0:
+          mesh_folder.mkdir(parents=True, exist_ok=True)  # Create 'mesh' folder if it doesn't exist
 
-        if not self.mesh_file.exists():
+          if not self.mesh_file.exists():
+            print(f'Rank {MPI.COMM_WORLD.rank}: Starting mesh generation')
             self.generate_mesh(structure)
+            print(f'Rank {MPI.COMM_WORLD.rank}: Mesh generation completed')
+                      
+          else:
+            print(f'Rank {MPI.COMM_WORLD.rank}: Using existing mesh file: {self.mesh_file}')
+          
+        else:
+          print(f'Rank {MPI.COMM_WORLD.rank}: Waiting for mesh generation...')
+          
+        # Barrier: All ranks wait until rank 0 finishes mesh generation
+        print(f'Rank {MPI.COMM_WORLD.rank}: Reaching barrier after mesh generation check')
+        MPI.COMM_WORLD.Barrier()
+        print(f'Rank {MPI.COMM_WORLD.rank}: Passed barrier, proceeding to load mesh')
+
             
             
         # Load the mesh
         self.domain, self.cell_markers, self.facet_markers = self._load_mesh()
-
+        # Synchronization point for debugging
+        MPI.COMM_WORLD.Barrier()
+        
         # Example: V ('Lagrange',1) are functions defined in domain, continuous (because Lagrange elements enforce continuity) and degree 1
         self.V = functionspace(self.domain, ('Lagrange',1))
         # Create vector function space for electric field evaluation
@@ -111,73 +133,337 @@ class PoissonSolver():
         str(self.mesh_file), MPI.COMM_WORLD, self.gmsh_model_rank, gdim=self.gdim
         )
         
-        # Synchronization point for debugging
-        MPI.COMM_WORLD.Barrier()
         return domain, cell_markers, facet_markers
         
     def generate_mesh(self, structure):
-        """
-        Generate a mesh using GMSH
-         - structure: structure variable created by Pymatgen
-         - padding: increase margins of the simulation domain (respect to structure)
-         - mesh_size: control the coarsen of the mesh
-        """
-        points = np.array([site.coords for site in structure])
-        gmsh.initialize()
-        gmsh.model.add(self.mesh_file.name)
+          """
+          Generate a mesh using GMSH
+           - structure: structure variable created by Pymatgen
+           - padding: increase margins of the simulation domain (respect to structure)
+           - mesh_size: control the coarsen of the mesh
+          """
         
-        # Add lattice points to the model using OCC - OpenCASCADE (OCC) geometry module
-        point_tags = []
-        for point in points:
-            tag = gmsh.model.occ.addPoint(point[0], point[1], point[2])
-            point_tags.append(tag)
+          points = np.array([site.coords for site in structure])
+          gmsh.initialize()
+          gmsh.model.add(self.mesh_file.name)
+          
+          # Add lattice points to the model using OCC - OpenCASCADE (OCC) geometry module
+          point_tags = []
+          for point in points:
+              tag = gmsh.model.occ.addPoint(point[0], point[1], point[2])
+              point_tags.append(tag)
+              
+          # Create bounding box -> The smallest rectangular (in 2D) or cuboidal (in 3D) volume that fully encloses a given set of objects.
+          # Defined by:
+          # Minimum coordinates (min_coords) → The smallest (𝑥,𝑦,𝑧) values.
+          # Maximum coordinates (max_coords) → The largest (𝑥,𝑦,𝑧) values.
+          min_coords = np.min(points, axis=0) - self.padding
+          max_coords = np.max(points, axis=0) + self.padding
+          box_tag = gmsh.model.occ.addBox(
+              min_coords[0], min_coords[1], min_coords[2], # Start (x, y, z)
+              max_coords[0] - min_coords[0], # Width (x-dimension)
+              max_coords[1] - min_coords[1], # Height (y-dimension)
+              max_coords[2] - min_coords[2] # Depth (z-dimension)
+              )
+          
+          # Synchronizes the OpenCASCADE (OCC) geometry kernel with gmsh model.
+          # Necessary after modifying the geometry (adding points, surfaces, volumes) to recognizes the changes
+          gmsh.model.occ.synchronize()
+          
+          # Embed lattice points (point_tags) into the volume (box_tag)
+          # gmsh.model.mesh.embed(dim, tags, target_dim, target_tag)
+              # dim = 0 → The dimension of the entities being embedded (0 = points).
+              # tags = point_tags → A list of point tags (the points to embed).
+              # target_dim = 3 → The dimension of the target entity (3 = volume).
+              # target_tag = box_tag → The tag of the target volume (where points are embedded).
+          gmsh.model.mesh.embed(0,point_tags,self.gdim,box_tag)
+          
+          # Add physical group for the domain (3D elements)
+          domain_tag = gmsh.model.addPhysicalGroup(self.gdim,[box_tag])
+          gmsh.model.setPhysicalName(self.gdim,domain_tag,"domain")
+          
+          # Add physical group for the boundary (2D elements)
+          # Extract boundary entities (surfaces) of the 3D box -> boundary of 3D volume box_tag
+          boundary_tags = gmsh.model.getBoundary([(self.gdim,box_tag)], oriented = False)
+          # Define physical group -> Surface (dim=2) -> Extract the tags of the surfaces
+          boundary_tag = gmsh.model.addPhysicalGroup(self.gdim-1, [tag for dim, tag, in boundary_tags])
+          gmsh.model.setPhysicalName(self.gdim-1,boundary_tag,"boundary")
+          
+          
+          if self.active_mesh_refinement:
+            print('Starting refinement')
+            self._add_adaptative_refinement(points)
+          else:
+            gmsh.option.setNumber("Mesh.CharacteristicLengthMax",self.mesh_size) # Coarsen globally
             
-        # Create bounding box -> The smallest rectangular (in 2D) or cuboidal (in 3D) volume that fully encloses a given set of objects.
-        # Defined by:
-        # Minimum coordinates (min_coords) → The smallest (𝑥,𝑦,𝑧) values.
-        # Maximum coordinates (max_coords) → The largest (𝑥,𝑦,𝑧) values.
-        min_coords = np.min(points, axis=0) - self.padding
-        max_coords = np.max(points, axis=0) + self.padding
-        box_tag = gmsh.model.occ.addBox(
-            min_coords[0], min_coords[1], min_coords[2], # Start (x, y, z)
-            max_coords[0] - min_coords[0], # Width (x-dimension)
-            max_coords[1] - min_coords[1], # Height (y-dimension)
-            max_coords[2] - min_coords[2] # Depth (z-dimension)
-            )
+          # Generate a coarse mesh
+          gmsh.option.setNumber("Mesh.Algorithm3D", 1) # Frontal-Delaunay (for efficiency)
+          
+          gmsh.model.mesh.generate(self.gdim)
+          
+          # Verify mesh quality
+          self._verify_mesh_quality(points)
+          # Verify refinement
+          #self._verify_refinement_smaller_radii(points)
         
-        # Synchronizes the OpenCASCADE (OCC) geometry kernel with gmsh model.
-        # Necessary after modifying the geometry (adding points, surfaces, volumes) to recognizes the changes
-        gmsh.model.occ.synchronize()
+          gmsh.write(str(self.mesh_file))
+          gmsh.finalize()
+    
+    
+    def _add_adaptative_refinement(self,site_positions):
+      """
+      Add distance-based mesh refinement near particles
+      Use Ball fields    
+      """
+      
+      try:
+        existing_fields = gmsh.model.mesh.field.list()
+        for field_id in existing_fields:
+          gmsh.model.mesh.field.remove(field_id)
+          
+      except:
+        pass
+      
+      
+      ball_fields = []
+      
+      total_sites = len(site_positions)
+      
+      
+      for i, pos in enumerate(site_positions):
+        # Create distance field to this particle
+        ball_field = gmsh.model.mesh.field.add("Ball")
+        gmsh.model.mesh.field.setNumber(ball_field, 'VIn', self.fine_mesh_size)
+        gmsh.model.mesh.field.setNumber(ball_field, 'VOut', self.mesh_size)
+        gmsh.model.mesh.field.setNumber(ball_field, 'XCenter', pos[0])
+        gmsh.model.mesh.field.setNumber(ball_field, 'YCenter', pos[1])
+        gmsh.model.mesh.field.setNumber(ball_field, 'ZCenter', pos[2])
+        gmsh.model.mesh.field.setNumber(ball_field, 'Radius', self.refinement_radius)
         
-        # Embed lattice points (point_tags) into the volume (box_tag)
-        # gmsh.model.mesh.embed(dim, tags, target_dim, target_tag)
-            # dim = 0 → The dimension of the entities being embedded (0 = points).
-            # tags = point_tags → A list of point tags (the points to embed).
-            # target_dim = 3 → The dimension of the target entity (3 = volume).
-            # target_tag = box_tag → The tag of the target volume (where points are embedded).
-        gmsh.model.mesh.embed(0,point_tags,self.gdim,box_tag)
+
         
-        # Add physical group for the domain (3D elements)
-        domain_tag = gmsh.model.addPhysicalGroup(self.gdim,[box_tag])
-        gmsh.model.setPhysicalName(self.gdim,domain_tag,"domain")
+        ball_fields.append(ball_field)
         
-        # Add physical group for the boundary (2D elements)
-        # Extract boundary entities (surfaces) of the 3D box -> boundary of 3D volume box_tag
-        boundary_tags = gmsh.model.getBoundary([(self.gdim,box_tag)], oriented = False)
-        # Define physical group -> Surface (dim=2) -> Extract the tags of the surfaces
-        boundary_tag = gmsh.model.addPhysicalGroup(self.gdim-1, [tag for dim, tag, in boundary_tags])
-        gmsh.model.setPhysicalName(self.gdim-1,boundary_tag,"boundary")
+
+        # Show the progress
+        if total_sites < 20 or i % max(1, total_sites // 10) == 0 or i == total_sites - 1:
+          progress = (i + 1) / total_sites * 100
+          print(f'Refinement progress: {progress:.1f} % ({i+1}/{total_sites})')
         
-        # Generate a coarse mesh
-        gmsh.option.setNumber("Mesh.Algorithm3D", 4) # Frontal-Delaunay (for efficiency)
+      
+      if ball_fields:  
+        if len(ball_fields) > 1:  
+          # Combine all threshold fields using minimum (finest mesh)
+          min_field = gmsh.model.mesh.field.add('Min')
+          gmsh.model.mesh.field.setNumbers(min_field,'FieldsList', ball_fields)
+          gmsh.model.mesh.field.setAsBackgroundMesh(min_field)
+          print(f'Combined {len(ball_fields)} ball fields using Min field (ID: {min_field})')
+
+        else:
+          gmsh.model.mesh.field.setAsBackgroundMesh(ball_fields[0])
+          
+          
         
-        gmsh.option.setNumber("Mesh.CharacteristicLengthMax",self.mesh_size) # Coarsen globally
+        print(f"Applied {len(ball_fields)} ball refinement fields")
+            
+      else:
+        # Fallback to global mesh size if no refinement fields
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", self.mesh_size)
+        print("No refinement fields applied, using global mesh size")
         
-        gmsh.model.mesh.generate(self.gdim)
-        gmsh.write(str(self.mesh_file))
-        gmsh.finalize()
+      
+    def _verify_mesh_quality(self,site_positions):
+      """
+      Verify mesh quality and refinement after generation
+      """
+      print('\n=== Mesh Quality Verification ===')
+      
+      try:
+        #Get mesh statistics
+        nodes = gmsh.model.mesh.getNodes()
+        elements = gmsh.model.mesh.getElements()
+        
+        print(f'Total nodes: {len(nodes[0])}')
+        print(f'Element types: {len(elements[0])}')
+        
+        if len(elements[0]) > 0:
+          total_elements = sum(len(elem_tags) for elem_tags in elements[1])
+          print(f'Total elements: {total_elements}')
+          
+          
+        # Check mesh size near particles if refinement is active
+        #if self.active_mesh_refinement:
+        self._check_refinement_near_particles(site_positions)
+          
+          
+      except Exception as e:
+        print(f'Mesh verification failed: {str(e)}')
+        
+      print('=== End Mesh Verification ===\n')
+      
+    def _check_refinement_near_particles(self,site_positions):
+      """
+      Check if mesh is actually refined near particle positions
+      """
+      print('Checking mesh refinement near particles...')
+      
+      try:
+        #Get all nodes
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node_coords = node_coords.reshape(-1,3)
+        
+        coords_min = np.min(node_coords,axis=0)
+        coords_max = np.max(node_coords,axis=0)
+        domain_size = coords_max - coords_min
+        
+        # Define margin to avoid boundaries
+        margin = domain_size * 0.4
+        
+        #Filter interior nodes
+        interior_mask = (
+          (node_coords[:, 0] > coords_min[0] + margin[0]) &
+          (node_coords[:, 0] < coords_max[0] - margin[0]) &
+          (node_coords[:, 1] > coords_min[1] + margin[1]) &
+          (node_coords[:, 1] < coords_max[1] - margin[1]) &
+          (node_coords[:, 2] > coords_min[2] + margin[2]) &
+          (node_coords[:, 2] < coords_max[2] - margin[2])
+        )
+        
+        interior_nodes = node_coords[interior_mask]
+        
+        # Check a few particles
+        particles_to_check = min(5, len(site_positions))
+        
+        if self.active_mesh_refinement:
+          radius_to_find_nodes = self.refinement_radius
+        else:
+          radius_to_find_nodes = self.mesh_size  
+        
+        part_checked = 0 # Particles checked
+        i = 0 # idx of particles
+        while part_checked < particles_to_check:
+        #for i in range(particles_to_check):
+          particle_pos = site_positions[i]
+          
+          
+          # Check if particle is in interior region
+          is_interior = (
+                    (particle_pos[0] > coords_min[0] + margin[0]) and
+                    (particle_pos[0] < coords_max[0] - margin[0]) and
+                    (particle_pos[1] > coords_min[1] + margin[1]) and
+                    (particle_pos[1] < coords_max[1] - margin[1]) and
+                    (particle_pos[2] > coords_min[2] + margin[2]) and
+                    (particle_pos[2] < coords_max[2] - margin[2])
+          )
+          
+          if not is_interior:
+            i+=1
+          else:
+            i+=1
+            part_checked+=1
+          
+          # Find nodes within refinement radius
+          distances = np.linalg.norm(interior_nodes - particle_pos, axis = 1)
+          nearby_nodes = interior_nodes[distances <= radius_to_find_nodes]
+          
+          if len(nearby_nodes) > 0:
+            # Estimate local mesh density
+            if len(nearby_nodes) > 1:
+              #Calculate average distance to nearest neighbors
+              from scipy.spatial.distance import pdist
+              if len(nearby_nodes) > 1:
+                pairwise_distances = pdist(nearby_nodes)
+                avg_distance = np.mean(pairwise_distances)
+                min_distance = np.min(pairwise_distances[pairwise_distances > 1e-10]) # Avoid zero distances
+                
+                print(f'Particle {i} at ({particle_pos[0]:.3f}, {particle_pos[1]:.3f}, {particle_pos[2]:.3f}):')
+                print(f'  - Nodes within {radius_to_find_nodes:.3f} angstrom: {len(nearby_nodes)}')
+                print(f'  - Average node spacing: {avg_distance:.4f} angstrom')
+                print(f'  - Minimum node spacing: {min_distance:.4f} angstrom')
+                
+                # Check if refinement is working
+                if self.active_mesh_refinement:
+                  if min_distance > self.fine_mesh_size * 2:
+                    print(f'  - WARNING: Minimum spacing ({min_distance:.4f}) is larger than expected fine mesh size ({self.fine_mesh_size})')
+                    
+                  else:
+                    print(f'  - Refinement appears to be working correctly')
+                    
+                else:
+                  print(f'  - No refinement applied')
+                  
+          else:
+            print(f'Particle {i}: No nodes found within refinement radius (potential issue)')
+            
+      except Exception as e:
+        print(f'Refinement check failed: {str(e)}')
         
         
+    def _verify_refinement_smaller_radii(self, site_positions):
+      """
+      Verify refinement 
+      """
+      
+      
+      # 1. Check what fields exist
+      all_fields = gmsh.model.mesh.field.list()
+      print(f"Total fields: {len(all_fields)}")
+      
+      for field_id in all_fields:
+        field_type = gmsh.model.mesh.field.getType(field_id)
+        print(f'Field {field_id}: {field_type}')
+        
+        if field_type == "Ball":
+          try:
+            vin = gmsh.model.mesh.field.getNumber(field_id,'VIn')
+            vout = gmsh.model.mesh.field.getNumber(field_id, 'VOut')
+            radius = gmsh.model.mesh.field.getNumber(field_id,'Radius')
+            print(f'  VIn={vin}, VOut={vout}, Radius={radius}')
+          except:
+            print(f'  Could not get parameters')
+            
+      
+          
+      # 2. Check if background field is set
+      # Try to verify Min field is background
+      min_fields = [f for f in all_fields if gmsh.model.mesh.field.getType(f) == 'Min']
+      if min_fields:
+        print(f'Min field exists: {min_fields[0]}')
+        #Try to see what it combines
+        try:
+          field_list = gmsh.model.mesh.field.getNumbers(min_fields[0], 'FieldsList')
+          print(f'Combines fields: {field_list}')
+        except:
+          print('Could not get field list')
+      
+       
+        
+      # 3. Check a specific particle location more carefully
+      if len(site_positions) > 0:
+        test_pos = site_positions[0]
+        print(f'\nDetailed check for particle at {test_pos}:')
+        
+        # Get very close nodes
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node_coords = node_coords.reshape(-1,3)
+        
+        # Check increasingly smaller radii
+        for radius in [self.refinement_radius * 2, self.refinement_radius * 1.5, self.refinement_radius, self.refinement_radius * 0.5]:
+          distances = np.linalg.norm(node_coords - test_pos, axis = 1)
+          nearby = node_coords[distances <= radius]
+          print(f'  Nodes within {radius} angstroms: {len(nearby)}')
+          
+          if len(nearby) > 1:
+            from scipy.spatial.distance import pdist
+            valid_dists = pdist(nearby)
+            valid_dists = valid_dists [valid_dists > 1e-10]
+            if len(valid_dists) > 0:
+              min_dist = np.min(valid_dists)
+              avg_dist = np.mean(valid_dists)
+              print(f'   Min spacing: {min_dist:.4f} angstroms, Avg:{avg_dist:.4f} angstroms')
+      
+                
+    
         
     def update_mesh_parameters(self, padding=None, mesh_size=None):
       """
@@ -243,7 +529,7 @@ class PoissonSolver():
         self.bcs = [bc_top, bc_bottom]
         
         
-    def charge_density(self, charge_locations, charges, tolerance = 1):
+    def charge_density(self, charge_locations, charges, tolerance = 2):
         """
         Create a DG0 Function representing charge density with Gaussian approximations
         of point charges at specified locations.
@@ -273,6 +559,7 @@ class PoissonSolver():
           # Vectorized Gaussian computation for all cells
           r_sq = np.sum((midpoints - x0) ** 2, axis = 1)
           gauss_values = q * np.exp(-r_sq / (2 * self.epsilon_gc ** 2)) / ((2 * np.pi * self.epsilon_gc ** 2) ** (self.tdim / 2))
+          
           cell_values += gauss_values
           
         with rho.vector.localForm() as local_rho:
@@ -411,16 +698,13 @@ class PoissonSolver():
       E_expr =  -ufl.grad(uh)
       
       
-      if not hasattr(self,'_E_field_cache') or self._last_uh_id != id(uh):
-        # For electric field, we need to compute the gradient
-        # Create a vector function to store the gradient
-        self._E_field_cache = fem.Function(self.V_vec)
-        # Create expression for evaluation at points
-        expr = fem.Expression(E_expr, self.V_vec.element.interpolation_points()) 
-        self._E_field_cache.interpolate(expr)
-        self._last_uh_id = id(uh)
-        
-      E_field = self._E_field_cache
+      # For electric field, we need to compute the gradient
+      # Create a vector function to store the gradient
+      E_field = fem.Function(self.V_vec)
+      # Create expression for evaluation at points
+      expr = fem.Expression(E_expr, self.V_vec.element.interpolation_points()) 
+      E_field.interpolate(expr)
+
       
       # Convert points to numpy array with correct dtype
       points_array = np.asarray(points,dtype=np.float64)
@@ -437,8 +721,7 @@ class PoissonSolver():
       colliding_cells = geometry.compute_colliding_cells(self.domain, cell_candidates, points_array)
       
       # Initialize result array for all points
-      num_points = len(points_array)
-      E_values_global = np.zeros((num_points, 3), dtype=np.float64)
+      E_values_global = np.zeros((len(points_array), 3), dtype=np.float64)
       
       # Collect points and corresponding cells
       local_cells = []
@@ -457,8 +740,12 @@ class PoissonSolver():
         # Evaluate expression at all points at once
         E_local = E_field.eval(points_on_proc, local_cells) # Units: V/�
         
+        
         for j, global_idx in enumerate(local_idx):
-          E_values_global[global_idx] = E_local[j]
+          if len(local_idx) == 1:
+            E_values_global[global_idx] = E_local
+          else:
+            E_values_global[global_idx] = E_local[j]
           
       # Communicate results across all MPI processes
       # Each point is evaluated by exactly one process, so we sum the results
@@ -466,6 +753,112 @@ class PoissonSolver():
              
       return E_values_global * 1e10 * self.bond_polarization_factor # Units: V/m
       
+    def test_point_charge_analytical(self,charge_location,charges):
+      """
+      Test electric field against analytical point charge solution
+      """
+      
+      coords = self.domain.geometry.x # Nx3 array of node coordinates
+      # Get max of coordinates
+      #max_x = np.max(coords[:,0])
+      #max_y = np.max(coords[:,1])
+      #max_z = np.max(coords[:,2])
+      
+      #charge_location = np.array([[max_x/2,max_y/2,max_z/2]])
+      #charge_value = np.array([e]) # Elementary charge
+      epsilon_r = self.poissonSolver_parameters['epsilon_r']
+      
+      actual_center = self.find_actual_charge_center(charge_location)
+            
+      uh = self.solve(charge_location,charges)
+      
+      # Test points at varios distances
+      
+      test_distances = np.linspace(-1.0,1.0,3)
+      
+      for r in test_distances:
+      
+        test_point = np.array([[charge_location[0][0], charge_location[0][1], charge_location[0][2] + r]])
+        E_computed = self.evaluate_electric_field_at_points(uh,test_point)
+        E_magnitude = np.linalg.norm(E_computed[0])
+        
+        # Analytical solution
+        E_analytical = self.bond_polarization_factor * charges[0] * (r * 1e-10) / (4 * np.pi * epsilon_0 * epsilon_r * ((r * 1e-10)**2 + (self.epsilon_gc * 1e-10)**2)**1.5)
+        
+        proportion_E_computed_analytical = abs(E_magnitude / E_analytical)
+        
+        print(f"Distance {r} angstrom: Computed={E_magnitude:.2e}, Analytical={E_analytical:.2e}, Proportion E (computed/analytical)={proportion_E_computed_analytical:.2e}")
+        print(f"Computed(x,y,z)={E_computed[0]}")
+
+        
+        
+      return uh
+      
+    
+    def test_uniform_field(self):
+      """
+      Test with linear potential (should give uniform field)
+      Set up linear boundary conditions that should create uniform field
+      For example: V(x) = -E0 * x should give E = E0 in x-direction
+      """
+      pass
+      
+      
+      
+    def evaluate_function_at_points(self,function,points):
+      """
+      Evaluate a dolfinx function at specific points
+      """
+      points_array = np.asarray(points,dtype=np.float64)
+      
+      # Find cells containing points
+      bb_tree = geometry.bb_tree(self.domain,self.domain.topology.dim)
+      cell_candidates = geometry.compute_collisions_points(bb_tree,points_array)
+      colliding_cells = geometry.compute_colliding_cells(self.domain,cell_candidates,points_array)
+      
+      # Prepare cells array
+      cells = []
+      for i in range(len(points_array)):
+        if len(colliding_cells.links(i)) > 0:  
+          cell_id = colliding_cells.links(i)[0]
+          cells.append(cell_id)
+        else:
+          cells.append(0)
+          
+      # Evaluate function
+      values = function.eval(points_array,cells)
+      
+      return values
+      
+    
+    def find_actual_charge_center(self, requested_center):
+      """
+      Find where the charge density is actually maximized on the mesh
+      """    
+      
+      # Create a test charge at the requested position
+      test_rho = self.charge_density([requested_center],[1.0])
+      
+      # Get all cell midpoints
+      num_cells = (self.domain.topology.index_map(self.tdim).size_local 
+        + self.domain.topology.index_map(self.tdim).num_ghosts)
+      midpoints = mesh.compute_midpoints(self.domain, self.tdim, np.arange(num_cells, dtype=np.int32))
+      
+      # Evaluate charge density at all midpoints
+      rho_values = self.evaluate_function_at_points(test_rho,midpoints)
+      
+      # Find the maximum
+      max_idx = np.argmax(rho_values)
+      actual_center = midpoints[max_idx]
+      
+      if MPI.COMM_WORLD.rank == 0:
+        print(f"Requested center: {requested_center}")
+        print(f"Actual center on mesh: {actual_center}")
+        print(f"Offset: {actual_center - requested_center}")
+        
+      return actual_center
+      
+             
 
       
     def _calculate_dipole_moment(self):
@@ -528,7 +921,7 @@ class PoissonSolver():
         mesh_coordinates = self.domain.geometry.x
         function_values = uh.x.array
         data =  np.column_stack((mesh_coordinates, function_values))
-        np.savetxt(results_folder / "fundamentals.csv", data, delimiter=",", header="x,y,z,value", comments="")
+        np.savetxt(self.path_results_folder / "fundamentals.csv", data, delimiter=",", header="x,y,z,value", comments="")
         
         
         
