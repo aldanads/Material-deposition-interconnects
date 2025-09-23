@@ -27,6 +27,9 @@ class Site():
         self.cache_TR = {}
         self.cache_edges = {}
         self.cache_clustering_energy = {}
+        
+        self.kb = constants.physical_constants['Boltzmann constant in eV/K'][0]
+        self.nu0=7E12  # nu0 (s^-1) bond vibration frequency
 # =============================================================================
 #     We only consider the neighbors within the lattice domain            
 # =============================================================================
@@ -438,18 +441,27 @@ class Site():
 # =============================================================================
 #         Calculate transition rates    
 # =============================================================================
-    def transition_rates(self,T = 300):
+    def transition_rates(self,**kwargs):
         
-        kb = constants.physical_constants['Boltzmann constant in eV/K'][0]
-        nu0=7E12;  # nu0 (s^-1) bond vibration frequency
+        T = kwargs.get("T", 300)
+        E_site_field = kwargs.get("E_site_field", np.array([0.0, 0.0, 0.0]))
+        migration_pathways =  kwargs.get("migration_pathways")
+        
+        relevant_field = np.any(E_site_field > 1e6)
         
         # Iterate over site_events directly, no need to use range(len(...))
         for event in self.site_events:
+          
+            if relevant_field:
+              mig_vec = migration_pathways[event[-2]]
+              
+              event[-1] -= round(np.dot(E_site_field,mig_vec) * 1e-10,3) # EAct - b * E_field; (b is bond polarization factor)
+          
             if event[-1] in self.cache_TR:
                 tr_value = self.cache_TR[event[-1]]
 
             else:
-                tr_value = nu0 * np.exp(-event[-1] / (kb * T))
+                tr_value = self.nu0 * np.exp(-event[-1] / (self.kb * T))
                 self.cache_TR[event[-1]] = tr_value
                 
             # Use the length of event to determine the appropriate action
@@ -458,6 +470,7 @@ class Site():
                 event.insert(0, tr_value)
             elif len(event) == 4:
                 event[0] = tr_value
+                
                 
         
 class Island:

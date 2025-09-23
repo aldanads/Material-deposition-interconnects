@@ -993,7 +993,7 @@ class Crystal_Lattice():
             # Sites are not available because a particle has migrated there
             for idx in update_specie_events:
                 self.grid_crystal[idx].available_migrations(self.grid_crystal,idx,self.facets_type)
-                self.grid_crystal[idx].transition_rates(self.temperature)
+                self.grid_crystal[idx].transition_rates()
    
     # def update_sites_2(self,update_specie_events,update_supp_av, batch_size=10):
 

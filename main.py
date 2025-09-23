@@ -180,7 +180,7 @@ for n_sim in range(4,5):
             
             # Initialize Poisson solver on all MPI ranks
             poisson_solver = PoissonSolver(mesh_file,System_state.poissonSolver_parameters, structure=System_state.structure,path_results = paths["results"])
-            poisson_solver.set_boundary_conditions(top_value=0.0, bottom_value=0.0)  # Set appropriate BCs
+            poisson_solver.set_boundary_conditions(top_value=1.0, bottom_value=0.0)  # Set appropriate BCs
             
             poisson_solve_frequency = System_state.poissonSolver_parameters['poisson_solve_frequency']  # Solve Poisson every N KMC steps
             
@@ -226,10 +226,10 @@ for n_sim in range(4,5):
                 #try: 
                 
                     
-                    
-                    #uh = poisson_solver.solve(charge_locations,charges)
                     run_start_time = MPI.Wtime()
-                    uh = poisson_solver.test_point_charge_analytical(charge_locations,charges)
+                    uh = poisson_solver.solve(charge_locations,charges)
+                    
+                    #uh = poisson_solver.test_point_charge_analytical(charge_locations,charges)
                     run_time = MPI.Wtime() - run_start_time
                     
                     if rank == 0: print(f'Run time to solve Poisson: {run_time}')
@@ -251,18 +251,21 @@ for n_sim in range(4,5):
                     Finish testing
                     """
                     
-                    #E_loc_field = poisson_solver.evaluate_electric_field_at_points(uh,charge_locations)
+                    E_field = poisson_solver.evaluate_electric_field_at_points(uh,charge_locations)
         
                     poisson_solver.save_potential(uh,System_state.time,j+1)
                     
                     if rank == 0:
                     
                     
-                      #print('Charge locations:', charge_locations)
-                      #print('Local field: ', E_loc_field)
+                      print(f'Chosen event: ', chosen_event)
+                      print('Local field: ', E_field)
                     
                       
                       # Update System_state based on electric field
+                      for site, E_site_field in zip(System_state.sites_occupied,E_field):
+                        print(System_state.grid_crystal[site].position)
+                        System_state.grid_crystal[site].transition_rates(E_site_field = E_site_field, migration_pathways = System_state.migration_pathways)
                         
                       print(f"Poisson solved at step {i}")
                     

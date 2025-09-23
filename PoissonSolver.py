@@ -57,11 +57,11 @@ class PoissonSolver():
         self.gdim = kwargs.get("gdim",3)
         self.padding = kwargs.get("bounding_box_padding",5.0)
         self.mesh_size = kwargs.get("mesh_size",0.8) #(Å)
-        self.epsilon_gc = kwargs.get("epsilon_gaussian_charge",1) #(Å)
+        self.epsilon_gc = kwargs.get("epsilon_gaussian_charge",1.8) #(Å)
         # Set parameters for mesh refinement
         self.active_mesh_refinement = kwargs.get("activate_mesh_refinement",True)
         if self.active_mesh_refinement:
-          self.fine_mesh_size = kwargs.get("fine_mesh_size",0.5) #(Å)
+          self.fine_mesh_size = kwargs.get("fine_mesh_size",0.4) #(Å)
           self.refinement_radius = kwargs.get("refinement_radius",1) #(Å)
         
         # Poisson parameters
@@ -774,11 +774,11 @@ class PoissonSolver():
       
       # Test points at varios distances
       
-      test_distances = np.linspace(-1.0,1.0,3)
+      test_distances = np.linspace(-0.5,0.5,21)
       
       for r in test_distances:
       
-        test_point = np.array([[charge_location[0][0], charge_location[0][1], charge_location[0][2] + r]])
+        test_point = np.array([[charge_location[0][0] + r, charge_location[0][1], charge_location[0][2]]])
         E_computed = self.evaluate_electric_field_at_points(uh,test_point)
         E_magnitude = np.linalg.norm(E_computed[0])
         
@@ -787,8 +787,9 @@ class PoissonSolver():
         
         proportion_E_computed_analytical = abs(E_magnitude / E_analytical)
         
-        print(f"Distance {r} angstrom: Computed={E_magnitude:.2e}, Analytical={E_analytical:.2e}, Proportion E (computed/analytical)={proportion_E_computed_analytical:.2e}")
-        print(f"Computed(x,y,z)={E_computed[0]}")
+        if MPI.COMM_WORLD.rank == 0:
+          print(f"Distance {r} angstrom: Computed={E_magnitude:.2e}, Analytical={E_analytical:.2e}, Proportion E (computed/analytical)={proportion_E_computed_analytical:.2e}")
+          print(f"Computed(x,y,z)=({E_computed[0][0]:.2e},{E_computed[0][1]:.2e},{E_computed[0][2]:.2e})")
 
         
         
