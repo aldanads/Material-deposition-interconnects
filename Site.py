@@ -447,16 +447,15 @@ class Site():
         E_site_field = kwargs.get("E_site_field", np.array([0.0, 0.0, 0.0]))
         migration_pathways =  kwargs.get("migration_pathways")
         
-        relevant_field = np.any(E_site_field > 1e6)
+        relevant_field = np.any(abs(E_site_field) > 1e6)
         
         # Iterate over site_events directly, no need to use range(len(...))
         for event in self.site_events:
           
             if relevant_field:
               mig_vec = migration_pathways[event[-2]]
-              
               event[-1] -= round(np.dot(E_site_field,mig_vec) * 1e-10,3) # EAct - b * E_field; (b is bond polarization factor)
-          
+              
             if event[-1] in self.cache_TR:
                 tr_value = self.cache_TR[event[-1]]
 

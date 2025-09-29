@@ -750,7 +750,7 @@ class Crystal_Lattice():
             for idx_3 in self.grid_crystal[idx].nearest_neighbors_idx:
                 print(self.grid_crystal[idx_3].supp_by)
                 
-        # Single particle introduced and removed
+        # Two adjacent particles
         elif test == 2:
             
             for idx,site in self.grid_crystal.items():
@@ -948,6 +948,8 @@ class Crystal_Lattice():
             update_specie_events,update_supp_av = self.remove_specie_site(chosen_event[-1],update_specie_events,update_supp_av)
 
 
+            # We have to update every activation energy affected by the electric field            
+            if self.poissonSolver_parameters['solve_Poisson']: update_specie_events = self.sites_occupied
             # Update sites availables, the support to each site and available migrations
             self.update_sites(update_specie_events,update_supp_av)
 

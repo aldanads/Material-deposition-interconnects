@@ -481,7 +481,7 @@ def initialization(n_sim,save_data,lammps_file):
         # =============================================================================
         P = 0.0
         #System_state.defect_gen(rng,P)
-        System_state.deposition_specie(0,rng,test = 1)
+        System_state.deposition_specie(0,rng,test = 2)
         
         # This timestep_limits will depend on the V/s ratio
         System_state.timestep_limits = float('inf')

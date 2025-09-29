@@ -180,7 +180,7 @@ for n_sim in range(4,5):
             
             # Initialize Poisson solver on all MPI ranks
             poisson_solver = PoissonSolver(mesh_file,System_state.poissonSolver_parameters, structure=System_state.structure,path_results = paths["results"])
-            poisson_solver.set_boundary_conditions(top_value=1.0, bottom_value=0.0)  # Set appropriate BCs
+            poisson_solver.set_boundary_conditions(top_value=0.0, bottom_value=0.0)  # Set appropriate BCs
             
             poisson_solve_frequency = System_state.poissonSolver_parameters['poisson_solve_frequency']  # Solve Poisson every N KMC steps
             
@@ -253,21 +253,24 @@ for n_sim in range(4,5):
                     
                     E_field = poisson_solver.evaluate_electric_field_at_points(uh,charge_locations)
         
-                    poisson_solver.save_potential(uh,System_state.time,j+1)
+                    if save_Poisson:
+                      poisson_solver.save_potential(uh,System_state.time,j+1)
                     
                     if rank == 0:
                     
                     
                       print(f'Chosen event: ', chosen_event)
-                      print('Local field: ', E_field)
                     
                       
                       # Update System_state based on electric field
+                      #print(f"Migration pathways: {System_state.migration_pathways}")
                       for site, E_site_field in zip(System_state.sites_occupied,E_field):
-                        print(System_state.grid_crystal[site].position)
+                        #print(System_state.grid_crystal[site].position,E_site_field)
                         System_state.grid_crystal[site].transition_rates(E_site_field = E_site_field, migration_pathways = System_state.migration_pathways)
-                        
+                        #print(System_state.grid_crystal[site].site_events)
+                      
                       print(f"Poisson solved at step {i}")
+                      print("")
                     
                 #except Exception as e:
                 #    if rank == 0:
