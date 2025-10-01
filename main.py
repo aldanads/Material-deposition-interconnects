@@ -24,7 +24,7 @@ lammps_file = True
 
 
 
-for n_sim in range(4,5):
+for n_sim in range(0,1):
     
     System_state,rng,paths,Results = initialization(n_sim,save_data,lammps_file)
 
@@ -180,7 +180,7 @@ for n_sim in range(4,5):
             
             # Initialize Poisson solver on all MPI ranks
             poisson_solver = PoissonSolver(mesh_file,System_state.poissonSolver_parameters, structure=System_state.structure,path_results = paths["results"])
-            poisson_solver.set_boundary_conditions(top_value=0.0, bottom_value=0.0)  # Set appropriate BCs
+            poisson_solver.set_boundary_conditions(top_value=1.0, bottom_value=0.0)  # Set appropriate BCs
             
             poisson_solve_frequency = System_state.poissonSolver_parameters['poisson_solve_frequency']  # Solve Poisson every N KMC steps
             
@@ -193,7 +193,7 @@ for n_sim in range(4,5):
         
         i = 0
         #total_steps = int(1e4)
-        total_steps = int(1e1)
+        total_steps = int(1e2)
         # list_sites_occu = []
         
 
@@ -222,10 +222,8 @@ for n_sim in range(4,5):
             
               should_solve_poisson = (charges is not None and len(charges) > 0 and i%poisson_solve_frequency == 0)
               
-              if should_solve_poisson:
-                #try: 
+              if should_solve_poisson: 
                 
-                    
                     run_start_time = MPI.Wtime()
                     uh = poisson_solver.solve(charge_locations,charges)
                     
@@ -233,23 +231,6 @@ for n_sim in range(4,5):
                     run_time = MPI.Wtime() - run_start_time
                     
                     if rank == 0: print(f'Run time to solve Poisson: {run_time}')
-                    """
-                    Testing electric field
-                    
-                    original_points = charge_locations[0]
-                    
-                    # Create shifted points
-                    shift = System_state.basis_vectors[2][2] * 1  # or whatever shift value you want
-                    above_points = original_points + [0, 0, shift * 2]
-                    below_points = original_points - [0, 0, shift * 2]
-                    
-                    
-                    # Combine all points into a single 2D array
-                    #charge_locations = np.vstack([original_points, above_points, below_points,original_points_2,above_points_2,below_points_2])
-                    test_points = np.vstack([original_points, above_points, below_points])
-                   
-                    Finish testing
-                    """
                     
                     E_field = poisson_solver.evaluate_electric_field_at_points(uh,charge_locations)
         
@@ -257,10 +238,6 @@ for n_sim in range(4,5):
                       poisson_solver.save_potential(uh,System_state.time,j+1)
                     
                     if rank == 0:
-                    
-                    
-                      print(f'Chosen event: ', chosen_event)
-                    
                       
                       # Update System_state based on electric field
                       #print(f"Migration pathways: {System_state.migration_pathways}")
@@ -272,10 +249,7 @@ for n_sim in range(4,5):
                       print(f"Poisson solved at step {i}")
                       print("")
                     
-                #except Exception as e:
-                #    if rank == 0:
-                #        print(f"Poisson solver failed at step {i}: {e}")
-                        
+                
             # Synchronize before continuing
             if comm is not None:
               comm.Barrier()

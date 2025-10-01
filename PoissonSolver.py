@@ -61,7 +61,7 @@ class PoissonSolver():
         # Set parameters for mesh refinement
         self.active_mesh_refinement = kwargs.get("activate_mesh_refinement",True)
         if self.active_mesh_refinement:
-          self.fine_mesh_size = kwargs.get("fine_mesh_size",0.4) #(Å)
+          self.fine_mesh_size = kwargs.get("fine_mesh_size",0.25) #(Å)
           self.refinement_radius = kwargs.get("refinement_radius",1) #(Å)
         
         # Poisson parameters
@@ -121,6 +121,67 @@ class PoissonSolver():
         
         
         
+        
+        # ========== Reusable objects ===============
+        # Pre-create DGO space for charge density (reused in charge_density())
+        # Discontinuous Galerkin (DG) space of order 0 -> no continuity between elements
+        # DG(0) useful for defining constant fields, like properties, density
+        self.W = fem.functionspace(self.domain, ("DG",0))
+        self.rho = fem.Function(self.W,dtype=np.float64)
+        
+        # Pre-compute cell midpoints (constant for fixed mesh)
+        # Get all cell midpoints (for DG0 interpolation)
+        #   Local cells (cells owned by this process in parallel computation)
+        #   Ghost cells (cells shared between processes in parallel computing)
+        num_cells = self.domain.topology.index_map(self.tdim).size_local + self.domain.topology.index_map(self.tdim).num_ghosts
+        # Computes the midpoint of each cell in the domain
+        #   Since DG(0) functions (like rho) are piecewise constant per element, we typically evaluate them at the midpoint of each element
+        self.cell_midpoints = mesh.compute_midpoints(self.domain, self.tdim, np.arange(num_cells, dtype=np.int32))
+        self.num_cells = num_cells
+        
+        # Pre-create trial and test functions
+        self.u_trial = ufl.TrialFunction(self.V)
+        self.v_test = ufl.TestFunction(self.V)
+        
+        # Pre-create forms (bilinear form is constant)
+        # Pymatgen works in angstrom
+        
+        # Unit analysis:
+        #   grad(u) = V/angstrom
+        #   grad(v) = 1/angstrom
+        # dx = angstrom^3 
+        # a = V * angstrom --> Transform to SI --> Scaling factor 1e-10
+        angstrom_to_m = 1e-10
+        self.a_form = fem.form(ufl.inner(ufl.grad(self.u_trial), ufl.grad(self.v_test)) * angstrom_to_m * ufl.dx)
+        
+        # Pre-allocate matrix A (will be reassembled when BCs change)
+        # Create empty matrix with correct sparsity pattern
+        self.A = fem.petsc.create_matrix(self.a_form)
+        
+        # Pre-create PETSc vectors
+        self.b = fem.petsc.create_vector(fem.form(self.v_test * ufl.dx))
+        
+        # Track if BCs have changed to trigger matrix reassembly
+        self._bcs_changed = True
+        
+        # Pre-create KSP solver (reuse across solves)
+        # Configure KSP solver with initial guess
+        self.ksp = PETSc.KSP().create(self.domain.comm)
+        self.ksp.setOperators(self.A)
+        self.ksp.setType(PETSc.KSP.Type.CG)
+        self.ksp.getPC().setType(PETSc.PC.Type.HYPRE)
+        self.ksp.getPC().setHYPREType("boomeramg")
+        self.ksp.setTolerances(rtol=1e-8,atol=1e-10,max_it=1000)
+        self.ksp.setInitialGuessNonzero(True)
+        
+        # Pre-create solution function
+        self.uh = fem.Function(self.V)
+        
+        # Pre-create E_field function and expression (for evaluate_electric_field_at_points)
+        self.E_field = fem.Function(self.V_vec)
+        
+        # Pre-compute bounding box tree for point evaluation (cached)
+        self.bb_tree = geometry.bb_tree(self.domain, self.domain.topology.dim)
         
         
     def _load_mesh(self):
@@ -528,49 +589,42 @@ class PoissonSolver():
         
         self.bcs = [bc_top, bc_bottom]
         
+        # Mark that BCs have changed
+        self._bcs_changed = True
+        
         
     def charge_density(self, charge_locations, charges, tolerance = 2):
         """
         Create a DG0 Function representing charge density with Gaussian approximations
         of point charges at specified locations.
         
+        Reuses pre-allocated self.rho and self.cell_midpoints
+        
         Parameters:
         -----------
         tolerance : float, optional
         Tolerance in % for numerical errors in charge conservation (default: 1)
         """
-        # Discontinuous Galerkin (DG) space of order 0 -> no continuity between elements
-        # DG(0) useful for defining constant fields, like properties, density
-        W = fem.functionspace(self.domain,("DG",0)) 
-        rho = fem.Function(W, dtype=np.float64) # storing floating-point values -> field variable defined over the entire mesh
         
-        # Get all cell midpoints (for DG0 interpolation)
-        #   Local cells (cells owned by this process in parallel computation)
-        #   Ghost cells (cells shared between processes in parallel computing)
-        num_cells = self.domain.topology.index_map(self.tdim).size_local + self.domain.topology.index_map(self.tdim).num_ghosts
-        # Computes the midpoint of each cell in the domain
-        #   Since DG(0) functions (like rho) are piecewise constant per element, we typically evaluate them at the midpoint of each element
-        midpoints = mesh.compute_midpoints(self.domain, self.tdim, np.arange(num_cells, dtype=np.int32))
-        
-        cell_values = np.zeros(num_cells, dtype = np.float64)
-        
+        # Reuse pre-allocated arrays
+        cell_values = np.zeros(self.num_cells, dtype = np.float64)
         
         for x0, q in zip(charge_locations, charges):
           # Vectorized Gaussian computation for all cells
-          r_sq = np.sum((midpoints - x0) ** 2, axis = 1)
+          r_sq = np.sum((self.cell_midpoints - x0) ** 2, axis = 1)
           gauss_values = q * np.exp(-r_sq / (2 * self.epsilon_gc ** 2)) / ((2 * np.pi * self.epsilon_gc ** 2) ** (self.tdim / 2))
           
           cell_values += gauss_values
           
-        with rho.vector.localForm() as local_rho:
-          local_rho.setArray(cell_values[:W.dofmap.index_map.size_local])
+        with self.rho.vector.localForm() as local_rho:
+          local_rho.setArray(cell_values[:self.W.dofmap.index_map.size_local])
           
         # Sum the local charges across all processes using MPI
-        local_charge = fem.assemble_scalar(fem.form(rho * ufl.dx))  # Local total charge for this process
+        local_charge = fem.assemble_scalar(fem.form(self.rho * ufl.dx))  # Local total charge for this process
     
         # Gather the total charge from all processes
         total_charge = MPI.COMM_WORLD.allreduce(local_charge, op=MPI.SUM)
-        #total_charge = fem.assemble_scalar(fem.form(rho * ufl.dx))
+        
         expected_charge = sum(charges)
         charge_error = 100 * abs((total_charge - expected_charge) / expected_charge)
         
@@ -602,34 +656,36 @@ class PoissonSolver():
         #  if MPI.COMM_WORLD.rank == 0:
         #    print(f"Total charge validated: {total_charge:.2e} C (Charge error = {charge_error:.2f}% of expected charge)")
           
-        return rho
+        return self.rho
         
         
         
     def solve(self, charge_locations, charges, charge_err_tol = 2):
         """
         Solve the Poisson equation with the given charge locations and magnitudes.
+        
+        Reuses pre-allocated objects instead of creating new ones each call
+          - Reuses self.rho (charge density)
+          - Reuses self.b (RHS vector)
+          - Reassembles self.A only when BCs change (tracked by self._bcs_changed flag)
+          - Reuses self.ksp (solver)
+          - Reuses self.uh (solution function)
+          - Only creates L_form once per solve (not stored as it depends on rho) 
+          
         """
         
-        # Create charge density
+        # Reassemble matrix only when BCs change
+        if self._bcs_changed:
+          # Zero out matrix and reassemble with new BCs
+          self.A.zeroEntries()
+          assemble_matrix(self.A, self.a_form, bcs = self.bcs)
+          self.A.assemble()
+          self.ksp.setOperators(self.A)
+          self._bcs_changed = False # Reset flag
+        
+        # Create charge density (reuses self.rho internally)
         rho = self.charge_density(charge_locations,charges, charge_err_tol)
         
-        # Define variational problem
-        u = ufl.TrialFunction(self.V)
-        v = ufl.TestFunction(self.V)
-        
-        """
-        Pymatgen works in angstrom
-        
-        Unit analysis:
-        grad(u) = V/angstrom
-        grad(v) = 1/angstrom
-        dx = angstrom^3
-        
-        a = V * angstrom --> Transform to SI --> Scaling factor 1e-10
-        """
-        angstrom_to_m = 1e-10 # Scale factor to convert to SI
-        a = ufl.inner(ufl.grad(u), ufl.grad(v)) * angstrom_to_m * ufl.dx
         
         """
         Unit analysis:
@@ -639,42 +695,35 @@ class PoissonSolver():
         
         L = V * m
         """
+        # Create linear form L (must be recreated as it depends on rho)
         epsilon_r = self.poissonSolver_parameters['epsilon_r']
-        L = (rho / (epsilon_0 * epsilon_r)) * v * ufl.dx
+        L = (rho / (epsilon_0 * epsilon_r)) * self.v_test * ufl.dx
+        L_form = fem.form(L)
         
-        # Assemble matrix and vector
-        A = assemble_matrix(fem.form(a), bcs=self.bcs)
-        A.assemble()
-        b = assemble_vector(fem.form(L))
-        fem.apply_lifting(b, [fem.form(a)], [self.bcs])
-        b.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES,mode=PETSc.ScatterMode.REVERSE)
-        fem.set_bc(b, self.bcs)
+        # Reuse pre-allocated vector self.b --> We zero and reuse
+        self.b.zeroEntries()
+        assemble_vector(self.b,L_form)
         
-        # Initialize solution function
-        uh = fem.Function(self.V)
+        fem.apply_lifting(self.b, [self.a_form], [self.bcs])
+        self.b.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES,mode=PETSc.ScatterMode.REVERSE)
+        fem.set_bc(self.b, self.bcs)
+        
+        # Reuse solution function self.uh:
         if self.previous_solution is not None:
-          uh.x.array[:] = self.previous_solution.x.array[:] # Set initial guess
-
-        # Configure KSP solver with initial guess
-        ksp = PETSc.KSP().create(self.domain.comm)
-        ksp.setOperators(A)
-        ksp.setType(PETSc.KSP.Type.CG)
-        ksp.getPC().setType(PETSc.PC.Type.HYPRE)
-        ksp.getPC().setHYPREType("boomeramg")
-        ksp.setTolerances(rtol=1e-8,atol=1e-10,max_it=1000)
-        ksp.setInitialGuessNonzero(True) # Enable initial guess
-        
+          self.uh.x.array[:] = self.previous_solution.x.array[:] # Set initial guess
+        else:
+          self.uh.x.array[:] = 0.0 # Zero initial guest on first solve
         
         # Solve with initial guess
-        ksp.solve(b, uh.x.petsc_vec)
+        self.ksp.solve(self.b, self.uh.x.petsc_vec)
         
         #Store solution for next iteration
         if self.previous_solution is None:
           self.previous_solution = fem.Function(self.V)
           
-        self.previous_solution.x.array[:] = uh.x.array[:]
+        self.previous_solution.x.array[:] = self.uh.x.array[:]
         
-        return uh
+        return self.uh
         
 
     def evaluate_electric_field_at_points(self,uh,points):
@@ -697,13 +746,9 @@ class PoissonSolver():
       # Compute gradient expression (E = -?V)
       E_expr =  -ufl.grad(uh)
       
-      
-      # For electric field, we need to compute the gradient
-      # Create a vector function to store the gradient
-      E_field = fem.Function(self.V_vec)
       # Create expression for evaluation at points
       expr = fem.Expression(E_expr, self.V_vec.element.interpolation_points()) 
-      E_field.interpolate(expr)
+      self.E_field.interpolate(expr)
 
       
       # Convert points to numpy array with correct dtype
@@ -711,12 +756,8 @@ class PoissonSolver():
       if points_array.ndim == 1:
         points_array = points_array.reshape(1, -1)
         
-      if not hasattr(self, '_bb_tree_cache'):
-        # Find the correct cell for each point
-        bb_tree = geometry.bb_tree(self.domain, self.domain.topology.dim)
-        
       # Find cells whose bounding-box collide with the points
-      cell_candidates = geometry.compute_collisions_points(bb_tree,points_array)
+      cell_candidates = geometry.compute_collisions_points(self.bb_tree,points_array)
       # Choose one of the cells that contains the point
       colliding_cells = geometry.compute_colliding_cells(self.domain, cell_candidates, points_array)
       
@@ -738,7 +779,7 @@ class PoissonSolver():
       if len(points_on_proc) > 0:
         points_on_proc = np.array(points_on_proc, dtype = np.float64)
         # Evaluate expression at all points at once
-        E_local = E_field.eval(points_on_proc, local_cells) # Units: V/Å
+        E_local = self.E_field.eval(points_on_proc, local_cells) # Units: V/Å
         
         
         for j, global_idx in enumerate(local_idx):
@@ -757,15 +798,6 @@ class PoissonSolver():
       """
       Test electric field against analytical point charge solution
       """
-      
-      coords = self.domain.geometry.x # Nx3 array of node coordinates
-      # Get max of coordinates
-      #max_x = np.max(coords[:,0])
-      #max_y = np.max(coords[:,1])
-      #max_z = np.max(coords[:,2])
-      
-      #charge_location = np.array([[max_x/2,max_y/2,max_z/2]])
-      #charge_value = np.array([e]) # Elementary charge
       epsilon_r = self.poissonSolver_parameters['epsilon_r']
       
       actual_center = self.find_actual_charge_center(charge_location)
@@ -774,7 +806,7 @@ class PoissonSolver():
       
       # Test points at varios distances
       
-      test_distances = np.linspace(-0.5,0.5,21)
+      test_distances = np.linspace(-0.5,0.5,11)
       
       for r in test_distances:
       
@@ -840,17 +872,12 @@ class PoissonSolver():
       # Create a test charge at the requested position
       test_rho = self.charge_density([requested_center],[1.0])
       
-      # Get all cell midpoints
-      num_cells = (self.domain.topology.index_map(self.tdim).size_local 
-        + self.domain.topology.index_map(self.tdim).num_ghosts)
-      midpoints = mesh.compute_midpoints(self.domain, self.tdim, np.arange(num_cells, dtype=np.int32))
-      
       # Evaluate charge density at all midpoints
-      rho_values = self.evaluate_function_at_points(test_rho,midpoints)
+      rho_values = self.evaluate_function_at_points(test_rho,self.cell_midpoints)
       
       # Find the maximum
       max_idx = np.argmax(rho_values)
-      actual_center = midpoints[max_idx]
+      actual_center = self.cell_midpoints[max_idx]
       
       if MPI.COMM_WORLD.rank == 0:
         print(f"Requested center: {requested_center}")

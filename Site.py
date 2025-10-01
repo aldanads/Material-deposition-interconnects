@@ -30,6 +30,8 @@ class Site():
         
         self.kb = constants.physical_constants['Boltzmann constant in eV/K'][0]
         self.nu0=7E12  # nu0 (s^-1) bond vibration frequency
+        
+        self.Act_E_lim = 0.267 # (eV) # Minimum activation barrier for migration
 # =============================================================================
 #     We only consider the neighbors within the lattice domain            
 # =============================================================================
@@ -442,6 +444,7 @@ class Site():
 #         Calculate transition rates    
 # =============================================================================
     def transition_rates(self,**kwargs):
+        self.Act_E_lim = 0.267
         
         T = kwargs.get("T", 300)
         E_site_field = kwargs.get("E_site_field", np.array([0.0, 0.0, 0.0]))
@@ -454,7 +457,7 @@ class Site():
           
             if relevant_field:
               mig_vec = migration_pathways[event[-2]]
-              event[-1] -= round(np.dot(E_site_field,mig_vec) * 1e-10,3) # EAct - b * E_field; (b is bond polarization factor)
+              event[-1] = max(event[-1] - round(np.dot(E_site_field,mig_vec) * 1e-10,3),self.Act_E_lim)
               
             if event[-1] in self.cache_TR:
                 tr_value = self.cache_TR[event[-1]]

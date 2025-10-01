@@ -19,7 +19,7 @@ import os
 import pickle
 import shelve
 import time
-
+import warnings
 
 
 def initialization(n_sim,save_data,lammps_file):
@@ -324,18 +324,18 @@ def initialization(n_sim,save_data,lammps_file):
         # =============================================================================
         material_selection = {"CeO2":"mp-20194", "ZrPbO3":"mp-1068577"}
         technologies = ['ECM','PZT']
-        techonology = technologies[0]
-        id_material_Material_Project = material_selection["CeO2"]
+        techonology = technologies[1]
+        id_material_Material_Project = material_selection["ZrPbO3"]
         crystal_size = (50,50,50) # (angstrom (Å))
         orientation = ['001']
         use_parallel = None
         facets_type = None
         affected_sites = ['Empty','O']
         affected_site = affected_sites[0]
-        interstitial_specie = 'Ag'
+        interstitial_specie = 'H'
 
         mode = ['interstitial', 'vacancy']
-        radius_neighbors = 4
+        radius_neighbors = 5
         
         # The no selected layer will behave like an additional particle for the clustering energy
         sites_generation_layer = ['bottom_layer','top_layer']
@@ -404,7 +404,7 @@ def initialization(n_sim,save_data,lammps_file):
         d_metal_O = central_atom.distance(material_data[0].mol_from_site_environments[0][1])
         
         # Dielectric constant
-        epsilon_r = dielectric_data[0].e_total
+        #epsilon_r = dielectric_data[0].e_total
         try:
             if dielectric_data and len(dielectric_data) > 0 and hasattr(dielectric_data[0], 'e_total'):
                 epsilon_r = dielectric_data[0].e_total
@@ -456,6 +456,12 @@ def initialization(n_sim,save_data,lammps_file):
         clustering_energy = E_dataset[-1]
         E_clustering = [0,0,clustering_energy * 2,clustering_energy * 3,clustering_energy * 4,clustering_energy * 5,clustering_energy * 6,clustering_energy * 7,clustering_energy * 8,clustering_energy * 9,clustering_energy * 10,clustering_energy * 11,clustering_energy * 12,clustering_energy * 13] 
 
+        E_min_mig = 0.267
+
+        Act_E_list = {
+          'E_gen_defect': E_gen_defect, 'E_mig_plane': E_mig_plane, 'E_mig_upward': E_mig_upward, 'E_mig_downward': E_mig_downward,
+          'Binding_energy':binding_energy_bottom_layer, 'clustering_energy': clustering_energy, 'E_min_mig': E_min_mig
+        } 
         Act_E_list = [E_gen_defect, E_mig_plane, E_mig_upward,E_mig_downward,
                       binding_energy_bottom_layer,E_clustering] 
         
@@ -479,9 +485,9 @@ def initialization(n_sim,save_data,lammps_file):
         #             Initialization of defects
         #     
         # =============================================================================
-        P = 0.0
-        #System_state.defect_gen(rng,P)
-        System_state.deposition_specie(0,rng,test = 2)
+        P = 0.03
+        System_state.defect_gen(rng,P)
+        System_state.deposition_specie(0,rng,test = 0)
         
         # This timestep_limits will depend on the V/s ratio
         System_state.timestep_limits = float('inf')
