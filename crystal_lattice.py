@@ -71,6 +71,14 @@ class Crystal_Lattice():
         # Poisson solver parameters
         self.poissonSolver_parameters = kwargs.get('poissonSolver_parameters', None)
 
+        # The device is globally neutral. Charged ions + electrons/dielectric reduced
+        # Example: Ag/CeO2 (Ce4+) --> Ag+ + CeO2 (Ce3+)
+        # Debye length:
+        # There is a distance from a charged particle beyond which its electrostatic influence 
+        # is effectively blocked due to the redistribution of neighboring charges
+        self.screening_factor = self.poissonSolver_parameters['screening_factor']
+        self.ion_charge = self.poissonSolver_parameters['ion_charge']
+
         self.time = 0
         self.list_time = []
         
@@ -94,7 +102,7 @@ class Crystal_Lattice():
         else:
             self.wulff_facets = None
             self.dir_edge_facets = None
-            self.Act_E_gen = self.activation_energies[0]
+            self.Act_E_gen = self.activation_energies['E_gen_defect']
             
             kb = constants.physical_constants['Boltzmann constant in eV/K'][0]
             nu0=7E12;  # nu0 (s^-1) bond vibration frequency
@@ -314,23 +322,20 @@ class Crystal_Lattice():
         if solve_Poisson: #and platform.system() == 'Linux':
             
             Act_E_mig = {}
-            Act_E_gen = self.activation_energies[0]
-            Act_E_binding = self.activation_energies[-2]
-            Act_E_CN_contr = self.activation_energies[-1]
             
             for key,migration_vector in self.migration_pathways.items():
                 z_component = migration_vector[2]
                 # Migration in plane
                 if np.isclose(z_component, 0.0, atol=1e-9):
-                    Act_E_mig[key] = self.activation_energies[1] 
+                    Act_E_mig[key] = self.activation_energies['E_mig_plane'] 
                 # Migration upward
                 elif z_component > 0:
-                    Act_E_mig[key] = self.activation_energies[2]
+                    Act_E_mig[key] = self.activation_energies['E_mig_upward']
                 # Migration downward
                 elif z_component < 0:
-                    Act_E_mig[key] = self.activation_energies[3]
+                    Act_E_mig[key] = self.activation_energies['E_mig_downward']
                     
-            self.activation_energies = [Act_E_gen,Act_E_mig,Act_E_binding,Act_E_CN_contr]
+            self.activation_energies['E_mig'] = Act_E_mig
             
     def crystal_grid(self,grid_crystal,radius_neighbors,mode,affected_site,use_parallel=None):
         
@@ -403,9 +408,8 @@ class Crystal_Lattice():
                 import concurrent.futures
                 # Parallel execution
                 grid_keys = list(self.grid_crystal.keys())
-                # Calculate batch size based on the number of keys
-                batch_size = len(grid_keys) // num_cores
-                batches = [grid_keys[i:i + batch_size] for i in range(0, len(grid_keys), batch_size)]
+                batches = np.array_split(grid_keys, num_cores)
+
 
                 # Each process generates its dictionary 
                 results = []
@@ -444,29 +448,6 @@ class Crystal_Lattice():
                 site.site_events = []
                 site.Act_E_list = self.activation_energies
                 
-    def extract_charges(self):
-        """
-        Extract charge locations and magnitudes from System_state.
-        """
-        charge_locations = []
-        charges = []
-        
-        """
-        The device is globally neutral. Charged ions + electrons
-        The cloud of electrons forms a screening for the electric field
-        
-        Debye length:
-        There is a distance from a charged particle beyond which its electrostatic influence 
-        is effectively blocked due to the redistribution of neighboring charges
-        """
-        screening_factor = 0.018
-        
-        for site in self.sites_occupied:
-            charge_locations.append(self.grid_crystal[site].position)
-            charges.append(1* constants.e * screening_factor)
-            
-        return np.array(charge_locations,dtype=np.float64), np.array(charges, dtype=np.float64)
-            
 
     def get_num_cores(self):
         cores_from_env = (os.environ.get('SLURM_CPUS_PER_TASK') or 
@@ -495,6 +476,20 @@ class Crystal_Lattice():
             )
 
         return local_grid_crystal
+        
+    def extract_charges(self):
+        """
+        Extract charge locations and magnitudes from System_state.
+        """
+        charge_locations = []
+        charges = []
+        
+        for site in self.sites_occupied:
+            charge_locations.append(self.grid_crystal[site].position)
+            charges.append(1* constants.e * self.screening_factor)
+            
+        return np.array(charge_locations,dtype=np.float64), np.array(charges, dtype=np.float64)
+            
                 
     
     def get_idx_coords(self, coords,basis_vectors):
@@ -1035,7 +1030,7 @@ class Crystal_Lattice():
     def introduce_specie_site(self,idx,update_specie_events,update_supp_av):
         
         # Chemical specie deposited
-        self.grid_crystal[idx].introduce_specie(self.chemical_specie)
+        self.grid_crystal[idx].introduce_specie(self.chemical_specie,self.ion_charge)
         
         # Track sites occupied
         self.sites_occupied.append(idx) 

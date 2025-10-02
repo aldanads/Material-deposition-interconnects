@@ -388,6 +388,9 @@ def initialization(n_sim,save_data,lammps_file):
         solve_Poisson = True
         save_Poisson = False
         
+        screening_factor = 0.018
+        ion_charge = 1
+        
 
         
         # Extract data from Materials Project
@@ -404,7 +407,6 @@ def initialization(n_sim,save_data,lammps_file):
         d_metal_O = central_atom.distance(material_data[0].mol_from_site_environments[0][1])
         
         # Dielectric constant
-        #epsilon_r = dielectric_data[0].e_total
         try:
             if dielectric_data and len(dielectric_data) > 0 and hasattr(dielectric_data[0], 'e_total'):
                 epsilon_r = dielectric_data[0].e_total
@@ -419,7 +421,8 @@ def initialization(n_sim,save_data,lammps_file):
 
         poissonSolver_parameters = {'mesh_file':mesh_file,
                                     'epsilon_r':epsilon_r,'chem_env_symmetry':chem_env_symmetry,'metal_valence':metal_valence,'d_metal_O':d_metal_O,'active_dipoles':active_dipoles,
-                                    'poisson_solve_frequency':poisson_solve_frequency,'solve_Poisson':solve_Poisson,'save_Poisson':save_Poisson
+                                    'poisson_solve_frequency':poisson_solve_frequency,'solve_Poisson':solve_Poisson,'save_Poisson':save_Poisson, 'screening_factor':screening_factor,
+                                    'ion_charge':ion_charge
         
         }
         
@@ -457,13 +460,11 @@ def initialization(n_sim,save_data,lammps_file):
         E_clustering = [0,0,clustering_energy * 2,clustering_energy * 3,clustering_energy * 4,clustering_energy * 5,clustering_energy * 6,clustering_energy * 7,clustering_energy * 8,clustering_energy * 9,clustering_energy * 10,clustering_energy * 11,clustering_energy * 12,clustering_energy * 13] 
 
         E_min_mig = 0.267
-
+        
         Act_E_list = {
           'E_gen_defect': E_gen_defect, 'E_mig_plane': E_mig_plane, 'E_mig_upward': E_mig_upward, 'E_mig_downward': E_mig_downward,
-          'Binding_energy':binding_energy_bottom_layer, 'clustering_energy': clustering_energy, 'E_min_mig': E_min_mig
+          'Binding_energy':binding_energy_bottom_layer, 'CN_contr': E_clustering, 'E_min_mig': E_min_mig
         } 
-        Act_E_list = [E_gen_defect, E_mig_plane, E_mig_upward,E_mig_downward,
-                      binding_energy_bottom_layer,E_clustering] 
         
 
         # =============================================================================

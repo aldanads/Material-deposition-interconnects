@@ -31,7 +31,7 @@ class Site():
         self.kb = constants.physical_constants['Boltzmann constant in eV/K'][0]
         self.nu0=7E12  # nu0 (s^-1) bond vibration frequency
         
-        self.Act_E_lim = 0.267 # (eV) # Minimum activation barrier for migration
+        self.ion_charge = 0
 # =============================================================================
 #     We only consider the neighbors within the lattice domain            
 # =============================================================================
@@ -141,10 +141,10 @@ class Site():
                 return
             
             if self.sites_generation_layer in self.supp_by:
-                self.energy_site = self.Act_E_list[-1][len(self.supp_by)] + self.Act_E_list[-2]
+                self.energy_site = self.Act_E_list['CN_contr'][len(self.supp_by)] + self.Act_E_list['Binding_energy']
             else:
                 
-                self.energy_site = self.Act_E_list[-1][len(self.supp_by)+1]
+                self.energy_site = self.Act_E_list['CN_contr'][len(self.supp_by)+1]
                 
                 # Store the result in the cache
             self.cache_clustering_energy[cache_key] = self.energy_site
@@ -161,13 +161,13 @@ class Site():
 
             
             if self.sites_generation_layer in supp_by_destiny and idx_origin in supp_by_destiny:
-                energy_site = self.Act_E_list[-1][len(supp_by_destiny)-1] + self.Act_E_list[-2]
+                energy_site = self.Act_E_list['CN_contr'][len(supp_by_destiny)-1] + self.Act_E_list['Binding_energy']
             elif self.sites_generation_layer in supp_by_destiny and idx_origin not in supp_by_destiny:
-                energy_site = self.Act_E_list[-1][len(supp_by_destiny)] + self.Act_E_list[-2]
+                energy_site = self.Act_E_list['CN_contr'][len(supp_by_destiny)] + self.Act_E_list['Binding_energy']
             elif self.sites_generation_layer not in supp_by_destiny and idx_origin in supp_by_destiny:
-                energy_site = self.Act_E_list[-1][len(supp_by_destiny)]
+                energy_site = self.Act_E_list['CN_contr'][len(supp_by_destiny)]
             elif self.sites_generation_layer not in supp_by_destiny and idx_origin not in supp_by_destiny:
-                energy_site = self.Act_E_list[-1][len(supp_by_destiny)+1]
+                energy_site = self.Act_E_list['CN_contr'][len(supp_by_destiny)+1]
             
             # Store the result in the cache
             self.cache_clustering_energy[cache_key] = energy_site
@@ -184,12 +184,13 @@ class Site():
 # =============================================================================
     # Change chemical_specie status
     # Add the desorption process
-    def introduce_specie(self,chemical_specie):
+    def introduce_specie(self,chemical_specie,ion_charge):
         self.chemical_specie = chemical_specie
-        #self.site_events.append(['Desorption',self.num_event])
+        self.ion_charge = ion_charge
 
     def remove_specie(self,affected_site):
         self.chemical_specie = affected_site
+        self.ion_charge = 0
         #self.site_events.remove(['Desorption',self.num_event])
         self.site_events = []
 
@@ -293,34 +294,20 @@ class Site():
         else:
             
             new_site_events = []
-            Act_E_mig = self.Act_E_list[1]
-    
-            # Plane migrations
-            for site_idx, num_event in self.migration_paths['Plane']:
+            Act_E_mig = self.Act_E_list['E_mig']
+            
+            # Migration types
+            migration_types = ['Plane', 'Up', 'Down']
+            
+            
+            for migration_type in migration_types:
+              for site_idx, num_event in self.migration_paths[migration_type]:
                 if site_idx not in self.supp_by:
-                    
-                    # Obtain energy difference between sites
-                    energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
-                    energy_change = max(energy_site_destiny - self.energy_site, 0)
-                    
-                    new_site_events.append([site_idx, num_event, Act_E_mig[num_event] + energy_change])
-            # Upward migrations
-            for site_idx, num_event in self.migration_paths['Up']:
-                if site_idx not in self.supp_by:
-                    # Obtain energy difference between sites
-                    energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
-                    energy_change = max(energy_site_destiny - self.energy_site, 0)
+                  # Calculate energy difference between sites
+                  energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
+                  energy_change = max(energy_site_destiny - self.energy_site, 0)
+                  new_site_events.append([site_idx, num_event, Act_E_mig[num_event] + energy_change])
 
-                    new_site_events.append([site_idx, num_event, Act_E_mig[num_event] + energy_change])
-
-            # Downward migrations
-            for site_idx, num_event in self.migration_paths['Down']:
-                if site_idx not in self.supp_by:
-                    # Obtain energy difference between sites
-                    energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
-                    energy_change = max(energy_site_destiny - self.energy_site, 0)
-                    
-                    new_site_events.append([site_idx, num_event, Act_E_mig[num_event] + energy_change])
             self.site_events = new_site_events
 
         
@@ -444,7 +431,6 @@ class Site():
 #         Calculate transition rates    
 # =============================================================================
     def transition_rates(self,**kwargs):
-        self.Act_E_lim = 0.267
         
         T = kwargs.get("T", 300)
         E_site_field = kwargs.get("E_site_field", np.array([0.0, 0.0, 0.0]))
@@ -457,7 +443,7 @@ class Site():
           
             if relevant_field:
               mig_vec = migration_pathways[event[-2]]
-              event[-1] = max(event[-1] - round(np.dot(E_site_field,mig_vec) * 1e-10,3),self.Act_E_lim)
+              event[-1] = max(event[-1] - self.ion_charge * round(np.dot(E_site_field,mig_vec) * 1e-10,3),self.Act_E_list['E_min_mig'])
               
             if event[-1] in self.cache_TR:
                 tr_value = self.cache_TR[event[-1]]

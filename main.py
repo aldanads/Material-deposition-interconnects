@@ -193,7 +193,7 @@ for n_sim in range(0,1):
         
         i = 0
         #total_steps = int(1e4)
-        total_steps = int(1e2)
+        total_steps = int(1e1)
         # list_sites_occu = []
         
 
@@ -240,7 +240,6 @@ for n_sim in range(0,1):
                     if rank == 0:
                       
                       # Update System_state based on electric field
-                      #print(f"Migration pathways: {System_state.migration_pathways}")
                       for site, E_site_field in zip(System_state.sites_occupied,E_field):
                         #print(System_state.grid_crystal[site].position,E_site_field)
                         System_state.grid_crystal[site].transition_rates(E_site_field = E_site_field, migration_pathways = System_state.migration_pathways)
