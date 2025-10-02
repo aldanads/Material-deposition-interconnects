@@ -205,7 +205,6 @@ def main():
                 if rank == 0:
                     System_state,KMC_time_step, chosen_event = KMC(System_state,rng)
                     #list_sites_occu.append(len(System_state.sites_occupied))
-                    break
                     # Get charge locations and charges from System_state
                     charge_locations, charges = System_state.extract_charges()
                     
