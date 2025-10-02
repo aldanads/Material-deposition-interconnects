@@ -294,7 +294,7 @@ class Crystal_Lattice():
                 [-1/np.sqrt(3), 1/np.sqrt(3), 1/np.sqrt(3)]
             ])
         
-    def initialize_migration_pathways(self, radius_neighbors):
+    def _initialize_migration_pathways(self, radius_neighbors):
         """Initialize migration pathways and event labels for all possible atomic migrations"""
         self.coord_cache = {}
         self.event_labels = {}
@@ -339,7 +339,7 @@ class Crystal_Lattice():
             
     def crystal_grid(self,grid_crystal,radius_neighbors,mode,affected_site,use_parallel=None):
         
-        self.initialize_migration_pathways(radius_neighbors)
+        self._initialize_migration_pathways(radius_neighbors)
         
         try:
             from mpi4py import MPI
@@ -515,15 +515,45 @@ class Crystal_Lattice():
                 self.crystal_size, self.event_labels, idx
             )
 
-    def get_num_cores(self):
-        # cores_from_env = (os.environ.get('SLURM_CPUS_PER_TASK') or 
-        #     os.environ.get('PBS_NP'))        
-        # # Default to 1 core if environment variables are not set
-        # requested_cores = int(cores_from_env) if cores_from_env else 1
-        # return requested_cores
-        """Get the number of logical CPU cores available."""
-        import psutil
-        return psutil.cpu_count(logical=False)
+    def get_num_cores(self,local_max_cores=6):
+        # Get number of cores in SLURM, PBS or local machine
+        
+        # HPC: SLURM
+        if 'SLURM_CPUS_PER_TASK' in os.environ:
+            try:
+                cores = int(os.environ['SLURM_CPUS_PER_TASK'])
+                return max(1, cores - 1)  # Reserve 1 for system/OpenMP
+            except (ValueError, TypeError):
+                pass
+        
+        # HPC: PBS
+        if 'PBS_NUM_PPN' in os.environ:
+            try:
+                cores = int(os.environ['PBS_NUM_PPN'])
+                # Reserve 1 core for OpenMP/system processes
+                return max(1, cores - 1)
+            except ValueError:
+                pass
+            
+        # Fallback to OMP_NUM_THREADS if set
+        if 'OMP_NUM_THREADS' in os.environ:
+            try:
+                cores = int(os.environ['OMP_NUM_THREADS'])
+                return max(1, cores - 1)
+            except ValueError:
+                pass
+            
+        # Local machine:
+        try:
+            import psutil
+            cores = psutil.cpu_count(logical=True)
+            if cores in None:
+                cores = os.cpu_count() or 1
+                
+        except ImportError:
+            cores = os.cpu_count() or 1
+        return min(cores, local_max_cores)
+        
     
     def process_batch_sites_worker(self, batch_keys, batch_sites,full_grid,shared_data):
 

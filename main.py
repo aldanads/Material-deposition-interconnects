@@ -277,8 +277,6 @@ def main():
     
     
         if rank == 0:
-          System_state.plot_crystal(45,45)
-        
           # Variables to save
           variables = {'System_state' : System_state}
           filename = 'variables'
