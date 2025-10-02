@@ -382,7 +382,7 @@ def initialization(n_sim,save_data,lammps_file):
         
         # Parameters for Poisson solver
         active_dipoles = 4
-        poisson_solve_frequency = int(1e0)  # Solve Poisson every N KMC steps
+        poisson_solve_frequency = int(1e1)  # Solve Poisson every N KMC steps
         
         solve_Poisson = True
         save_Poisson = False

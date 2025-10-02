@@ -35,7 +35,7 @@ def main():
         System_state.plot_crystal(45,45,paths['data'],0)    
         j = 0
         
-        snapshoots_steps = int(1e0)
+        snapshoots_steps = int(1e1)
         starting_time = time.time()
     # =============================================================================
     #     Deposition
@@ -194,13 +194,12 @@ def main():
             
             i = 0
             #total_steps = int(1e4)
-            total_steps = int(1e1)
+            total_steps = int(1e3)
             # list_sites_occu = []
             
     
             while j*snapshoots_steps < total_steps:
                 
-                i+=1
                 # KMC step runs in serial (only on rank 0)
                 if rank == 0:
                     System_state,KMC_time_step, chosen_event = KMC(System_state,rng)
@@ -236,24 +235,25 @@ def main():
             
                         if save_Poisson:
                           poisson_solver.save_potential(uh,System_state.time,j+1)
-                        
-                        if rank == 0:
                           
-                          # Update System_state based on electric field
-                          for site, E_site_field in zip(System_state.sites_occupied,E_field):
-                            #print(System_state.grid_crystal[site].position,E_site_field)
-                            System_state.grid_crystal[site].transition_rates(E_site_field = E_site_field, migration_pathways = System_state.migration_pathways)
-                            #print(System_state.grid_crystal[site].site_events)
-                          
-                          print(f"Poisson solved at step {i}")
-                          print("")
+                        if rank == 0: print(f"Poisson solved at step {i}")
+
                         
+                        
+                  if rank == 0:
+                          
+                    # Update System_state based on electric field
+                    for site, E_site_field in zip(System_state.sites_occupied,E_field):
+                      #print(System_state.grid_crystal[site].position,E_site_field)
+                      System_state.grid_crystal[site].transition_rates(E_site_field = E_site_field, migration_pathways = System_state.migration_pathways)
+                      #print(System_state.grid_crystal[site].site_events)
+                          
                     
                 # Synchronize before continuing
                 if comm is not None:
                   comm.Barrier()
                      
-    
+                i+=1
                 if i%snapshoots_steps== 0:
                 
                     j+=1
