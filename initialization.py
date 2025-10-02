@@ -324,18 +324,18 @@ def initialization(n_sim,save_data,lammps_file):
         # =============================================================================
         material_selection = {"CeO2":"mp-20194", "ZrPbO3":"mp-1068577"}
         technologies = ['ECM','PZT']
-        techonology = technologies[1]
-        id_material_Material_Project = material_selection["ZrPbO3"]
+        techonology = technologies[0]
+        id_material_Material_Project = material_selection["CeO2"]
         crystal_size = (50,50,50) # (angstrom (Å))
         orientation = ['001']
         use_parallel = None
         facets_type = None
         affected_sites = ['Empty','O']
         affected_site = affected_sites[0]
-        interstitial_specie = 'H'
+        interstitial_specie = 'Ag'
 
         mode = ['interstitial', 'vacancy']
-        radius_neighbors = 5
+        radius_neighbors = 4
         
         # The no selected layer will behave like an additional particle for the clustering energy
         sites_generation_layer = ['bottom_layer','top_layer']
@@ -378,7 +378,6 @@ def initialization(n_sim,save_data,lammps_file):
         #             Electric field parameters: Required for the Poisson Solver
         #     
         # =============================================================================
-        # Initialize Poisson solver on all MPI ranks
         mesh_file = formula + "_" + str(int(max(crystal_size) / 10)) + "nm" + "_mesh.msh"  # Adjust filename as needed
         
         # Parameters for Poisson solver

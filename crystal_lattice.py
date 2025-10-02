@@ -340,105 +340,73 @@ class Crystal_Lattice():
     def crystal_grid(self,grid_crystal,radius_neighbors,mode,affected_site,use_parallel=None):
         
         self.initialize_migration_pathways(radius_neighbors)
-
         
+        try:
+            from mpi4py import MPI
+            comm = MPI.COMM_WORLD
+            rank = comm.rank
+            use_mpi = True
+        except (ImportError, AttributeError):
+            # MPI not available or not initialized
+            rank = 0
+            use_mpi = False
+ 
         if grid_crystal == None:
-            # Set default parallelization based on system size and cores
-            if use_parallel is None:
-                use_parallel = len(self.structure) > 1600
-                num_cores = self.get_num_cores()
-
-            
-            
-            # Step 1: Create the initial grid_crystal dictionary
-            # We obtain integer idx
-            # if mode == 'vacancy':
-            self.grid_crystal = {
-                self.get_idx_coords(site.coords,self.basis_vectors):Site(affected_site,
-                    tuple(site.coords),
-                    self.activation_energies)
-                for site in self.structure
-            }
-            # else:
-                # self.grid_crystal = {
-                #     self.get_idx_coords(site.coords,self.basis_vectors):Site("Empty",
-                #         tuple(site.coords),
-                #         self.activation_energies)
-                #     for site in self.structure
-                # }
-                    
-            # Step 2: Handle missing neighbors
-            # Search for missing sites before we start the neighbor analysis
-            
-            tol = 1e-6
-            domain_height = tol
-
-            for site in self.structure:
-                # Neighbors for each idx in grid_crystal
-                neighbors = self.structure.get_neighbors(site,radius_neighbors)
-                neighbors_positions = [neigh.coords for neigh in neighbors]
-                neighbors_idx = [self.get_idx_coords(neigh.coords,self.basis_vectors) for neigh in neighbors]
-    
-                # Some sites are not created with the dictionary comprenhension
-                # If the sites have neighbors that are within the crystal dimension range
-                # but not included, we included
-                for neigh_idx,pos in zip(neighbors_idx,neighbors_positions):
-                    if (neigh_idx not in self.grid_crystal) and (-tol <= pos[2] <= self.crystal_size[2] + tol): 
-                        
-                        # Select the highest point of the domain
-                        if pos[2] > domain_height:
-                            domain_height = pos[2]
+            if rank == 0:
+                # Set default parallelization based on system size and cores
+                if use_parallel is None:
+                    use_parallel = len(self.structure) > 1600
+                    num_cores = self.get_num_cores()
                 
-                        pos_aux = (pos[0] % self.crystal_size[0], pos[1] % self.crystal_size[1], pos[2])
+                # Step 1: Create the initial grid_crystal dictionary
+                # We obtain integer idx
+                print(f'Initializing grid_crystal with {len(self.structure)} sites')
+                start_time = time.perf_counter()
+                self.grid_crystal = {
+                    self.get_idx_coords(site.coords,self.basis_vectors):Site(affected_site,
+                        tuple(site.coords),
+                        self.activation_energies)
+                    for site in self.structure
+                }
                         
-                        # If not in the boundary region, where we should apply periodic boundary conditions
-                        if tuple(pos) == pos_aux:
-                            self.grid_crystal[neigh_idx] = Site(affected_site,
-                                          tuple(pos),
-                                          self.activation_energies)
-                            
-                self.domain_height = domain_height
-                
-    
-            # Step 3: Perform neighbor analysis
-            # Use ProcessPoolExecutor to parallelize the loop
-            start_time = time.perf_counter()
+                # Step 2: Handle missing neighbors
+                # Search for missing sites before we start the neighbor analysis
+                self._handle_missing_neighbors(radius_neighbors, affected_site)
             
-            if use_parallel and num_cores > 1:
-                import concurrent.futures
-                # Parallel execution
-                grid_keys = list(self.grid_crystal.keys())
-                batches = np.array_split(grid_keys, num_cores)
-
-
-                # Each process generates its dictionary 
-                results = []
-                with concurrent.futures.ProcessPoolExecutor(max_workers=num_cores) as executor:
-                    results = list(executor.map(self.process_batch_site, batches))                
-    
-                # Combine results from all processes: Merge dictionaries and combine missing sites
-                for result in results:
-                    self.grid_crystal.update(result)
+                # Step 3: Perform neighbor analysis
+                # Use ProcessPoolExecutor to parallelize the loop
+                if use_parallel and num_cores > 1:
+                    print(f'Starting parallel neighbor analysis with {num_cores} cores')
+                    self._parallel_neighbors_analysis(num_cores)
+                else:
+                    print('Starting sequencial neighbor')
+                    self._sequencial_neighbors_analysis()
                     
+                end_time = time.perf_counter()
+                print(f"Initialization time for grid and neighbor analysis: {end_time - start_time:.4f} seconds")
+                    
+                if use_mpi:
+                    # Prepare data for broadcasting
+                    grid_data = {
+                        'grid_crystal': self.grid_crystal,
+                        'domain_height': self.domain_height
+                    }
+                else:
+                    grid_data = None
+                
             else:
-
-                # Sequential execution
-                for idx,site in self.grid_crystal.items(): 
-                    neighbors = self.structure.get_sites_in_sphere(site.position,radius_neighbors)
-                    neighbors = [neighbor for neighbor in neighbors if not np.allclose(neighbor.coords, site.position)]
-                    neighbors_positions = [neigh.coords for neigh in neighbors]
-                    neighbors_idx = [self.get_idx_coords(neigh.coords,self.basis_vectors) for neigh in neighbors]
-                    
-                    site.neighbors_analysis(
-                        self.grid_crystal, neighbors_idx, neighbors_positions,
-                        self.crystal_size, self.event_labels, idx
-                        )
-                    
-                    
-            end_time = time.perf_counter()
-            elapsed_time = end_time - start_time
-            print(f"Time elapsed in neighbor analysis: {elapsed_time:.4f} seconds")
-            
+                # Only reached when using MPI and rank != 0
+                grid_data = None
+                
+            # Broadcast only if using MPI
+            if use_mpi:
+                grid_data = comm.bcast(grid_data,root = 0)
+                
+                if rank != 0:
+                    self.grid_crystal = grid_data['grid_crystal']
+                    self.domain_height = grid_data['domain_height']
+                        
+                
         else:
             
             self.grid_crystal = grid_crystal
@@ -448,34 +416,165 @@ class Crystal_Lattice():
                 site.site_events = []
                 site.Act_E_list = self.activation_energies
                 
+    def _handle_missing_neighbors(self,radius_neighbors, affected_site):
+        """
+        Identify and add missing neighbor sites to the grid_crystal.
+        Some neighbor sites weren't initially created during grid initialization using structure. 
+        This method finds these missing sites and adds them to ensure complete neighbor analysis.
+        
+        Args:
+        radius_neighbors (float): Neighbor search radius
+        affected_site: Site type for newly created sites
+        """
+        tol = 1e-6
+        domain_height = tol
 
-    def get_num_cores(self):
-        cores_from_env = (os.environ.get('SLURM_CPUS_PER_TASK') or 
-            os.environ.get('PBS_NP'))        
-        # Default to 1 core if environment variables are not set
-        requested_cores = int(cores_from_env) if cores_from_env else 1
-        return requested_cores
-                
-    def process_batch_site(self, batch):
-
-        radius_neighbors = 3
-        local_grid_crystal = {key:self.grid_crystal[key] for key in batch}
- 
-        i = 0
-        for idx,site in local_grid_crystal.items():
-            i+= 1
-            neighbors = self.structure.get_sites_in_sphere(site.position,radius_neighbors)
-            neighbors = [neighbor for neighbor in neighbors if not np.allclose(neighbor.coords, site.position)]
+        for site in self.structure:
+            # Neighbors for each idx in grid_crystal
+            neighbors = self.structure.get_neighbors(site,radius_neighbors)
             neighbors_positions = [neigh.coords for neigh in neighbors]
             neighbors_idx = [self.get_idx_coords(neigh.coords,self.basis_vectors) for neigh in neighbors]
-        
 
+            # Some sites are not created with the dictionary comprenhension
+            # If the sites have neighbors that are within the crystal dimension range
+            # but not included, we included
+            for neigh_idx,pos in zip(neighbors_idx,neighbors_positions):
+                if (neigh_idx not in self.grid_crystal) and (-tol <= pos[2] <= self.crystal_size[2] + tol): 
+                    
+                    # Select the highest point of the domain
+                    if pos[2] > domain_height:
+                        domain_height = pos[2]
+            
+                    pos_aux = (pos[0] % self.crystal_size[0], pos[1] % self.crystal_size[1], pos[2])
+                    
+                    # If not in the boundary region, where we should apply periodic boundary conditions
+                    if tuple(pos) == pos_aux:
+                        self.grid_crystal[neigh_idx] = Site(affected_site,
+                                      tuple(pos),
+                                      self.activation_energies)
+                        
+            self.domain_height = domain_height
+                
+    def _parallel_neighbors_analysis(self, num_cores=4):
+        import concurrent.futures
+        import math
+        from itertools import batched
+
+        #from copy import deepcopy
+        # Parallel execution
+        grid_keys = list(self.grid_crystal.keys())
+        batch_size = math.ceil(len(grid_keys) / num_cores)
+        batches = list(batched(grid_keys, batch_size))
+        # Prepare immutable shared data
+        shared_data = {
+            'structure':self.structure,
+            'basis_vectors':self.basis_vectors,
+            'crystal_size': self.crystal_size,
+            'event_labels': self.event_labels,
+            'radius_neighbors': self.radius_neighbors
+        }
+
+
+        # Each process generates its dictionary 
+        with concurrent.futures.ProcessPoolExecutor(max_workers=num_cores) as executor:
+            futures = [
+                executor.submit(
+                    self.process_batch_sites_worker,
+                    batch,
+                    {k:self.grid_crystal[k] for k in batch}, # Sites to process
+                    self.grid_crystal, # Full grid for neighbor
+                    shared_data
+                )
+                for batch in batches
+                
+            ]
+            
+            results = [future.result() for future in futures]                
+
+        # Upgrade grid with modified sites
+        for batch_result in results:
+            for idx, modified_site in batch_result.items():
+                self.grid_crystal[idx] = modified_site
+                
+    def _sequencial_neighbors_analysis(self):
+        # Sequential execution
+        for idx,site in self.grid_crystal.items(): 
+            neighbors = self.structure.get_sites_in_sphere(
+                site.position,self.radius_neighbors
+            )
+            neighbors = [neighbor for neighbor in neighbors 
+                         if not np.allclose(neighbor.coords, site.position)]
+            neighbors_positions = [neigh.coords for neigh in neighbors]
+            neighbors_idx = [
+                self.get_idx_coords(neigh.coords,self.basis_vectors) 
+                for neigh in neighbors
+            ]
+            
             site.neighbors_analysis(
                 self.grid_crystal, neighbors_idx, neighbors_positions,
                 self.crystal_size, self.event_labels, idx
             )
 
-        return local_grid_crystal
+    def get_num_cores(self):
+        # cores_from_env = (os.environ.get('SLURM_CPUS_PER_TASK') or 
+        #     os.environ.get('PBS_NP'))        
+        # # Default to 1 core if environment variables are not set
+        # requested_cores = int(cores_from_env) if cores_from_env else 1
+        # return requested_cores
+        """Get the number of logical CPU cores available."""
+        import psutil
+        return psutil.cpu_count(logical=False)
+    
+    def process_batch_sites_worker(self, batch_keys, batch_sites,full_grid,shared_data):
+
+        """
+        Worker function that processes a batch of sites.
+
+        Args:
+            batch_keys: List of site indices to process
+            batch_sites: Dict of sites to modify (copies)
+            full_grid: Complete grid for neighbor lookups (read-only)
+            shared_data: Dict with structure, basis_vectors, etc.
+
+        Returns:
+            Dict of {idx: modified_site} for sites in this batch
+        """
+        structure = shared_data['structure']
+        basis_vectors = shared_data['basis_vectors']
+        crystal_size = shared_data['crystal_size']
+        event_labels = shared_data['event_labels']
+        radius_neighbors = shared_data['radius_neighbors']
+        
+        modified_sites = {}
+ 
+        for idx in batch_keys:
+            site = batch_sites[idx]
+            
+            #Get neighbors
+            neighbors = structure.get_sites_in_sphere(
+                site.position,radius_neighbors
+            )
+            neighbors = [neighbor for neighbor in neighbors 
+                         if not np.allclose(neighbor.coords, site.position)]
+            neighbors_positions = [neigh.coords for neigh in neighbors]
+            neighbors_idx = [
+                self.get_idx_coords(neigh.coords,basis_vectors) 
+                for neigh in neighbors
+            ]
+        
+            # Modify site in-place (it is a copy)
+            site.neighbors_analysis(
+                full_grid, # Read-only access
+                neighbors_idx, 
+                neighbors_positions,
+                crystal_size, 
+                event_labels, 
+                idx
+            )
+            
+            modified_sites[idx] = site
+
+        return modified_sites
         
     def extract_charges(self):
         """

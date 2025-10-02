@@ -15,7 +15,6 @@ from pathlib import Path
 from dolfinx import mesh, fem, default_scalar_type, io, geometry
 from dolfinx.fem import functionspace
 from dolfinx.fem.petsc import LinearProblem
-from mpi4py import MPI
 from dolfinx.io import gmshio
 from dolfinx.io import VTXWriter
 import gmsh
@@ -56,13 +55,13 @@ class PoissonSolver():
         self.gmsh_model_rank = kwargs.get("gmsh_model_rank", 0)
         self.gdim = kwargs.get("gdim",3)
         self.padding = kwargs.get("bounding_box_padding",5.0)
-        self.mesh_size = kwargs.get("mesh_size",0.8) #(�)
-        self.epsilon_gc = kwargs.get("epsilon_gaussian_charge",1.8) #(�)
+        self.mesh_size = kwargs.get("mesh_size",0.8) #(Å)
+        self.epsilon_gc = kwargs.get("epsilon_gaussian_charge",1.8) #(Å)
         # Set parameters for mesh refinement
         self.active_mesh_refinement = kwargs.get("activate_mesh_refinement",True)
         if self.active_mesh_refinement:
-          self.fine_mesh_size = kwargs.get("fine_mesh_size",0.25) #(�)
-          self.refinement_radius = kwargs.get("refinement_radius",1) #(�)
+          self.fine_mesh_size = kwargs.get("fine_mesh_size",0.25) #(Å)
+          self.refinement_radius = kwargs.get("refinement_radius",1) #(Å)
         
         # Poisson parameters
         self.poissonSolver_parameters = poissonSolver_parameters
@@ -216,8 +215,8 @@ class PoissonSolver():
               
           # Create bounding box -> The smallest rectangular (in 2D) or cuboidal (in 3D) volume that fully encloses a given set of objects.
           # Defined by:
-          # Minimum coordinates (min_coords) → The smallest (𝑥,𝑦,𝑧) values.
-          # Maximum coordinates (max_coords) → The largest (𝑥,𝑦,𝑧) values.
+          # Minimum coordinates (min_coords) â The smallest (ð¥,ð¦,ð§) values.
+          # Maximum coordinates (max_coords) â The largest (ð¥,ð¦,ð§) values.
           min_coords = np.min(points, axis=0) - self.padding
           max_coords = np.max(points, axis=0) + self.padding
           box_tag = gmsh.model.occ.addBox(
@@ -233,10 +232,10 @@ class PoissonSolver():
           
           # Embed lattice points (point_tags) into the volume (box_tag)
           # gmsh.model.mesh.embed(dim, tags, target_dim, target_tag)
-              # dim = 0 → The dimension of the entities being embedded (0 = points).
-              # tags = point_tags → A list of point tags (the points to embed).
-              # target_dim = 3 → The dimension of the target entity (3 = volume).
-              # target_tag = box_tag → The tag of the target volume (where points are embedded).
+              # dim = 0 â The dimension of the entities being embedded (0 = points).
+              # tags = point_tags â A list of point tags (the points to embed).
+              # target_dim = 3 â The dimension of the target entity (3 = volume).
+              # target_tag = box_tag â The tag of the target volume (where points are embedded).
           gmsh.model.mesh.embed(0,point_tags,self.gdim,box_tag)
           
           # Add physical group for the domain (3D elements)
@@ -779,7 +778,7 @@ class PoissonSolver():
       if len(points_on_proc) > 0:
         points_on_proc = np.array(points_on_proc, dtype = np.float64)
         # Evaluate expression at all points at once
-        E_local = self.E_field.eval(points_on_proc, local_cells) # Units: V/�
+        E_local = self.E_field.eval(points_on_proc, local_cells) # Units: V/Å
         
         
         for j, global_idx in enumerate(local_idx):
@@ -907,12 +906,12 @@ class PoissonSolver():
       of dielectric breakdown in high dielectric constant              
       materials." Applied Physics Letters 82, no. 13 (2003): 2121-2123.
       """
-      # Dipole moment: Units (e�); 1D = Debye	� 0.2081943 e�� (large dipole moment is around 11D)
+      # Dipole moment: Units (eÅ); 1D = Debye	 0.2081943 e·Å (large dipole moment is around 11D)
       # Dipole moment: Units (enm)
       L = {'Tetrahedron': 1/3, 'Octahedron': 1, 'Trigonal': np.sqrt(2/3), 'Cube': np.sqrt(1/3), 'Disheptahedral': np.sqrt(2/3), 'Cuboctahedral': np.sqrt(1/3)}
       
       metal_valence = self.poissonSolver_parameters['metal_valence'] # Metal valence
-      d_metal_O = self.poissonSolver_parameters['d_metal_O'] #Units: �
+      d_metal_O = self.poissonSolver_parameters['d_metal_O'] #Units: Å
       chem_env_symmetry = self.poissonSolver_parameters['chem_env_symmetry'] # Symmetry in the local environment (molecule)
       active_dipoles = self.poissonSolver_parameters['active_dipoles']
       epsilon_r = self.poissonSolver_parameters['epsilon_r']
