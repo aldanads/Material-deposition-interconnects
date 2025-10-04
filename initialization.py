@@ -382,7 +382,7 @@ def initialization(n_sim,save_data,lammps_file):
         
         # Parameters for Poisson solver
         active_dipoles = 4
-        poisson_solve_frequency = int(1e1)  # Solve Poisson every N KMC steps
+        poisson_solve_frequency = int(1e0)  # Solve Poisson every N KMC steps
         
         solve_Poisson = True
         save_Poisson = False
@@ -459,10 +459,11 @@ def initialization(n_sim,save_data,lammps_file):
         E_clustering = [0,0,clustering_energy * 2,clustering_energy * 3,clustering_energy * 4,clustering_energy * 5,clustering_energy * 6,clustering_energy * 7,clustering_energy * 8,clustering_energy * 9,clustering_energy * 10,clustering_energy * 11,clustering_energy * 12,clustering_energy * 13] 
 
         E_min_mig = 0.267
+        E_min_gen = 0.3
         
         Act_E_list = {
           'E_gen_defect': E_gen_defect, 'E_mig_plane': E_mig_plane, 'E_mig_upward': E_mig_upward, 'E_mig_downward': E_mig_downward,
-          'Binding_energy':binding_energy_bottom_layer, 'CN_contr': E_clustering, 'E_min_mig': E_min_mig
+          'Binding_energy':binding_energy_bottom_layer, 'CN_contr': E_clustering, 'E_min_mig': E_min_mig, 'E_min_gen': E_min_gen
         } 
         
 
@@ -485,9 +486,9 @@ def initialization(n_sim,save_data,lammps_file):
         #             Initialization of defects
         #     
         # =============================================================================
-        P = 0.03
-        System_state.defect_gen(rng,P)
-        System_state.deposition_specie(0,rng,test = 0)
+        #P = 0.03
+        #System_state.defect_gen(rng,P)
+        #System_state.deposition_specie(0,rng,test = 0)
         
         # This timestep_limits will depend on the V/s ratio
         System_state.timestep_limits = float('inf')

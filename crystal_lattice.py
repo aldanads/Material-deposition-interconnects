@@ -547,7 +547,7 @@ class Crystal_Lattice():
         try:
             import psutil
             cores = psutil.cpu_count(logical=True)
-            if cores in None:
+            if cores is None:
                 cores = os.cpu_count() or 1
                 
         except ImportError:
@@ -606,18 +606,29 @@ class Crystal_Lattice():
 
         return modified_sites
         
-    def extract_charges(self):
+    def extract_particles_charges(self):
         """
         Extract charge locations and magnitudes from System_state.
         """
-        charge_locations = []
+        particle_locations = []
         charges = []
         
         for site in self.sites_occupied:
-            charge_locations.append(self.grid_crystal[site].position)
-            charges.append(1* constants.e * self.screening_factor)
+            particle_locations.append(self.grid_crystal[site].position)
+            charges.append(self.grid_crystal[site].ion_charge * constants.e * self.screening_factor)
             
-        return np.array(charge_locations,dtype=np.float64), np.array(charges, dtype=np.float64)
+        return np.array(particle_locations,dtype=np.float64), np.array(charges, dtype=np.float64)
+        
+    def extract_generation_site_location(self):
+        """
+        Extract generation site locations from System_state.
+        """
+        gen_site_locations = []
+        
+        for site in self.adsorption_sites:
+            gen_site_locations.append(self.grid_crystal[site].position)
+            
+        return np.array(gen_site_locations,dtype=np.float64)
             
                 
     
@@ -748,37 +759,76 @@ class Crystal_Lattice():
         }
 
         
-    def available_generation_sites(self, sites_generation_layer,update_supp_av = set()):
+    def available_generation_sites(self, update_supp_av = set()):
         
+        
+        # Generation of vacancy in the bulk
         if self.mode == 'vacancy': return
 
-        if not update_supp_av:
 
-            self.adsorption_sites = [
-                idx for idx, site in self.grid_crystal.items()
-                if (sites_generation_layer in site.supp_by or len(site.supp_by) > 2) and site.chemical_specie == self.affected_site
-                ]
                 
                     
-                    
-        else:
+        # Normal deposition process: gas-substrate interface
+        elif self.mode == 'regular':
+        
+            """
+            Deprecating: 2025/10/03
+            
+            if not update_supp_av:
+              # The sites in contact with the substrate or supported by more than 2 particles
+              self.adsorption_sites = [
+                  idx for idx, site in self.grid_crystal.items()
+                  if (self.sites_generation_layer in site.supp_by or len(site.supp_by) > 2) and site.chemical_specie == self.affected_site
+              ]
+            """
+            
             adsorption_sites_set = set(self.adsorption_sites)
 
             for idx in update_supp_av:
                 site = self.grid_crystal[idx]
 
                 if idx in adsorption_sites_set:
-                    if ((sites_generation_layer not in site.supp_by and len(site.supp_by) < 3) or (site.chemical_specie != self.affected_site)):
+                    if ((self.sites_generation_layer not in site.supp_by and len(site.supp_by) < 3) or (site.chemical_specie != self.affected_site)):
                         self.adsorption_sites.remove(idx)
                         site.remove_event_type(self.num_event-1)
                     
                 else:
-                    if (sites_generation_layer in site.supp_by or len(site.supp_by) > 2) and site.chemical_specie == self.affected_site:
+                    if (self.sites_generation_layer in site.supp_by or len(site.supp_by) > 2) and site.chemical_specie == self.affected_site:
                         self.adsorption_sites.append(idx)
                         site.deposition_event(self.TR_gen,idx,self.num_event-1,self.Act_E_gen)
+           
+           
                         
+        # Oxidation reaction at the electrode-dielectric interface
+        elif self.mode == 'interstitial':
+          
+          """
+          Deprecating: 2025/10/03
+          
+          if not update_supp_av:
+                # The sites in contact with the chemically active electrode and they are empty
+                self.adsorption_sites = [
+                    idx for idx, site in self.grid_crystal.items()
+                    if (self.sites_generation_layer in site.supp_by) and (site.chemical_specie == self.affected_site)
+                ]
+          """      
+                
+                        
+          adsorption_sites_set = set(self.adsorption_sites)
 
+          for idx in update_supp_av:
+                site = self.grid_crystal[idx]
 
+                if idx in adsorption_sites_set:
+                    if (site.chemical_specie != self.affected_site):
+                        self.adsorption_sites.remove(idx)
+                        site.remove_event_type(self.num_event-1)
+                    
+                else:
+                    if (self.sites_generation_layer in site.supp_by) and (site.chemical_specie == self.affected_site):
+                        self.adsorption_sites.append(idx)
+                        site.ion_generation_interface(idx,'generation',self.Act_E_gen)
+           
         
                     
     def transition_rate_adsorption(self,experimental_conditions):
@@ -1063,7 +1113,7 @@ class Crystal_Lattice():
 # =============================================================================
 #         Specie migration
 # =============================================================================
-        if chosen_event[2] <= (self.num_event - 2): # 12 migration possibilities [0-11] and [12] for migrating from superbasin
+        if isinstance(chosen_event[2], int): # If is int: migration or superbasin
             
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(chosen_event[1],update_specie_events,update_supp_av)
@@ -1078,9 +1128,9 @@ class Crystal_Lattice():
             self.update_sites(update_specie_events,update_supp_av)
 
 # =============================================================================
-#         Specie deposition
+#         Specie generation
 # =============================================================================            
-        elif chosen_event[2] == self.num_event - 1: # [13 for deposition]
+        elif chosen_event[2] == 'generation':
             
             update_specie_events,update_supp_av = self.introduce_specie_site(chosen_event[1],update_specie_events,update_supp_av)
             
@@ -1113,7 +1163,7 @@ class Crystal_Lattice():
                 self.grid_crystal[idx].supported_by(self.grid_crystal,self.wulff_facets,
                                                     self.dir_edge_facets,self.chemical_specie,self.affected_site,
                                                     self.domain_height,self.sites_generation_layer)
-            self.available_generation_sites(self.sites_generation_layer,update_supp_av)
+            self.available_generation_sites(update_supp_av)
         
         if update_specie_events: 
             # Sites are not available because a particle has migrated there
@@ -1121,37 +1171,6 @@ class Crystal_Lattice():
                 self.grid_crystal[idx].available_migrations(self.grid_crystal,idx,self.facets_type)
                 self.grid_crystal[idx].transition_rates()
    
-    # def update_sites_2(self,update_specie_events,update_supp_av, batch_size=10):
-
-    #     if update_supp_av:
-    #         with ThreadPoolExecutor() as executor:
-    #             # Split update_supp_av into batches
-    #             batches = [list(update_supp_av)[i:i + batch_size] for i in range(0, len(update_supp_av), batch_size)]
-    #             futures = []
-
-    #             for batch in batches:
-    #                 futures.append(executor.submit(self.process_batch_update, batch, update_specie_events))
-                        
-    #             for future in futures:
-    #                 future.result()  # Wait for all futures to complete
-                
-        
-        # if update_specie_events: 
-        #     # Sites are not available because a particle has migrated there
-        #     for idx in update_specie_events:
-        #         self.grid_crystal[idx].available_migrations(self.grid_crystal,idx)
-        #         self.grid_crystal[idx].transition_rates(self.temperature)
-    
-                
-    # def process_site_update(self, idx, update_specie_events):
-    #     self.grid_crystal[idx].supported_by(self.grid_crystal, self.wulff_facets[:,14],self.dir_edge_facets)
-    #     self.available_adsorption_sites([idx])
-    #     if self.grid_crystal[idx].chemical_specie != 'Empty':
-    #         update_specie_events.append(idx)
-            
-    # def process_batch_update(self, batch, update_specie_events):
-    #     for idx in batch:
-    #         self.process_site_update(idx, update_specie_events)
 
 # =============================================================================
 #             Introduce particle

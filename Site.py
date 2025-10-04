@@ -314,6 +314,9 @@ class Site():
     def deposition_event(self,TR,idx_origin,num_event,Act_E):
         self.site_events.append([TR,idx_origin, num_event, Act_E])
         
+    def ion_generation_interface(self,idx_origin,num_event,Act_E):
+        self.site_events.append([idx_origin, num_event, Act_E])
+        
     def remove_event_type(self,num_event):
         
         for i, event in enumerate(self.site_events):
@@ -442,8 +445,11 @@ class Site():
         for event in self.site_events:
           
             if relevant_field:
-              mig_vec = migration_pathways[event[-2]]
-              event[-1] = max(event[-1] - self.ion_charge * round(np.dot(E_site_field,mig_vec) * 1e-10,3),self.Act_E_list['E_min_mig'])
+              if event[-2] == 'generation':
+                event[-1] = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
+              else:
+                mig_vec = migration_pathways[event[-2]]
+                event[-1] = max(event[-1] - self.ion_charge * round(np.dot(E_site_field,mig_vec) * 1e-10,3),self.Act_E_list['E_min_mig'])
               
             if event[-1] in self.cache_TR:
                 tr_value = self.cache_TR[event[-1]]

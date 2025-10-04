@@ -38,7 +38,7 @@ def KMC(System_state,rng):
     TR_tree = build_tree(TR_catalog)
     # Each node is the sum of their children, starting from the leaf
     sumTR = update_data(TR_tree)
-    
+    print(sumTR)
 
     if sumTR == None: return System_state,time_step, None # Exit if there is not possible event
     # When we only have one node in the tree, it returns a tuple

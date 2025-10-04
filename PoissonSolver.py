@@ -625,7 +625,12 @@ class PoissonSolver():
         total_charge = MPI.COMM_WORLD.allreduce(local_charge, op=MPI.SUM)
         
         expected_charge = sum(charges)
-        charge_error = 100 * abs((total_charge - expected_charge) / expected_charge)
+        #if expected_charge > 0:
+        #  charge_error = 100 * abs((total_charge - expected_charge) / expected_charge)
+        #else: 
+        #  charge_error = 0
+          
+        charge_error = 100 * abs((total_charge - expected_charge) / expected_charge) if abs(expected_charge) > 0 else 0.0
         
         if charge_error > tolerance:
           if MPI.COMM_WORLD.rank == 0:
@@ -748,7 +753,6 @@ class PoissonSolver():
       # Create expression for evaluation at points
       expr = fem.Expression(E_expr, self.V_vec.element.interpolation_points()) 
       self.E_field.interpolate(expr)
-
       
       # Convert points to numpy array with correct dtype
       points_array = np.asarray(points,dtype=np.float64)
