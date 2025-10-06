@@ -201,8 +201,7 @@ def main():
             while j*snapshoots_steps < total_steps:
                
                 # KMC step runs in serial (only on rank 0)
-                if rank == 0:
-                    #System_state,KMC_time_step, chosen_event = KMC(System_state,rng)                   
+                if rank == 0:                
                     # Get charge locations and charges from System_state
                     particle_locations, charges = System_state.extract_particles_charges()
                     gen_site_locations = System_state.extract_generation_site_location()
@@ -228,8 +227,6 @@ def main():
                 comm.Barrier()
                 
                 if solve_Poisson and platform.system() == 'Linux': 
-                
-                  #particle_locations, charges = System_state.extract_particles_charges()
                   
                   if i%poisson_solve_frequency == 0:
                     
@@ -239,14 +236,6 @@ def main():
                         run_time = MPI.Wtime() - run_start_time
                         
                         if rank == 0: print(f'Run time to solve Poisson: {run_time}')
-                        # Obtain the generation sites
-                        # gen_site_locations = System_state.extract_generation_site_location()
-                        # Generation sites + particle locations
-                        #if len(particle_locations) > 0 : # In case there is no particles
-                        #  E_field_points = np.concatenate([particle_locations,gen_site_locations],axis = 0)
-                        #else:
-                        #  E_field_points = gen_site_locations
-                        #  print(len(particle_locations),len(gen_site_locations), len(E_field_points))
                         E_field = poisson_solver.evaluate_electric_field_at_points(uh,E_field_points)
             
                         if save_Poisson:
@@ -270,8 +259,7 @@ def main():
                     
                 # kMC steps after solving Poisson equation, calculating the electric field and the impact in the transition rates
                 if rank == 0:      
-                  System_state,KMC_time_step, chosen_event = KMC(System_state,rng)  
-                #  print(f'Chosen event: {chosen_event}')  
+                  System_state,KMC_time_step, chosen_event = KMC(System_state,rng)   
                     
                 # Synchronize before continuing
                 if comm is not None:
