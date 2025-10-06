@@ -199,27 +199,27 @@ def main():
             
     
             while j*snapshoots_steps < total_steps:
-               
-                # KMC step runs in serial (only on rank 0) 
-                # It is the only rank that have updated System_state --> kMC steps only in rank = 0
-                if rank == 0:    
+                
+                if solve_Poisson and platform.system() == 'Linux': 
+                
+                  # KMC step runs in serial (only on rank 0) 
+                  # It is the only rank that have updated System_state --> kMC steps only in rank = 0
+                  if rank == 0:    
                     particle_locations, charges, E_field_points = System_state.get_evaluation_points()
-                else:
+                  else:
                     # Other ranks wait
                     particle_locations = None
                     charges = None
                     E_field_points = None
                 
-                # Broadcast charge information to all MPI ranks
-                # Poisson equation and electric field use all the ranks 
-                if comm is not None:
+                  # Broadcast charge information to all MPI ranks
+                  # Poisson equation and electric field use all the ranks 
+                  if comm is not None:
                     particle_locations = comm.bcast(particle_locations, root=0)
                     charges = comm.bcast(charges, root=0)
                     E_field_points = comm.bcast(E_field_points, root=0)
                   
-                comm.Barrier()
-                
-                if solve_Poisson and platform.system() == 'Linux': 
+                  comm.Barrier()
                   
                   if i%poisson_solve_frequency == 0:
                     
