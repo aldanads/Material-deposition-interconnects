@@ -606,7 +606,23 @@ class Crystal_Lattice():
 
         return modified_sites
         
-    def extract_particles_charges(self):
+        
+# =============================================================================
+# Get coordinates of particles for solving Poisson and points to evaluate electric field
+# =============================================================================
+    def get_evaluation_points(self):
+      # Get charge locations and charges from System_state
+      particle_locations, charges = self._extract_particles_charges()
+      gen_site_locations = self._extract_generation_site_location()
+                    
+      if len(particle_locations) > 0 : # In case there is no particles
+        E_field_points = np.concatenate([particle_locations,gen_site_locations],axis = 0)
+      else:
+        E_field_points = gen_site_locations
+        
+      return particle_locations, charges, E_field_points
+        
+    def _extract_particles_charges(self):
         """
         Extract charge locations and magnitudes from System_state.
         """
@@ -619,7 +635,7 @@ class Crystal_Lattice():
             
         return np.array(particle_locations,dtype=np.float64), np.array(charges, dtype=np.float64)
         
-    def extract_generation_site_location(self):
+    def _extract_generation_site_location(self):
         """
         Extract generation site locations from System_state.
         """
@@ -1152,6 +1168,10 @@ class Crystal_Lattice():
         for key in keys_to_delete:
             del self.superbasin_dict[key]
             
+            
+# =============================================================================
+# Update sites: supporting particles, available generation sites and possible events                      
+# =============================================================================
     
     def update_sites(self,update_specie_events,update_supp_av):
             
@@ -1170,7 +1190,16 @@ class Crystal_Lattice():
             for idx in update_specie_events:
                 self.grid_crystal[idx].available_migrations(self.grid_crystal,idx,self.facets_type)
                 self.grid_crystal[idx].transition_rates()
-   
+                
+                
+# =============================================================================
+# Update transition rates with electric field                    
+# =============================================================================
+
+    def update_transition_rates_with_electric_field(self,E_field):
+      # Update System_state based on electric field
+      for site, E_site_field in zip(self.sites_occupied + self.adsorption_sites,E_field):
+        self.grid_crystal[site].transition_rates(E_site_field = E_site_field, migration_pathways = self.migration_pathways)   
 
 # =============================================================================
 #             Introduce particle

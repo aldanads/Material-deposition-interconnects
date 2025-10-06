@@ -35,7 +35,7 @@ def main():
         System_state.plot_crystal(45,45,paths['data'],0)    
         j = 0
         
-        snapshoots_steps = int(1e0)
+        snapshoots_steps = int(1e1)
         starting_time = time.time()
     # =============================================================================
     #     Deposition
@@ -194,34 +194,27 @@ def main():
             
             i = 0
             #total_steps = int(1e4)
-            total_steps = int(1e2)
+            total_steps = int(1e3)
             # list_sites_occu = []
             
     
             while j*snapshoots_steps < total_steps:
                
-                # KMC step runs in serial (only on rank 0)
-                if rank == 0:                
-                    # Get charge locations and charges from System_state
-                    particle_locations, charges = System_state.extract_particles_charges()
-                    gen_site_locations = System_state.extract_generation_site_location()
-                    
-                    if len(particle_locations) > 0 : # In case there is no particles
-                      E_field_points = np.concatenate([particle_locations,gen_site_locations],axis = 0)
-                    else:
-                      E_field_points = gen_site_locations
+                # KMC step runs in serial (only on rank 0) 
+                # It is the only rank that have updated System_state --> kMC steps only in rank = 0
+                if rank == 0:    
+                    particle_locations, charges, E_field_points = System_state.get_evaluation_points()
                 else:
                     # Other ranks wait
                     particle_locations = None
                     charges = None
-                    gen_site_locations = None
                     E_field_points = None
                 
                 # Broadcast charge information to all MPI ranks
+                # Poisson equation and electric field use all the ranks 
                 if comm is not None:
                     particle_locations = comm.bcast(particle_locations, root=0)
                     charges = comm.bcast(charges, root=0)
-                    gen_site_locations = comm.bcast(gen_site_locations, root=0)
                     E_field_points = comm.bcast(E_field_points, root=0)
                   
                 comm.Barrier()
@@ -236,25 +229,17 @@ def main():
                         run_time = MPI.Wtime() - run_start_time
                         
                         if rank == 0: print(f'Run time to solve Poisson: {run_time}')
-                        E_field = poisson_solver.evaluate_electric_field_at_points(uh,E_field_points)
             
                         if save_Poisson:
                           poisson_solver.save_potential(uh,System_state.time,j+1)
                           
                         if rank == 0: print(f"Poisson solved at step {i}")
 
-                        
-                        
+                  
+                  E_field = poisson_solver.evaluate_electric_field_at_points(uh,E_field_points)      
                   if rank == 0:
-                          
-                    """
-                    Encapsulate this in a method in crystal_lattice
-                    """
-                    # Update System_state based on electric field
-                    for site, E_site_field in zip(System_state.sites_occupied + System_state.adsorption_sites,E_field):
-                      #print(System_state.grid_crystal[site].position,E_site_field)
-                      System_state.grid_crystal[site].transition_rates(E_site_field = E_site_field, migration_pathways = System_state.migration_pathways)
-                      
+                    print(f'Calculated electric field at step {i}')
+                    System_state.update_transition_rates_with_electric_field(E_field)      
 
                     
                 # kMC steps after solving Poisson equation, calculating the electric field and the impact in the transition rates
