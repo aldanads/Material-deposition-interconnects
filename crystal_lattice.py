@@ -52,6 +52,7 @@ class Crystal_Lattice():
         self.mode = crystal_features[7]
         self.radius_neighbors = crystal_features[8]
         self.sites_generation_layer = crystal_features[9]
+        self.available_events = crystal_features[10]
         self.interstitial_specie = kwargs.get('interstitial_specie', None)
         
         # Deposition
@@ -844,7 +845,7 @@ class Crystal_Lattice():
                 else:
                     if (self.sites_generation_layer in site.supp_by) and (site.chemical_specie == self.affected_site):
                         self.adsorption_sites.append(idx)
-                        site.ion_generation_interface(idx,'generation',self.Act_E_gen)
+                        site.ion_generation_interface(idx,self.Act_E_gen)
                         update_gen_sites.add(idx)
                         
           return update_gen_sites  
@@ -1139,7 +1140,10 @@ class Crystal_Lattice():
         if isinstance(chosen_event[2], int): # If is int: migration or superbasin
             
             # Introduce specie in the site
-            update_specie_events,update_supp_av = self.introduce_specie_site(chosen_event[1],update_specie_events,update_supp_av)
+            update_specie_events,update_supp_av = self.introduce_specie_site(
+                chosen_event[1],update_specie_events,update_supp_av,
+                self.grid_crystal[chosen_event[-1]].ion_charge # The charge also change its position
+            )
 
             # Remove particle
             update_specie_events,update_supp_av = self.remove_specie_site(chosen_event[-1],update_specie_events,update_supp_av)
@@ -1155,11 +1159,28 @@ class Crystal_Lattice():
 # =============================================================================            
         elif chosen_event[2] == 'generation':
             
-            update_specie_events,update_supp_av = self.introduce_specie_site(chosen_event[1],update_specie_events,update_supp_av)
+            update_specie_events,update_supp_av = self.introduce_specie_site(
+                chosen_event[1],update_specie_events,update_supp_av,
+                self.ion_charge
+            )
             
             # Update sites availables, the support to each site and available migrations
             self.update_sites(update_specie_events,update_supp_av)
-
+            
+# =============================================================================
+#         Redox reactions
+# =============================================================================         
+        elif chosen_event[2] == 'reduction':
+            
+            self.grid_crystal[chosen_event[1]].ion_charge -= 1
+            update_specie_events.add(chosen_event[1])
+            self.update_sites(update_specie_events,set())
+            
+        elif chosen_event[2] == 'oxidation':
+            
+            self.grid_crystal[chosen_event[1]].ion_charge += 1
+            update_specie_events.add(chosen_event[1])
+            self.update_sites(update_specie_events,set())
 # =============================================================================
 # At every kMC step we have to check if we destroy any superbasin                      
 # =============================================================================
@@ -1190,12 +1211,12 @@ class Crystal_Lattice():
                 self.grid_crystal[idx].supported_by(self.grid_crystal,self.wulff_facets,
                                                     self.dir_edge_facets,self.chemical_specie,self.affected_site,
                                                     self.domain_height,self.sites_generation_layer)
-            update_gen_sites = self.available_generation_sites(update_supp_av)
+        update_gen_sites = self.available_generation_sites(update_supp_av)
 
         if update_specie_events: 
             # Sites are not available because a particle has migrated there
             for idx in update_specie_events:
-                self.grid_crystal[idx].available_migrations(self.grid_crystal,idx,self.facets_type)
+                self.grid_crystal[idx].available_pathways(self.grid_crystal,idx,self.facets_type,self.available_events)
                 self.grid_crystal[idx].transition_rates()
         
         # We need Linux to solve Poisson equation
@@ -1221,10 +1242,10 @@ class Crystal_Lattice():
 # =============================================================================
 #             Introduce particle
 # =============================================================================
-    def introduce_specie_site(self,idx,update_specie_events,update_supp_av):
+    def introduce_specie_site(self,idx,update_specie_events,update_supp_av,ion_charge):
         
         # Chemical specie deposited
-        self.grid_crystal[idx].introduce_specie(self.chemical_specie,self.ion_charge)
+        self.grid_crystal[idx].introduce_specie(self.chemical_specie,ion_charge)
         
         # Track sites occupied
         self.sites_occupied.append(idx) 

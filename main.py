@@ -244,8 +244,13 @@ def main():
                     
                 # kMC steps after solving Poisson equation, calculating the electric field and the impact in the transition rates
                 if rank == 0:      
-                  System_state,KMC_time_step, chosen_event = KMC(System_state,rng)   
-                  return System_state
+                  System_state,KMC_time_step, chosen_event = KMC(System_state,rng)  
+                  site = System_state.sites_occupied[0]
+
+                  print(System_state.grid_crystal[site].site_events)
+                  print(System_state.grid_crystal[site].ion_charge)
+                  if i == 2:
+                      return System_state
                     
                 # Synchronize before continuing
                 if comm is not None:

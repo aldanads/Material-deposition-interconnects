@@ -121,7 +121,9 @@ class Site():
         # Convert supp_by to a tuple
         self.supp_by = tuple(self.supp_by)
         self.calculate_clustering_energy()
-
+        if 'E_reduction' or 'E_oxidation':
+            self.calculate_CN_contribution_redox_energy()
+        
         if wulff_facets is not None and dir_edge_facets is not None:
             self.detect_edges(grid_crystal,dir_edge_facets,chemical_specie)               
             self.detect_planes(grid_crystal,wulff_facets[:14])
@@ -184,6 +186,7 @@ class Site():
       # Higher CN imply higher activation barriers for oxidation and lower for reduction
       
       cache_key = self.supp_by
+
       if cache_key in self.cache_CN_contr_redox_energy:
         self.CN_redox_energy = self.cache_CN_contr_redox_energy[cache_key]
         return
@@ -195,7 +198,7 @@ class Site():
       else: # Bulk
         self.CN_redox_energy = self.Act_E_list['CN_redox_energy'][len(self.supp_by) + 1]
         
-      self.cache_CN_contr_redox_energy = self.CN_redox_energy
+      self.cache_CN_contr_redox_energy[cache_key] = self.CN_redox_energy
    
 
    
@@ -216,13 +219,16 @@ class Site():
         #self.site_events.remove(['Desorption',self.num_event])
         self.site_events = []
         
-    def available_pathways(self,grid_crystal,idx_origin, facets_type = None):
+    def available_pathways(self,grid_crystal,idx_origin, facets_type,available_events):
     
-      self.available_migrations(grid_crystal,idx_origin,facets_type)
+      self.site_events = []
       
-      self.available_reduction()
-      
-      self.available_oxidation()
+      if available_events['migration']:      
+          self.available_migrations(grid_crystal,idx_origin,facets_type)
+      if available_events['reduction']: 
+          self.available_reduction(idx_origin)
+      if available_events['oxidation']:
+          self.available_oxidation(idx_origin)
     
 
     # Calculate posible migration sites
@@ -236,7 +242,7 @@ class Site():
     #         Physical Review Materials, 2(6). https://doi.org/10.1103/PhysRevMaterials.2.063401
     #         - Number of nearest neighbors needed to support a site so a particle can migrate there
     # =============================================================================
-            new_site_events = []
+            
     
             # Plane migrations
             for site_idx, num_event in self.migration_paths['Plane']:
@@ -246,20 +252,20 @@ class Site():
                     
                     # Migrating on the substrate
                     if self.sites_generation_layer in self.supp_by:
-                        new_site_events.append([site_idx, num_event, self.Act_E_list[0] + energy_change])
+                        self.site_events.append([site_idx, num_event, self.Act_E_list[0] + energy_change])
                         
                     # Migrating on the film (111)
                     elif grid_crystal[site_idx].wulff_facet == facets_type[0]:
                         if self.edges_v[num_event] == None: 
-                            new_site_events.append([site_idx, num_event, self.Act_E_list[7] + energy_change])
+                            self.site_events.append([site_idx, num_event, self.Act_E_list[7] + energy_change])
                         elif self.edges_v[num_event] == facets_type[0]:
-                            new_site_events.append([site_idx, num_event, self.Act_E_list[10] + energy_change])
+                            self.site_events.append([site_idx, num_event, self.Act_E_list[10] + energy_change])
                         elif self.edges_v[num_event] == facets_type[1]:
-                            new_site_events.append([site_idx, num_event, self.Act_E_list[9] + energy_change])
+                            self.site_events.append([site_idx, num_event, self.Act_E_list[9] + energy_change])
                             
                     # Migrating on the film (100)
                     elif grid_crystal[site_idx].wulff_facet == facets_type[1]:
-                        new_site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
+                        self.site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
     
     
     # =============================================================================
@@ -281,18 +287,18 @@ class Site():
                    
                     # Migrating upward from the substrate
                     if self.sites_generation_layer in self.supp_by and grid_crystal[site_idx].wulff_facet == facets_type[0]:
-                        new_site_events.append([site_idx, num_event, self.Act_E_list[1] + energy_change])
+                        self.site_events.append([site_idx, num_event, self.Act_E_list[1] + energy_change])
                     
                     elif self.sites_generation_layer in self.supp_by and grid_crystal[site_idx].wulff_facet == facets_type[0]:
-                        new_site_events.append([site_idx, num_event, self.Act_E_list[5] + energy_change])
+                        self.site_events.append([site_idx, num_event, self.Act_E_list[5] + energy_change])
                         
                     # Migrating upward from the film (111)
                     elif self.wulff_facet == facets_type[0]:
-                        new_site_events.append([site_idx, num_event, self.Act_E_list[3] + energy_change])
+                        self.site_events.append([site_idx, num_event, self.Act_E_list[3] + energy_change])
                         
                     # Migrating upward from the film (100)
                     elif self.wulff_facet ==  facets_type[1]:
-                        new_site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
+                        self.site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
     
                     
             # Downward migrations
@@ -306,25 +312,24 @@ class Site():
                     
                     # From layer 1 to substrate
                     if self.wulff_facet == facets_type[0] and self.sites_generation_layer in grid_crystal[site_idx].supp_by:
-                        new_site_events.append([site_idx, num_event, self.Act_E_list[2] + energy_change])
+                        self.site_events.append([site_idx, num_event, self.Act_E_list[2] + energy_change])
                     
                     elif self.wulff_facet == facets_type[1] and self.sites_generation_layer in grid_crystal[site_idx].supp_by:
-                        new_site_events.append([site_idx, num_event, self.Act_E_list[6] + energy_change])
+                        self.site_events.append([site_idx, num_event, self.Act_E_list[6] + energy_change])
                     
                     # Migrating downward from the film (111)
                     elif self.wulff_facet == facets_type[0]:
-                        new_site_events.append([site_idx, num_event, self.Act_E_list[4] + energy_change])
+                        self.site_events.append([site_idx, num_event, self.Act_E_list[4] + energy_change])
                         
                     # Migrating downward from the film (100)
                     elif self.wulff_facet == facets_type[1]:
-                        new_site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
+                        self.site_events.append([site_idx, num_event, self.Act_E_list[8] + energy_change])
                 
-            self.site_events = new_site_events
+            
             
         # Migration of interstitial sites
         else:
             
-            new_site_events = []
             Act_E_mig = self.Act_E_list['E_mig']
             
             # Migration types
@@ -337,20 +342,25 @@ class Site():
                   # Calculate energy difference between sites
                   energy_site_destiny = self.calculate_clustering_energy(grid_crystal[site_idx].supp_by,idx_origin)
                   energy_change = max(energy_site_destiny - self.energy_site, 0)
-                  new_site_events.append([site_idx, num_event, Act_E_mig[num_event] + energy_change])
+                  self.site_events.append([site_idx, num_event, Act_E_mig[num_event] + energy_change])
 
-            self.site_events = new_site_events
             
-    def available_reduction(self):
+    def available_reduction(self,idx_origin):
     
-        pass
+        if self.ion_charge > 0:
+            self.site_events.append([idx_origin, 'reduction', self.Act_E_list['E_reduction'] - self.CN_redox_energy])
+            
+    def available_oxidation(self,idx_origin):
+        
+        if self.ion_charge == 0:   
+            self.site_events.append([idx_origin, 'oxidation', self.Act_E_list['E_oxidation'] + self.CN_redox_energy])
 
         
     def deposition_event(self,TR,idx_origin,num_event,Act_E):
         self.site_events.append([TR,idx_origin, num_event, Act_E])
         
-    def ion_generation_interface(self,idx_origin,num_event,Act_E):
-        self.site_events.append([idx_origin, num_event, Act_E])
+    def ion_generation_interface(self,idx_origin,Act_E):
+        self.site_events.append([idx_origin, 'generation', Act_E])
         
     def remove_event_type(self,num_event):
         

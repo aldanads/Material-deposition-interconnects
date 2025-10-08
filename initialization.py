@@ -333,6 +333,7 @@ def initialization(n_sim,save_data,lammps_file):
         affected_sites = ['Empty','O']
         affected_site = affected_sites[0]
         interstitial_specie = 'Ag'
+        available_events = {'migration': True, 'reduction': True, 'oxidation': True}
 
         mode = ['interstitial', 'vacancy']
         radius_neighbors = 4
@@ -361,7 +362,7 @@ def initialization(n_sim,save_data,lammps_file):
 
         crystal_features = [id_material_Material_Project,crystal_size,orientation[0],
                             api_key,use_parallel,
-                            facets_type,affected_site,mode[0],radius_neighbors,sites_generation_layer[1]]
+                            facets_type,affected_site,mode[0],radius_neighbors,sites_generation_layer[1],available_events]
 
 
         # =============================================================================
