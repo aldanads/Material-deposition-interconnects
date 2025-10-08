@@ -27,6 +27,7 @@ class Site():
         self.cache_TR = {}
         self.cache_edges = {}
         self.cache_clustering_energy = {}
+        self.cache_CN_contr_redox_energy = {}
         
         self.kb = constants.physical_constants['Boltzmann constant in eV/K'][0]
         self.nu0=7E12  # nu0 (s^-1) bond vibration frequency
@@ -139,12 +140,14 @@ class Site():
             if cache_key in self.cache_clustering_energy:
                 self.energy_site = self.cache_clustering_energy[cache_key]
                 return
-            
-            if self.sites_generation_layer in self.supp_by:
-                self.energy_site = self.Act_E_list['CN_contr'][len(self.supp_by)] + self.Act_E_list['Binding_energy']
+
+
+            if 'top_layer' in self.supp_by:
+                self.energy_site = self.Act_E_list['CN_clustering_energy'][len(self.supp_by)] + self.Act_E_list['binding_energy_top_layer']
+            elif 'bottom_layer' in self.supp_by:
+                self.energy_site = self.Act_E_list['CN_clustering_energy'][len(self.supp_by)] + self.Act_E_list['binding_energy_bottom_layer']
             else:
-                
-                self.energy_site = self.Act_E_list['CN_contr'][len(self.supp_by)+1]
+                self.energy_site = self.Act_E_list['CN_clustering_energy'][len(self.supp_by)+1]
                 
                 # Store the result in the cache
             self.cache_clustering_energy[cache_key] = self.energy_site
@@ -159,21 +162,40 @@ class Site():
                 return self.cache_clustering_energy[cache_key]
 
 
-            
-            if self.sites_generation_layer in supp_by_destiny and idx_origin in supp_by_destiny:
-                energy_site = self.Act_E_list['CN_contr'][len(supp_by_destiny)-1] + self.Act_E_list['Binding_energy']
-            elif self.sites_generation_layer in supp_by_destiny and idx_origin not in supp_by_destiny:
-                energy_site = self.Act_E_list['CN_contr'][len(supp_by_destiny)] + self.Act_E_list['Binding_energy']
-            elif self.sites_generation_layer not in supp_by_destiny and idx_origin in supp_by_destiny:
-                energy_site = self.Act_E_list['CN_contr'][len(supp_by_destiny)]
-            elif self.sites_generation_layer not in supp_by_destiny and idx_origin not in supp_by_destiny:
-                energy_site = self.Act_E_list['CN_contr'][len(supp_by_destiny)+1]
-            
+            if 'top_layer' in supp_by_destiny and idx_origin in supp_by_destiny:
+                energy_site = self.Act_E_list['CN_clustering_energy'][len(supp_by_destiny)-1] + self.Act_E_list['binding_energy_top_layer']
+            elif 'bottom_layer' in supp_by_destiny and idx_origin in supp_by_destiny:
+                energy_site = self.Act_E_list['CN_clustering_energy'][len(supp_by_destiny)-1] + self.Act_E_list['binding_energy_bottom_layer']
+            elif 'top_layer' in supp_by_destiny and idx_origin not in supp_by_destiny:
+                energy_site = self.Act_E_list['CN_clustering_energy'][len(supp_by_destiny)] + self.Act_E_list['binding_energy_top_layer']
+            elif 'bottom_layer' in supp_by_destiny and idx_origin in supp_by_destiny:
+                energy_site = self.Act_E_list['CN_clustering_energy'][len(supp_by_destiny)] + self.Act_E_list['binding_energy_bottom_layer']
+            elif 'top_layer' not in supp_by_destiny and 'bottom_layer' not in supp_by_destiny and idx_origin in supp_by_destiny:
+                energy_site = self.Act_E_list['CN_clustering_energy'][len(supp_by_destiny)]
+            elif 'top_layer' not in supp_by_destiny and 'bottom_layer' not in supp_by_destiny and idx_origin not in supp_by_destiny:
+                energy_site = self.Act_E_list['CN_clustering_energy'][len(supp_by_destiny)+1]
             # Store the result in the cache
             self.cache_clustering_energy[cache_key] = energy_site
             return energy_site
+            
+            
+    def calculate_CN_contribution_redox_energy(self):
+      # Redox reactions are modified by the local structure: the number of nearest neighbors (NN) or coordination number (CN)
+      # Higher CN imply higher activation barriers for oxidation and lower for reduction
+      
+      cache_key = self.supp_by
+      if cache_key in self.cache_CN_contr_redox_energy:
+        self.CN_redox_energy = self.cache_CN_contr_redox_energy[cache_key]
+        return
         
+      if 'bottom_layer' in self.supp_by: # Bottom interface
+        self.CN_redox_energy = self.Act_E_list['CN_redox_energy'][len(self.supp_by)] + self.Act_E_list['redox_bottom_electrode']
+      elif 'top_layer' in self.supp_by: # Top interface
+        self.CN_redox_energy = self.Act_E_list['CN_redox_energy'][len(self.supp_by)] + self.Act_E_list['redox_top_electrode']
+      else: # Bulk
+        self.CN_redox_energy = self.Act_E_list['CN_redox_energy'][len(self.supp_by) + 1]
         
+      self.cache_CN_contr_redox_energy = self.CN_redox_energy
    
 
    
@@ -193,6 +215,15 @@ class Site():
         self.ion_charge = 0
         #self.site_events.remove(['Desorption',self.num_event])
         self.site_events = []
+        
+    def available_pathways(self,grid_crystal,idx_origin, facets_type = None):
+    
+      self.available_migrations(grid_crystal,idx_origin,facets_type)
+      
+      self.available_reduction()
+      
+      self.available_oxidation()
+    
 
     # Calculate posible migration sites
     def available_migrations(self,grid_crystal,idx_origin,facets_type):
@@ -309,6 +340,10 @@ class Site():
                   new_site_events.append([site_idx, num_event, Act_E_mig[num_event] + energy_change])
 
             self.site_events = new_site_events
+            
+    def available_reduction(self):
+    
+        pass
 
         
     def deposition_event(self,TR,idx_origin,num_event,Act_E):

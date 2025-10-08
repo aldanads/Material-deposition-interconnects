@@ -324,9 +324,9 @@ def initialization(n_sim,save_data,lammps_file):
         # =============================================================================
         material_selection = {"CeO2":"mp-20194", "ZrPbO3":"mp-1068577"}
         technologies = ['ECM','PZT']
-        techonology = technologies[0]
+        technology = technologies[0]
         id_material_Material_Project = material_selection["CeO2"]
-        crystal_size = (50,50,50) # (angstrom (Å))
+        crystal_size = (20,20,20) # (angstrom (Å))
         orientation = ['001']
         use_parallel = None
         facets_type = None
@@ -435,8 +435,8 @@ def initialization(n_sim,save_data,lammps_file):
         with open(activation_energy_file, 'r') as file:
             data = json.load(file)
             
-        E_dataset = []
-        for defect in data[techonology]:
+        Act_E_list = {}
+        for defect in data[technology]:
             # Search the selected element we retrieved from Materials Project
             if defect['specie'] == interstitial_specie:
 
@@ -444,27 +444,20 @@ def initialization(n_sim,save_data,lammps_file):
                 for key,activation_energies in defect.items():
                     if 'activation_energies' in key:
                         # Select the dataset
-                        for act_energy in activation_energies.values():
+                        for key_1,act_energy in activation_energies.items():
                             if isinstance(act_energy, (int, float)):
-                                E_dataset.append(act_energy)
-                                
-                               
-        E_gen_defect = E_dataset[0] # (eV)
-        E_mig_plane = E_dataset[1]
-        E_mig_upward = E_dataset[2]
-        E_mig_downward = E_dataset[3] 
-        binding_energy_bottom_layer = E_dataset[-2]
-
-        clustering_energy = E_dataset[-1]
-        E_clustering = [0,0,clustering_energy * 2,clustering_energy * 3,clustering_energy * 4,clustering_energy * 5,clustering_energy * 6,clustering_energy * 7,clustering_energy * 8,clustering_energy * 9,clustering_energy * 10,clustering_energy * 11,clustering_energy * 12,clustering_energy * 13] 
-
-        E_min_mig = 0.267
-        E_min_gen = 0.3
+                                #E_dataset.append(act_energy)
+                                Act_E_list[key_1] = act_energy
+                
         
-        Act_E_list = {
-          'E_gen_defect': E_gen_defect, 'E_mig_plane': E_mig_plane, 'E_mig_upward': E_mig_upward, 'E_mig_downward': E_mig_downward,
-          'Binding_energy':binding_energy_bottom_layer, 'CN_contr': E_clustering, 'E_min_mig': E_min_mig, 'E_min_gen': E_min_gen
-        } 
+        CN_clustering_energy = Act_E_list['CN_clustering_energy']
+        E_clustering = [0,0,CN_clustering_energy * 2,CN_clustering_energy * 3,CN_clustering_energy * 4,CN_clustering_energy * 5,CN_clustering_energy * 6,CN_clustering_energy * 7,CN_clustering_energy * 8,CN_clustering_energy * 9,CN_clustering_energy * 10,CN_clustering_energy * 11,CN_clustering_energy * 12,CN_clustering_energy * 13] 
+
+        CN_redox_energy = Act_E_list['CN_redox_energy']
+        E_redox = [0,0,CN_redox_energy * 2,CN_redox_energy * 3,CN_redox_energy * 4,CN_redox_energy * 5,CN_redox_energy * 6,CN_redox_energy * 7,CN_redox_energy * 8,CN_redox_energy * 9,CN_redox_energy * 10,CN_redox_energy * 11,CN_redox_energy * 12,CN_redox_energy * 13] 
+
+        Act_E_list['CN_clustering_energy'] = E_clustering
+        Act_E_list['CN_redox_energy'] = E_redox
         
 
         # =============================================================================

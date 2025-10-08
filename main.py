@@ -238,13 +238,14 @@ def main():
                   
                   E_field = poisson_solver.evaluate_electric_field_at_points(uh,E_field_points)      
                   if rank == 0:
-                    print(f'Calculated electric field at step {i}')
-                    System_state.update_transition_rates_with_electric_field(E_field)      
-
+                      print(f'Calculated electric field at step {i}')
+                      System_state.update_transition_rates_with_electric_field(E_field)
+                    
                     
                 # kMC steps after solving Poisson equation, calculating the electric field and the impact in the transition rates
                 if rank == 0:      
                   System_state,KMC_time_step, chosen_event = KMC(System_state,rng)   
+                  return System_state
                     
                 # Synchronize before continuing
                 if comm is not None:

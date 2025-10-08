@@ -28,6 +28,7 @@ from pymatgen.core import Structure
 import json
 import os
 from pathlib import Path
+import platform
 
 
 # Rotation of a vector - Is copper growing in [111] direction?
@@ -777,7 +778,7 @@ class Crystal_Lattice():
         
     def available_generation_sites(self, update_supp_av = set()):
         
-        
+        update_gen_sites = set()
         # Generation of vacancy in the bulk
         if self.mode == 'vacancy': return
 
@@ -844,6 +845,10 @@ class Crystal_Lattice():
                     if (self.sites_generation_layer in site.supp_by) and (site.chemical_specie == self.affected_site):
                         self.adsorption_sites.append(idx)
                         site.ion_generation_interface(idx,'generation',self.Act_E_gen)
+                        update_gen_sites.add(idx)
+                        
+          return update_gen_sites  
+        
            
         
                     
@@ -1126,6 +1131,8 @@ class Crystal_Lattice():
         # site_affected = self.grid_crystal[chosen_event[-1]]
         update_supp_av = set()
         update_specie_events = {chosen_event[-1]}
+        
+        print('Chosen_event: ',chosen_event)
 # =============================================================================
 #         Specie migration
 # =============================================================================
@@ -1183,13 +1190,22 @@ class Crystal_Lattice():
                 self.grid_crystal[idx].supported_by(self.grid_crystal,self.wulff_facets,
                                                     self.dir_edge_facets,self.chemical_specie,self.affected_site,
                                                     self.domain_height,self.sites_generation_layer)
-            self.available_generation_sites(update_supp_av)
-        
+            update_gen_sites = self.available_generation_sites(update_supp_av)
+
         if update_specie_events: 
             # Sites are not available because a particle has migrated there
             for idx in update_specie_events:
                 self.grid_crystal[idx].available_migrations(self.grid_crystal,idx,self.facets_type)
                 self.grid_crystal[idx].transition_rates()
+        
+        # We need Linux to solve Poisson equation
+        # If we don't solve the Poisson equation, we are not updating TR of generation sites 
+        # We only detect generation sites with available_generation_sites
+        if not (self.poissonSolver_parameters['solve_Poisson'] and platform.system() == 'Linux'): 
+            for site in update_gen_sites:
+              self.grid_crystal[site].transition_rates()   
+        
+            
                 
                 
 # =============================================================================
@@ -1198,9 +1214,10 @@ class Crystal_Lattice():
 
     def update_transition_rates_with_electric_field(self,E_field):
       # Update System_state based on electric field
-      for site, E_site_field in zip(self.sites_occupied + self.adsorption_sites,E_field):
-        self.grid_crystal[site].transition_rates(E_site_field = E_site_field, migration_pathways = self.migration_pathways)   
-
+      
+        for site, E_site_field in zip(self.sites_occupied + self.adsorption_sites,E_field):
+          self.grid_crystal[site].transition_rates(E_site_field = E_site_field, migration_pathways = self.migration_pathways)   
+    
 # =============================================================================
 #             Introduce particle
 # =============================================================================

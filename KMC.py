@@ -29,7 +29,6 @@ def KMC(System_state,rng):
         else:
             TR_catalog.extend([(item[0],item[1],item[2],idx) for item in superbasin_dict[idx].site_events_absorbing])
 
-
     # Sort the list of events
     sorted(TR_catalog,key = lambda x:x[0])
     
