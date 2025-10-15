@@ -121,7 +121,7 @@ class Site():
         # Convert supp_by to a tuple
         self.supp_by = tuple(self.supp_by)
         self.calculate_clustering_energy()
-        if 'E_reduction' or 'E_oxidation':
+        if 'E_reduction' in self.Act_E_list or 'E_oxidation' in self.Act_E_list:
             self.calculate_CN_contribution_redox_energy()
         
         if wulff_facets is not None and dir_edge_facets is not None:
@@ -170,7 +170,7 @@ class Site():
                 energy_site = self.Act_E_list['CN_clustering_energy'][len(supp_by_destiny)-1] + self.Act_E_list['binding_energy_bottom_layer']
             elif 'top_layer' in supp_by_destiny and idx_origin not in supp_by_destiny:
                 energy_site = self.Act_E_list['CN_clustering_energy'][len(supp_by_destiny)] + self.Act_E_list['binding_energy_top_layer']
-            elif 'bottom_layer' in supp_by_destiny and idx_origin in supp_by_destiny:
+            elif 'bottom_layer' in supp_by_destiny and idx_origin not in supp_by_destiny:
                 energy_site = self.Act_E_list['CN_clustering_energy'][len(supp_by_destiny)] + self.Act_E_list['binding_energy_bottom_layer']
             elif 'top_layer' not in supp_by_destiny and 'bottom_layer' not in supp_by_destiny and idx_origin in supp_by_destiny:
                 energy_site = self.Act_E_list['CN_clustering_energy'][len(supp_by_destiny)]
@@ -492,6 +492,21 @@ class Site():
             if relevant_field:
               if event[-2] == 'generation':
                 event[-1] = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
+                
+              elif event[-2] == 'reduction':
+                if 'top_layer' in self.supp_by: 
+                  # Positive bias hinder reduction --> Field helps remove electrons
+                  event[-1] = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0)
+                elif 'bottom_layer' in self.supp_by:
+                  # Positive bias facilitate reduction --> Field helps add electrons
+                  event[-1] = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0)
+                  
+              elif event[-2] == 'oxidation':
+                if 'top_layer' in self.supp_by: 
+                  event[-1] = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
+                elif 'bottom_layer' in self.supp_by:
+                  event[-1] = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
+              
               else:
                 mig_vec = migration_pathways[event[-2]]
                 event[-1] = max(event[-1] - self.ion_charge * round(np.dot(E_site_field,mig_vec) * 1e-10,3),self.Act_E_list['E_min_mig'])

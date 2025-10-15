@@ -900,7 +900,7 @@ class Crystal_Lattice():
         for idx,site in self.grid_crystal.items():
             
             if rng.random() < P:
-                update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
+                update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av,self.ion_charge)
                 i += 1
                 
         # Update sites availables, the support to each site and available migrations
@@ -919,7 +919,7 @@ class Crystal_Lattice():
             for idx in self.adsorption_sites:
                 if rng.random() < P:   
                     # Introduce specie in the site
-                    update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
+                    update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av,self.grid_crystal[idx].ion_charge)
             
             # Update sites availables, the support to each site and available migrations
             self.update_sites(update_specie_events,update_supp_av)
@@ -1133,7 +1133,6 @@ class Crystal_Lattice():
         update_supp_av = set()
         update_specie_events = {chosen_event[-1]}
         
-        print('Chosen_event: ',chosen_event)
 # =============================================================================
 #         Specie migration
 # =============================================================================
@@ -1171,10 +1170,13 @@ class Crystal_Lattice():
 #         Redox reactions
 # =============================================================================         
         elif chosen_event[2] == 'reduction':
-            
-            self.grid_crystal[chosen_event[1]].ion_charge -= 1
-            update_specie_events.add(chosen_event[1])
-            self.update_sites(update_specie_events,set())
+            if np.isclose(self.grid_crystal[chosen_event[1]].position[2], self.crystal_size[2]):
+              # Remove particle --> Re-adsorbed at the interface
+              update_specie_events,update_supp_av = self.remove_specie_site(chosen_event[-1],update_specie_events,update_supp_av)
+            else:
+              self.grid_crystal[chosen_event[1]].ion_charge -= 1
+              update_specie_events.add(chosen_event[1])
+              self.update_sites(update_specie_events,set())
             
         elif chosen_event[2] == 'oxidation':
             
@@ -1401,9 +1403,15 @@ class Crystal_Lattice():
             
         else:
             
-            species_mapping = {self.chemical_specie: 1}  # Example species mapping
+            #species_mapping = {self.chemical_specie: 1}  # Example species mapping
+            charge_mapping = {0: 1, 1: 2}  # charge 0 -> type 1, charge 1 -> type 2
+            
+            # Get charge values for occupied sites
+            charges = [self.grid_crystal[site].ion_charge for site in self.sites_occupied]  # Assuming charge attribute exists
+            species_ids = [charge_mapping.get(charge) for charge in charges]
+            
             sites_occupied_cart = [(self.idx_to_cart(site)) for site in self.sites_occupied]
-            species_ids = [species_mapping.get(self.grid_crystal[site].chemical_specie) for site in self.sites_occupied]
+            #species_ids = [species_mapping.get(self.grid_crystal[site].chemical_specie) for site in self.sites_occupied]
             # Define particle IDs
             particle_ids = list(range(1, len(sites_occupied_cart) + 1))  # Unique IDs for each particle
             
@@ -1428,7 +1436,7 @@ class Crystal_Lattice():
             # Write the metadata file
             if i == 1:
                 metadata_path = base_path / "metadata.json"
-                metadata_species = {species_mapping[specie]: specie for specie in species_mapping}
+                metadata_species = {charge_mapping[charge]: charge for charge in charge_mapping}
                 metadata_experimental_conditions = {'Experiment':self.experiment,
                                                     'Temperature':self.temperature,
                                                     'Partial pressure':self.partial_pressure,
@@ -1615,6 +1623,73 @@ class Crystal_Lattice():
                 histogram_neighbors[len(grid_crystal[site].supp_by)] += 1
                 
         self.histogram_neighbors = histogram_neighbors
+        
+        
+    # ----------------------------------------------------
+    #    Metal clusters and islands calculations
+    # ----------------------------------------------------
+    
+    def metal_clusters_analysis(self):
+    
+      atoms_idx = self._get_atoms()
+      
+      self._find_clusters(atoms_idx)
+      
+    def _get_atoms(self):
+        """
+        Extract only atoms (not ions) from system
+        """
+        atoms_idx = []
+        
+        for site in self.sites_occupied:
+          if self.grid_crystal[site].ion_charge == 0:
+            atoms_idx.append(site)
+            
+        return atoms_idx
+        
+    def _find_clusters(self,atoms_idx):
+      """
+      Find clusters using nearest neighbors connection
+      """
+      visited = set()
+      clusters = []
+      
+      for atom_id in atoms_idx:
+      
+        if atom_id not in visited:
+          # Start new cluster with this atom
+          cluster_atoms = self._dfs_explore(atom_id, visited)
+          
+          if len(cluster_atoms) > 1: # Only consider clusters with > 1 atom
+            print(f'Atoms in the cluster: {cluster_atoms}')
+            #cluster.append()
+            #pass
+            
+    def _dfs_explore(self, start_atom, visited):
+      """
+      Depth-first search to find all connected atoms
+      """
+      
+      stack = [start_atom]
+      cluster_atoms = []
+      
+      while stack:
+        atom_id = stack.pop()
+        
+        if atom_id not in visited:
+          visited.add(atom_id)
+          cluster_atoms.append(atom_id)
+          
+          if isinstance(atom_id, tuple):
+            for neighbor_id in self.grid_crystal[atom_id].supp_by:
+              if neighbor_id not in visited:
+                stack.append(neighbor_id)
+              
+      return cluster_atoms
+           
+      
+      
+    
     
     # Island is the full structure, not only the part that growth over the mean thickness
     def islands_analysis(self):

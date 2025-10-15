@@ -17,25 +17,25 @@ import time
 import platform
 
 
-save_data = True
-lammps_file = True
-
-
-
 def main():
 
 
 
     for n_sim in range(0,1):
         
-        System_state,rng,paths,Results = initialization(n_sim,save_data,lammps_file)
-    
+        System_state,rng,paths,Results,simulation_parameters = initialization(n_sim)
+        
+        print(f'System size: {System_state.crystal_size}')
+        
         System_state.add_time()
             
         System_state.plot_crystal(45,45,paths['data'],0)    
         j = 0
         
-        snapshoots_steps = int(1e1)
+        snapshoots_steps = simulation_parameters['snapshoots_steps']
+        total_steps = simulation_parameters['total_steps']
+        save_data = simulation_parameters['save_data']
+        
         starting_time = time.time()
     # =============================================================================
     #     Deposition
@@ -105,9 +105,9 @@ def main():
     # =============================================================================
         elif System_state.experiment == 'annealing':
             i = 0
-            total_steps = int(5e6)
+            
             nothing_happen = 0
-            # total_steps = int(10000)
+
             System_state.measurements_crystal()
             list_time_step = []
     
@@ -181,7 +181,7 @@ def main():
                 
                 # Initialize Poisson solver on all MPI ranks
                 poisson_solver = PoissonSolver(mesh_file,System_state.poissonSolver_parameters, structure=System_state.structure,path_results = paths["results"])
-                poisson_solver.set_boundary_conditions(top_value=1.0, bottom_value=0.0)  # Set appropriate BCs
+                poisson_solver.set_boundary_conditions(top_value=0.0, bottom_value=0.0)  # Set appropriate BCs
                 
                 poisson_solve_frequency = System_state.poissonSolver_parameters['poisson_solve_frequency']  # Solve Poisson every N KMC steps
                 
@@ -193,8 +193,6 @@ def main():
     
             
             i = 0
-            #total_steps = int(1e4)
-            total_steps = int(1e3)
             # list_sites_occu = []
             
     
@@ -221,6 +219,9 @@ def main():
                   
                   comm.Barrier()
                   
+                  #if i == 100:
+                  # poisson_solver.set_boundary_conditions(top_value=1.0, bottom_value=0.0)
+                  
                   if i%poisson_solve_frequency == 0:
                     
                         run_start_time = MPI.Wtime()
@@ -243,14 +244,10 @@ def main():
                     
                     
                 # kMC steps after solving Poisson equation, calculating the electric field and the impact in the transition rates
-                if rank == 0:      
+                if rank == 0:   
                   System_state,KMC_time_step, chosen_event = KMC(System_state,rng)  
-                  site = System_state.sites_occupied[0]
-
-                  print(System_state.grid_crystal[site].site_events)
-                  print(System_state.grid_crystal[site].ion_charge)
-                  if i == 2:
-                      return System_state
+                  
+                  System_state.metal_clusters_analysis()
                     
                 # Synchronize before continuing
                 if comm is not None:

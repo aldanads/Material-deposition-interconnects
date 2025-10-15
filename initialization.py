@@ -22,11 +22,25 @@ import time
 import warnings
 
 
-def initialization(n_sim,save_data,lammps_file):
+def initialization(n_sim):
     
+# =============================================================================
+#         Simulation parameters
+#         
+# =============================================================================
     seed = 1
     # Random seed as time
     rng = np.random.default_rng(seed) # Random Number Generator (RNG) object
+    
+    save_data = True
+    lammps_file = True
+    snapshoots_steps = int(1e1)
+    total_steps = int(1e2)
+    
+    simulation_parameters = {
+      'save_data':save_data, 'snapshoots_steps':snapshoots_steps,
+      'total_steps':total_steps
+    }    
 
     # Default resolution for figures
     plt.rcParams["figure.dpi"] = 100 # Default value of dpi = 300
@@ -48,6 +62,11 @@ def initialization(n_sim,save_data,lammps_file):
         
     experiments = ['deposition','annealing','ECM memristor']
     experiment = experiments[2]
+    
+
+
+
+
 
     if experiment == 'deposition':         
 # =============================================================================
@@ -323,10 +342,12 @@ def initialization(n_sim,save_data,lammps_file):
         #         
         # =============================================================================
         material_selection = {"CeO2":"mp-20194", "ZrPbO3":"mp-1068577"}
+        nearest_neighbors_distance = {"CeO2":4, "ZrPbO3": 5}
         technologies = ['ECM','PZT']
         technology = technologies[0]
         id_material_Material_Project = material_selection["CeO2"]
-        crystal_size = (20,20,20) # (angstrom (Å))
+        radius_neighbors = nearest_neighbors_distance["CeO2"]
+        crystal_size = (50,50,50) # (angstrom (Å))
         orientation = ['001']
         use_parallel = None
         facets_type = None
@@ -336,9 +357,7 @@ def initialization(n_sim,save_data,lammps_file):
         available_events = {'migration': True, 'reduction': True, 'oxidation': True}
 
         mode = ['interstitial', 'vacancy']
-        radius_neighbors = 4
-        
-        # The no selected layer will behave like an additional particle for the clustering energy
+
         sites_generation_layer = ['bottom_layer','top_layer']
 
 
@@ -362,7 +381,7 @@ def initialization(n_sim,save_data,lammps_file):
 
         crystal_features = [id_material_Material_Project,crystal_size,orientation[0],
                             api_key,use_parallel,
-                            facets_type,affected_site,mode[0],radius_neighbors,sites_generation_layer[1],available_events]
+                            facets_type,affected_site,mode[0],radius_neighbors,sites_generation_layer[0],available_events]
 
 
         # =============================================================================
@@ -384,7 +403,6 @@ def initialization(n_sim,save_data,lammps_file):
         # Parameters for Poisson solver
         active_dipoles = 4
         poisson_solve_frequency = int(1e1)  # Solve Poisson every N KMC steps
-        
         solve_Poisson = True
         save_Poisson = False
         
@@ -453,12 +471,12 @@ def initialization(n_sim,save_data,lammps_file):
         
         CN_clustering_energy = Act_E_list['CN_clustering_energy']
         E_clustering = [0,0,CN_clustering_energy * 2,CN_clustering_energy * 3,CN_clustering_energy * 4,CN_clustering_energy * 5,CN_clustering_energy * 6,CN_clustering_energy * 7,CN_clustering_energy * 8,CN_clustering_energy * 9,CN_clustering_energy * 10,CN_clustering_energy * 11,CN_clustering_energy * 12,CN_clustering_energy * 13] 
-
-        CN_redox_energy = Act_E_list['CN_redox_energy']
-        E_redox = [0,0,CN_redox_energy * 2,CN_redox_energy * 3,CN_redox_energy * 4,CN_redox_energy * 5,CN_redox_energy * 6,CN_redox_energy * 7,CN_redox_energy * 8,CN_redox_energy * 9,CN_redox_energy * 10,CN_redox_energy * 11,CN_redox_energy * 12,CN_redox_energy * 13] 
-
         Act_E_list['CN_clustering_energy'] = E_clustering
-        Act_E_list['CN_redox_energy'] = E_redox
+        
+        if 'CN_redox_energy' in Act_E_list:
+          CN_redox_energy = Act_E_list['CN_redox_energy']
+          E_redox = [0,0,CN_redox_energy * 2,CN_redox_energy * 3,CN_redox_energy * 4,CN_redox_energy * 5,CN_redox_energy * 6,CN_redox_energy * 7,CN_redox_energy * 8,CN_redox_energy * 9,CN_redox_energy * 10,CN_redox_energy * 11,CN_redox_energy * 12,CN_redox_energy * 13] 
+          Act_E_list['CN_redox_energy'] = E_redox
         
 
         # =============================================================================
@@ -480,14 +498,14 @@ def initialization(n_sim,save_data,lammps_file):
         #             Initialization of defects
         #     
         # =============================================================================
-        #P = 0.03
-        #System_state.defect_gen(rng,P)
+        P = 0.01
+        System_state.defect_gen(rng,P)
         #System_state.deposition_specie(0,rng,test = 0)
         
         # This timestep_limits will depend on the V/s ratio
         System_state.timestep_limits = float('inf')
 
-    return System_state,rng,paths,Results
+    return System_state,rng,paths,Results, simulation_parameters
 
     # =============================================================================
     #     Initialize the crystal grid structure - nodes with empty spaces
