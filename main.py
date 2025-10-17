@@ -257,22 +257,7 @@ def main():
                 if rank == 0:   
                   System_state,KMC_time_step, chosen_event = KMC(System_state,rng)  
                   
-                """
-                  System_state.metal_clusters_analysis()
-                  if len(System_state.clusters) > 0:
-                    clusters_atoms_positions = System_state.clusters[0].atoms_positions
-                  else:
-                    clusters_atoms_positions = []
-                else:
-                  clusters_atoms_positions = None
-                  
-
-                clusters_atoms_positions = comm.bcast(clusters_atoms_positions, root=0)
-
-                bcs = poisson_solver._create_cluster_boundary_conditions(clusters_atoms_positions, 0)
-                """
-  
-                    
+                      
                 # Synchronize before continuing
                 if comm is not None:
                   comm.Barrier()

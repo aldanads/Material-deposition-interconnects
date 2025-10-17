@@ -65,63 +65,66 @@ class PoissonSolver():
         
         # Poisson parameters
         self.poissonSolver_parameters = poissonSolver_parameters
+        self.path_results_folder = kwargs.get("path_results", "")
+        
+        # MPI setup
+        self.comm = MPI.COMM_WORLD
+        self.rank = self.comm.rank
+        
+        # Mesh handling
+        self.mesh_folder = Path("mesh")
+        self.mesh_file = self.mesh_folder / mesh_file
+        
+        # Ensure mesh exists (generates if missing, synchronized across ranks)
+        self._ensure_mesh(structure)
+       
+        # Load mesh and set up FEM spaces
+        self._load_and_setup_fem()
+            
+        # Precompute reusable objects
+        self._setup_function_spaces()
+        self._setup_linear_algebra()
+        self._setup_time_series_output(output_folder="Electric_potential_results")
+        self._precompute_domain_geometry()
+        
         self._calculate_dipole_moment()
         
-        mesh_folder = Path("mesh")
-        self.mesh_file = mesh_folder / mesh_file
-        """
-        Generate a mesh if the mesh file does not exist.
-        """
-        self.rank = MPI.COMM_WORLD.rank
-        if self.rank == 0:
-          mesh_folder.mkdir(parents=True, exist_ok=True)  # Create 'mesh' folder if it doesn't exist
-
-          if not self.mesh_file.exists():
-            print(f'Rank {MPI.COMM_WORLD.rank}: Starting mesh generation')
-            self.generate_mesh(structure)
-            print(f'Rank {MPI.COMM_WORLD.rank}: Mesh generation completed')
-                      
-          else:
-            print(f'Rank {MPI.COMM_WORLD.rank}: Using existing mesh file: {self.mesh_file}')
-          
+    # --- Mesh Management ---
+    def _ensure_mesh(self,structure):
+    
+      """Ensure mesh file exists; generate if missing (rank 0 only), then sync."""
+      if self.rank == 0:
+        self.mesh_folder.mkdir(parents=True, exist_ok=True)
+        if not self.mesh_file.exists():
+          print(f'Rank {self.rank}: Starting mesh generation')
+          self.generate_mesh(structure)
+          print(f'Rank {self.rank}: Mesh generation completed')
         else:
-          print(f'Rank {MPI.COMM_WORLD.rank}: Waiting for mesh generation...')
-          
-        # Barrier: All ranks wait until rank 0 finishes mesh generation
-        print(f'Rank {MPI.COMM_WORLD.rank}: Reaching barrier after mesh generation check')
-        MPI.COMM_WORLD.Barrier()
-        print(f'Rank {MPI.COMM_WORLD.rank}: Passed barrier, proceeding to load mesh')
+          print(f'Rank {self.rank}: Using existing mesh: {self.mesh_file}')
+      else:
+        print(f'Rank {self.rank}: Waiting for mesh...')
 
-            
-            
-        # Load the mesh
-        self.domain, self.cell_markers, self.facet_markers = self._load_mesh()
-        # Synchronization point for debugging
-        #MPI.COMM_WORLD.Barrier()
+      self.comm.Barrier()
+      print(f'Rank {self.rank}: Mesh ready on all ranks.')
+      
+    # --- FEM Setup ---
+    def _load_and_setup_fem(self):
+      """Load mesh and create function spaces."""
+      # Load the mesh
+      self.domain, self.cell_markers, self.facet_markers = self._load_mesh()
+      # Create facet to cell connectivity required to determine boundary facets 
+      self.tdim = self.domain.topology.dim # Get the dimension of the mesh (3D in this case)
+      self.fdim = self.tdim - 1 # The dimension of the facets (faces) is one less than the mesh dimension
+      self.domain.topology.create_connectivity(self.fdim,self.tdim) # Create connectivity between facets and cells
         
-        # Example: V ('Lagrange',1) are functions defined in domain, continuous (because Lagrange elements enforce continuity) and degree 1
-        self.V = functionspace(self.domain, ('Lagrange',1))
+      # Example: V ('Lagrange',1) are functions defined in domain, continuous (because Lagrange elements enforce continuity) and degree 1
+      self.V = functionspace(self.domain, ('Lagrange',1))
         # Create vector function space for electric field evaluation
-        self.V_vec = functionspace(self.domain, ("Lagrange",1, (self.domain.topology.dim,)))
-            
-        
-        # Create facet to cell connectivity required to determine boundary facets 
-        self.tdim = self.domain.topology.dim # Get the dimension of the mesh (3D in this case)
-        self.fdim = self.tdim - 1 # The dimension of the facets (faces) is one less than the mesh dimension
-        self.domain.topology.create_connectivity(self.fdim,self.tdim) # Create connectivity between facets and cells
-        self.bcs = []
-        
-        # Initialize the previous solution for recurrent solution of the Poisson equation
-        self.previous_solution = None
-        
-        # vtx_writer to save the solution
-        self.xdmf_writer = None
-        self.path_results_folder = kwargs.get("path_results", "")
-        self._setup_time_series_output(output_folder="Electric_potential_results")
+      self.V_vec = functionspace(self.domain, ("Lagrange",1, (self.domain.topology.dim,)))
         
         
-        
-        
+    # --- Function Spaces & Reusable Objects ---
+    def _setup_function_spaces(self):
         # ========== Reusable objects ===============
         # Pre-create DGO space for charge density (reused in charge_density())
         # Discontinuous Galerkin (DG) space of order 0 -> no continuity between elements
@@ -134,10 +137,11 @@ class PoissonSolver():
         #   Local cells (cells owned by this process in parallel computation)
         #   Ghost cells (cells shared between processes in parallel computing)
         num_cells = self.domain.topology.index_map(self.tdim).size_local + self.domain.topology.index_map(self.tdim).num_ghosts
+        self.num_cells = num_cells
         # Computes the midpoint of each cell in the domain
         #   Since DG(0) functions (like rho) are piecewise constant per element, we typically evaluate them at the midpoint of each element
         self.cell_midpoints = mesh.compute_midpoints(self.domain, self.tdim, np.arange(num_cells, dtype=np.int32))
-        self.num_cells = num_cells
+        
         
         # Pre-create trial and test functions
         self.u_trial = ufl.TrialFunction(self.V)
@@ -154,39 +158,42 @@ class PoissonSolver():
         angstrom_to_m = 1e-10
         self.a_form = fem.form(ufl.inner(ufl.grad(self.u_trial), ufl.grad(self.v_test)) * angstrom_to_m * ufl.dx)
         
-        # Pre-allocate matrix A (will be reassembled when BCs change)
-        # Create empty matrix with correct sparsity pattern
-        self.A = fem.petsc.create_matrix(self.a_form)
         
-        # Pre-create PETSc vectors
-        self.b = fem.petsc.create_vector(fem.form(self.v_test * ufl.dx))
+    # --- Linear Algebra & Solver ---
+    def _setup_linear_algebra(self):
+      # Pre-allocate matrix A (will be reassembled when BCs change)
+      # Create empty matrix with correct sparsity pattern
+      self.A = fem.petsc.create_matrix(self.a_form)
+      # Pre-create PETSc vectors
+      self.b = fem.petsc.create_vector(fem.form(self.v_test * ufl.dx))
+      # Pre-create solution function
+      self.uh = fem.Function(self.V)
+      # Track if BCs have changed to trigger matrix reassembly
+      # Pre-create E_field function and expression (for evaluate_electric_field_at_points)
+      self.E_field = fem.Function(self.V_vec)
+
         
-        # Track if BCs have changed to trigger matrix reassembly
-        self._bcs_changed = True
+      # Pre-create KSP solver (reuse across solves)
+      # Configure KSP solver with initial guess
+      self.ksp = PETSc.KSP().create(self.domain.comm)
+      self.ksp.setOperators(self.A)
+      self.ksp.setType(PETSc.KSP.Type.CG)
+      self.ksp.getPC().setType(PETSc.PC.Type.HYPRE)
+      self.ksp.getPC().setHYPREType("boomeramg")
+      self.ksp.setTolerances(rtol=1e-8,atol=1e-10,max_it=1000)
+      self.ksp.setInitialGuessNonzero(True)
         
-        # Pre-create KSP solver (reuse across solves)
-        # Configure KSP solver with initial guess
-        self.ksp = PETSc.KSP().create(self.domain.comm)
-        self.ksp.setOperators(self.A)
-        self.ksp.setType(PETSc.KSP.Type.CG)
-        self.ksp.getPC().setType(PETSc.PC.Type.HYPRE)
-        self.ksp.getPC().setHYPREType("boomeramg")
-        self.ksp.setTolerances(rtol=1e-8,atol=1e-10,max_it=1000)
-        self.ksp.setInitialGuessNonzero(True)
-        
-        # Pre-create solution function
-        self.uh = fem.Function(self.V)
-        
-        # Pre-create E_field function and expression (for evaluate_electric_field_at_points)
-        self.E_field = fem.Function(self.V_vec)
-        
-        # Pre-compute bounding box tree for point evaluation (cached)
-        self.bb_tree = geometry.bb_tree(self.domain, self.domain.topology.dim)
-        
-        self._precompute_domain_geometry()
-        
+      self._bcs_changed = True
+      self.bcs = []
+
+      # Pre-compute bounding box tree for point evaluation (cached)
+      self.bb_tree = geometry.bb_tree(self.domain, self.domain.topology.dim)         
+      # Initialize the previous solution for recurrent solution of the Poisson equation
+      self.previous_solution = None
+      
+    # ------ Pre-compute geometry -------  
     def _precompute_domain_geometry(self):
-      # ======= Pre-compute geometry ==============
+
       coords = self.domain.geometry.x
       x_min, x_max = coords[:,0].min(), coords[:,0].max()
       y_min, y_max = coords[:,1].min(), coords[:,1].max()
@@ -206,7 +213,7 @@ class PoissonSolver():
         
         # All processes load the mesh
         domain, cell_markers, facet_markers = gmshio.read_from_msh(
-        str(self.mesh_file), MPI.COMM_WORLD, self.gmsh_model_rank, gdim=self.gdim
+        str(self.mesh_file), self.comm, self.gmsh_model_rank, gdim=self.gdim
         )
         
         return domain, cell_markers, facet_markers
@@ -602,8 +609,6 @@ class PoissonSolver():
         all_boundary_conditions.append(bc_bottom)
         # Clusters boundary conditions
         for cluster in clusters:
-          if self.rank == 0:
-            print(f'Cluster: {cluster}')
           if cluster.attached_layer['bottom_layer']:
             cluster_boundary_conditions = self._create_cluster_boundary_conditions(cluster.atoms_positions, bottom_value)
           elif cluster.attached_layer['top_layer']:
@@ -716,7 +721,7 @@ class PoissonSolver():
         local_charge = fem.assemble_scalar(fem.form(self.rho * ufl.dx))  # Local total charge for this process
     
         # Gather the total charge from all processes
-        total_charge = MPI.COMM_WORLD.allreduce(local_charge, op=MPI.SUM)
+        total_charge = self.comm.allreduce(local_charge, op=MPI.SUM)
         
         expected_charge = sum(charges)
         #if expected_charge > 0:
@@ -746,12 +751,12 @@ class PoissonSolver():
             sys.stdout.flush()
     
           # Synchronize to ensure rank 0 finishes printing, then abort all processes
-          MPI.COMM_WORLD.Barrier()
-          MPI.COMM_WORLD.Abort(1)      
+          self.comm.Barrier()
+          self.comm.Abort(1)      
             
         #else:
           # Only print if rank = 0
-        #  if MPI.COMM_WORLD.rank == 0:
+        #  if self.rank == 0:
         #    print(f"Total charge validated: {total_charge:.2e} C (Charge error = {charge_error:.2f}% of expected charge)")
           
         return self.rho
@@ -887,7 +892,7 @@ class PoissonSolver():
           
       # Communicate results across all MPI processes
       # Each point is evaluated by exactly one process, so we sum the results
-      E_values_global = MPI.COMM_WORLD.allreduce(E_values_global, op=MPI.SUM)
+      E_values_global = self.comm.allreduce(E_values_global, op=MPI.SUM)
              
       return E_values_global * 1e10 * self.bond_polarization_factor # Units: V/m
       
