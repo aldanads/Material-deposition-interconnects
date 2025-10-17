@@ -72,7 +72,8 @@ class PoissonSolver():
         """
         Generate a mesh if the mesh file does not exist.
         """
-        if MPI.COMM_WORLD.rank == 0:
+        self.rank = MPI.COMM_WORLD.rank
+        if self.rank == 0:
           mesh_folder.mkdir(parents=True, exist_ok=True)  # Create 'mesh' folder if it doesn't exist
 
           if not self.mesh_file.exists():
@@ -96,7 +97,7 @@ class PoissonSolver():
         # Load the mesh
         self.domain, self.cell_markers, self.facet_markers = self._load_mesh()
         # Synchronization point for debugging
-        MPI.COMM_WORLD.Barrier()
+        #MPI.COMM_WORLD.Barrier()
         
         # Example: V ('Lagrange',1) are functions defined in domain, continuous (because Lagrange elements enforce continuity) and degree 1
         self.V = functionspace(self.domain, ('Lagrange',1))
@@ -181,6 +182,21 @@ class PoissonSolver():
         
         # Pre-compute bounding box tree for point evaluation (cached)
         self.bb_tree = geometry.bb_tree(self.domain, self.domain.topology.dim)
+        
+        self._precompute_domain_geometry()
+        
+    def _precompute_domain_geometry(self):
+      # ======= Pre-compute geometry ==============
+      coords = self.domain.geometry.x
+      x_min, x_max = coords[:,0].min(), coords[:,0].max()
+      y_min, y_max = coords[:,1].min(), coords[:,1].max()
+      self.z_min, self.z_max = coords[:,2].min(), coords[:,2].max()
+      
+      self.Lx = x_max - x_min
+      self.Ly = y_max - y_min
+      
+      # Pre-compute DOF coordinates ONCE
+      self.dof_coords = self.V.tabulate_dof_coordinates()
         
         
     def _load_mesh(self):
@@ -552,16 +568,20 @@ class PoissonSolver():
         Set Dirichlet boundary conditions on the top and bottom layers.
         """
         
-        coords = self.domain.geometry.x # Nx3 array of node coordinates
+        """
+        # Deprecating 2025/10/17
+        
+        coords = self.coords
         # Get min and max in the z-axis (third column)
         min_z = np.min(coords[:, 2])
         max_z = np.max(coords[:, 2])
+        """        
 
         def top_boundary(x):
-            return np.isclose(x[2],max_z)
+            return np.isclose(x[2],self.z_max)
         
         def bottom_boundary(x):
-            return np.isclose(x[2],min_z)
+            return np.isclose(x[2],self.z_min)
         
         # Find boundaries in domain where top_boundary returns True
         # - domain: finite element mesh
@@ -591,6 +611,75 @@ class PoissonSolver():
         # Mark that BCs have changed
         self._bcs_changed = True
         
+    def _create_cluster_boundary_conditions(self,cluster_particle_positions, cluster_potential):
+      """
+      Create boundary conditions for clusters 
+      They may be in contact with top or bottom layer.
+    
+      Parameters:
+      -----------
+      cluster_particle_positions : array-like, shape (n_particles, 3)
+        Coordinates of particles in cluster contact
+      cluster_potential : float
+        Potential value at cluster contact
+        
+      Returns:
+      --------
+      list of dirichletbc objects
+      """
+      
+      if cluster_particle_positions is None or len(cluster_particle_positions) == 0:
+        return []
+      
+      # Get all DOF coordinates
+      cluster_boundary_conditions = []
+      contact_radius = 2.0 # Choose a radius distances to nodes --> All nodes at that distance will have the same boundary
+      
+      cluster_particle_positions = np.array(cluster_particle_positions, dtype=np.float64)
+      
+      # Vectorized distance calculation for all particles
+      dofs_near_cluster = self._find_dofs_near_particles_vectorized(cluster_particle_positions, contact_radius)
+      
+      """
+      # FOR DEBUGGING PURPOSES
+      if self.rank == 0:
+        #print(f"Minimum distance to any DOF: {min_distance_found:.4f} Å")
+        print(f"DOFs within contact radius: {len(dofs_near_cluster)}")
+        print(f"Total DOFs in domain: {len(self.dof_coords)}")
+      """
+      
+      u_cluster = fem.Function(self.V)
+      u_cluster.interpolate(lambda x: np.full_like(x[0], cluster_potential))
+      # Apply BC directly to these DOFs
+      bc_cluster = fem.dirichletbc(u_cluster, dofs_near_cluster)
+      cluster_boundary_conditions.append(bc_cluster)
+          
+      return cluster_boundary_conditions
+      
+      
+    def _find_dofs_near_particles_vectorized(self, particle_positions, contact_radius):
+      
+      # Vectorized calculation for all particles at once
+      # Shape: (n_dofs, n_particles)
+      dx = self.dof_coords[:, np.newaxis, 0] - particle_positions[np.newaxis, :, 0]
+      dy = self.dof_coords[:, np.newaxis, 1] - particle_positions[np.newaxis, :, 1]  
+      dz = self.dof_coords[:, np.newaxis, 2] - particle_positions[np.newaxis, :, 2]
+    
+      # Apply minimum image convention (periodic in x, y)
+      dx = dx - self.Lx * np.round(dx / self.Lx)
+      dy = dy - self.Ly * np.round(dy / self.Ly)
+      # z is NOT periodic
+        
+      # Calculate all distances at once
+      distances = np.sqrt(dx**2 + dy**2 + dz**2) # Shape: (n_dofs, n_particles)
+      
+      # Find minimum distance to any particle for each DOF
+      min_dist = np.min(distances,axis=1) # Shape: (n_dofs,)
+      
+      # Find DOFs within contact radius
+      nearby_dofs = np.where(distances <= contact_radius)[0]
+      
+      return nearby_dofs.astype(np.int32)
         
     def charge_density(self, charge_locations, charges, tolerance = 2):
         """
@@ -633,7 +722,7 @@ class PoissonSolver():
         charge_error = 100 * abs((total_charge - expected_charge) / expected_charge) if abs(expected_charge) > 0 else 0.0
         
         if charge_error > tolerance:
-          if MPI.COMM_WORLD.rank == 0:
+          if self.rank == 0:
             error_msg = (
               f"\nCHARGE CONSERVATION ERROR:\n"
               f"- Total charge: {total_charge:.4e} C\n"
@@ -822,7 +911,7 @@ class PoissonSolver():
         
         proportion_E_computed_analytical = abs(E_magnitude / E_analytical)
         
-        if MPI.COMM_WORLD.rank == 0:
+        if self.rank == 0:
           print(f"Distance {r} angstrom: Computed={E_magnitude:.2e}, Analytical={E_analytical:.2e}, Proportion E (computed/analytical)={proportion_E_computed_analytical:.2e}")
           print(f"Computed(x,y,z)=({E_computed[0][0]:.2e},{E_computed[0][1]:.2e},{E_computed[0][2]:.2e})")
 
@@ -882,7 +971,7 @@ class PoissonSolver():
       max_idx = np.argmax(rho_values)
       actual_center = self.cell_midpoints[max_idx]
       
-      if MPI.COMM_WORLD.rank == 0:
+      if self.rank == 0:
         print(f"Requested center: {requested_center}")
         print(f"Actual center on mesh: {actual_center}")
         print(f"Offset: {actual_center - requested_center}")

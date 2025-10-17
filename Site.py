@@ -526,6 +526,15 @@ class Site():
                 event[0] = tr_value
                 
                 
+                
+class Cluster:
+    def __init__(self,cluster_atoms,atoms_positions,attached_layer):
+      self.atoms_id = cluster_atoms
+      self.atoms_positions = atoms_positions
+      self.size = len(cluster_atoms)
+      self.attached_layer = attached_layer
+      
+                                
         
 class Island:
     def __init__(self,z_starting_position,z_starting_pos_cart,island_sites):

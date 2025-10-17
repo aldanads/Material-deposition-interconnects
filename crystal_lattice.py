@@ -6,7 +6,7 @@ Created on Wed Jan 10 15:19:06 2024
 """
 # import lattpy as lp # https://lattpy.readthedocs.io/en/latest/tutorial/finite.html#position-and-neighbor-data
 import matplotlib.pyplot as plt
-from Site import Site,Island
+from Site import Site,Island, Cluster
 from scipy import constants
 import numpy as np
 import math
@@ -1632,7 +1632,6 @@ class Crystal_Lattice():
     def metal_clusters_analysis(self):
     
       atoms_idx = self._get_atoms()
-      
       self._find_clusters(atoms_idx)
       
     def _get_atoms(self):
@@ -1658,12 +1657,13 @@ class Crystal_Lattice():
       
         if atom_id not in visited:
           # Start new cluster with this atom
-          cluster_atoms = self._dfs_explore(atom_id, visited)
+          cluster_atoms,atoms_positions,attached_layer = self._dfs_explore(atom_id, visited)
           
           if len(cluster_atoms) > 1: # Only consider clusters with > 1 atom
-            print(f'Atoms in the cluster: {cluster_atoms}')
-            #cluster.append()
-            #pass
+            clusters.append(Cluster(cluster_atoms,atoms_positions,attached_layer))
+      
+      self.clusters = clusters
+
             
     def _dfs_explore(self, start_atom, visited):
       """
@@ -1672,20 +1672,28 @@ class Crystal_Lattice():
       
       stack = [start_atom]
       cluster_atoms = []
+      atoms_positions = []
+      attached_layer = {}
       
       while stack:
         atom_id = stack.pop()
         
         if atom_id not in visited:
-          visited.add(atom_id)
-          cluster_atoms.append(atom_id)
-          
           if isinstance(atom_id, tuple):
+            visited.add(atom_id)
+            cluster_atoms.append(atom_id)
+            atoms_positions.append(self.grid_crystal[atom_id].position)
+            
             for neighbor_id in self.grid_crystal[atom_id].supp_by:
               if neighbor_id not in visited:
                 stack.append(neighbor_id)
+          else: 
+            attached_layer[atom_id] = True
+          
+          
+            
               
-      return cluster_atoms
+      return cluster_atoms,atoms_positions,attached_layer
            
       
       

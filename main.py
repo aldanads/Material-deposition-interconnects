@@ -248,6 +248,23 @@ def main():
                   System_state,KMC_time_step, chosen_event = KMC(System_state,rng)  
                   
                   System_state.metal_clusters_analysis()
+                  if len(System_state.clusters) > 0:
+                    clusters_atoms_positions = System_state.clusters[0].atoms_positions
+                  else:
+                    clusters_atoms_positions = []
+                else:
+                  clusters_atoms_positions = None
+                  
+
+                clusters_atoms_positions = comm.bcast(clusters_atoms_positions, root=0)
+
+                bcs = poisson_solver._create_cluster_boundary_conditions(clusters_atoms_positions, 0)
+                
+                #if MPI.COMM_WORLD.rank == 0:
+                #  print(f"Created {len(bcs)} boundary conditions")
+                #  for i, bc in enumerate(bcs):
+                #    print(f"BC {i}: {type(bc)}")
+  
                     
                 # Synchronize before continuing
                 if comm is not None:
