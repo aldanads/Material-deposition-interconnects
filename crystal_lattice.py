@@ -1683,7 +1683,7 @@ class Crystal_Lattice():
       stack = [start_atom]
       cluster_atoms = []
       atoms_positions = []
-      attached_layer = {}
+      attached_layer = {'bottom_layer': False, 'top_layer': False}
       
       while stack:
         atom_id = stack.pop()

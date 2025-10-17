@@ -608,6 +608,7 @@ class PoissonSolver():
         bc_bottom = fem.dirichletbc(u_bottom, boundary_dofs_bottom)
         all_boundary_conditions.append(bc_bottom)
         # Clusters boundary conditions
+        cluster_boundary_conditions = []
         for cluster in clusters:
           if cluster.attached_layer['bottom_layer']:
             cluster_boundary_conditions = self._create_cluster_boundary_conditions(cluster.atoms_positions, bottom_value)
