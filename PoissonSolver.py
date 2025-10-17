@@ -563,19 +563,12 @@ class PoissonSolver():
         
         
         
-    def set_boundary_conditions(self,top_value=0.0, bottom_value=0.0):
+    def set_boundary_conditions(self,top_value=0.0, bottom_value=0.0,clusters = []):
         """
         Set Dirichlet boundary conditions on the top and bottom layers.
-        """
+        """   
         
-        """
-        # Deprecating 2025/10/17
-        
-        coords = self.coords
-        # Get min and max in the z-axis (third column)
-        min_z = np.min(coords[:, 2])
-        max_z = np.max(coords[:, 2])
-        """        
+        all_boundary_conditions = []  
 
         def top_boundary(x):
             return np.isclose(x[2],self.z_max)
@@ -604,9 +597,21 @@ class PoissonSolver():
         
         # Apply Dirichlet boundary conditions
         bc_top = fem.dirichletbc(u_top, boundary_dofs_top)
+        all_boundary_conditions.append(bc_top)
         bc_bottom = fem.dirichletbc(u_bottom, boundary_dofs_bottom)
+        all_boundary_conditions.append(bc_bottom)
+        # Clusters boundary conditions
+        for cluster in clusters:
+          if self.rank == 0:
+            print(f'Cluster: {cluster}')
+          if cluster.attached_layer['bottom_layer']:
+            cluster_boundary_conditions = self._create_cluster_boundary_conditions(cluster.atoms_positions, bottom_value)
+          elif cluster.attached_layer['top_layer']:
+            cluster_boundary_conditions = self._create_cluster_boundary_conditions(cluster.atoms_positions, top_value)
+          
+          all_boundary_conditions.extend(cluster_boundary_conditions) # Use extend() to avoid nested lists, as cluster_boundary_conditions is a list
         
-        self.bcs = [bc_top, bc_bottom]
+        self.bcs = all_boundary_conditions
         
         # Mark that BCs have changed
         self._bcs_changed = True

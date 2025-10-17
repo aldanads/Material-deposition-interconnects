@@ -209,7 +209,7 @@ def main():
                     particle_locations = None
                     charges = None
                     E_field_points = None
-                
+                    
                   # Broadcast charge information to all MPI ranks
                   # Poisson equation and electric field use all the ranks 
                   if comm is not None:
@@ -223,6 +223,16 @@ def main():
                   # poisson_solver.set_boundary_conditions(top_value=1.0, bottom_value=0.0)
                   
                   if i%poisson_solve_frequency == 0:
+                  
+                        # Calculate clusters for include BC in the cluster --> Virtual electrode
+                        if rank == 0:
+                          System_state.metal_clusters_analysis()
+                          clusters = System_state.clusters
+                        else:
+                          clusters = None
+                          
+                        clusters = comm.bcast(clusters, root=0)
+                        poisson_solver.set_boundary_conditions(top_value=1.0, bottom_value=0.0, clusters = clusters)
                     
                         run_start_time = MPI.Wtime()
                         uh = poisson_solver.solve(particle_locations,charges)
@@ -247,6 +257,7 @@ def main():
                 if rank == 0:   
                   System_state,KMC_time_step, chosen_event = KMC(System_state,rng)  
                   
+                """
                   System_state.metal_clusters_analysis()
                   if len(System_state.clusters) > 0:
                     clusters_atoms_positions = System_state.clusters[0].atoms_positions
@@ -259,11 +270,7 @@ def main():
                 clusters_atoms_positions = comm.bcast(clusters_atoms_positions, root=0)
 
                 bcs = poisson_solver._create_cluster_boundary_conditions(clusters_atoms_positions, 0)
-                
-                #if MPI.COMM_WORLD.rank == 0:
-                #  print(f"Created {len(bcs)} boundary conditions")
-                #  for i, bc in enumerate(bcs):
-                #    print(f"BC {i}: {type(bc)}")
+                """
   
                     
                 # Synchronize before continuing
