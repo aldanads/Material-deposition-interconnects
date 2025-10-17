@@ -632,10 +632,17 @@ class Crystal_Lattice():
         charges = []
         
         for site in self.sites_occupied:
-            particle_locations.append(self.grid_crystal[site].position)
-            charges.append(self.grid_crystal[site].ion_charge * constants.e * self.screening_factor)
-            
-        return np.array(particle_locations,dtype=np.float64), np.array(charges, dtype=np.float64)
+          particle_locations.append(self.grid_crystal[site].position)
+          charges.append(self.grid_crystal[site].ion_charge * constants.e * self.screening_factor)
+           
+        if len(particle_locations) == 0:
+          particle_locations = np.empty((0, 3), dtype=np.float64)
+          charges = np.empty((0,), dtype=np.float64)
+        else:
+          particle_locations = np.array(particle_locations,dtype=np.float64)
+          charges = np.array(charges, dtype=np.float64)
+         
+        return particle_locations, charges 
         
     def _extract_generation_site_location(self):
         """
@@ -645,8 +652,11 @@ class Crystal_Lattice():
         
         for site in self.adsorption_sites:
             gen_site_locations.append(self.grid_crystal[site].position)
-            
-        return np.array(gen_site_locations,dtype=np.float64)
+        
+        if len(gen_site_locations) == 0:
+          return np.empty((0, 3), dtype=np.float64)
+        else:
+          return np.array(gen_site_locations,dtype=np.float64)
             
                 
     

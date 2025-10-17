@@ -34,8 +34,8 @@ def initialization(n_sim):
     
     save_data = True
     lammps_file = True
-    snapshoots_steps = int(1e1)
-    total_steps = int(1e2)
+    snapshoots_steps = int(2e2)
+    total_steps = int(2e5)
     
     simulation_parameters = {
       'save_data':save_data, 'snapshoots_steps':snapshoots_steps,
@@ -381,7 +381,7 @@ def initialization(n_sim):
 
         crystal_features = [id_material_Material_Project,crystal_size,orientation[0],
                             api_key,use_parallel,
-                            facets_type,affected_site,mode[0],radius_neighbors,sites_generation_layer[0],available_events]
+                            facets_type,affected_site,mode[0],radius_neighbors,sites_generation_layer[1],available_events]
 
 
         # =============================================================================
@@ -402,11 +402,11 @@ def initialization(n_sim):
         
         # Parameters for Poisson solver
         active_dipoles = 4
-        poisson_solve_frequency = int(1e1)  # Solve Poisson every N KMC steps
+        poisson_solve_frequency = int(2e2)  # Solve Poisson every N KMC steps
         solve_Poisson = True
         save_Poisson = False
         
-        screening_factor = 0.018
+        screening_factor = 0.01
         ion_charge = 1
         
 
@@ -498,8 +498,8 @@ def initialization(n_sim):
         #             Initialization of defects
         #     
         # =============================================================================
-        P = 0.01
-        System_state.defect_gen(rng,P)
+        #P = 0.01
+        #System_state.defect_gen(rng,P)
         #System_state.deposition_specie(0,rng,test = 0)
         
         # This timestep_limits will depend on the V/s ratio
