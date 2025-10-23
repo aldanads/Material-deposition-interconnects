@@ -55,13 +55,22 @@ class PoissonSolver():
         self.gmsh_model_rank = kwargs.get("gmsh_model_rank", 0)
         self.gdim = kwargs.get("gdim",3)
         self.padding = kwargs.get("bounding_box_padding",5.0)
+        
+        """
+        Rules to estimate parameters:
+        
+        1. epsilon_gc < min_atomic_separation / 3  (avoid excessive overlap)
+        2. fine_mesh_size < epsilon_gc / 4  (resolve Gaussian with ≥4 elements)
+        3. refinement_radius ≥ 3 × epsilon_gc  (cover 99.7% of Gaussian)
+        4. fine_mesh_size / mesh_size < 0.3  (significant refinement ratio)
+        """
         self.mesh_size = kwargs.get("mesh_size",0.8) #(Å)
-        self.epsilon_gc = kwargs.get("epsilon_gaussian_charge",1.8) #(Å)
+        self.epsilon_gc = kwargs.get("epsilon_gaussian_charge",0.8) #(Å)
         # Set parameters for mesh refinement
         self.active_mesh_refinement = kwargs.get("activate_mesh_refinement",True)
         if self.active_mesh_refinement:
-          self.fine_mesh_size = kwargs.get("fine_mesh_size",0.25) #(Å)
-          self.refinement_radius = kwargs.get("refinement_radius",1) #(Å)
+          self.fine_mesh_size = kwargs.get("fine_mesh_size",0.4) #(Å)
+          self.refinement_radius = kwargs.get("refinement_radius",1.5) #(Å)
         
         # Poisson parameters
         self.poissonSolver_parameters = poissonSolver_parameters
@@ -181,14 +190,13 @@ class PoissonSolver():
       self.ksp.getPC().setType(PETSc.PC.Type.HYPRE)
       self.ksp.getPC().setHYPREType("boomeramg")
       self.ksp.setTolerances(rtol=1e-8,atol=1e-10,max_it=1000)
-      self.ksp.setInitialGuessNonzero(True)
+      
         
       self._bcs_changed = True
       self.bcs = []
 
       # Pre-compute bounding box tree for point evaluation (cached)
       self.bb_tree = geometry.bb_tree(self.domain, self.domain.topology.dim)         
-      # Initialize the previous solution for recurrent solution of the Poisson equation
       self.previous_solution = None
       
     # ------ Pre-compute geometry -------  
@@ -218,6 +226,169 @@ class PoissonSolver():
         
         return domain, cell_markers, facet_markers
         
+    def _calculate_min_atomic_separation(self, points):
+      """
+      Calculate minimum separation between atomic sites
+      """
+      from scipy.spatial.distance import pdist
+      
+      if len(points) < 2: 
+        return float('inf')
+        
+      distances = pdist(points)
+      return np.min(distances)
+      
+    def _validate_mesh_parameters(self,min_separation):
+      """
+      Validate mesh parameters for numerical stability
+      """
+      
+      print('\n=== Parameter Validation ===')
+      
+      issues = []
+      warnings = []
+      
+      # 1) Fine mesh should resolve Gaussian charge distribution
+      # Need at least 3-4 elements across the Gaussian width
+      recommended_fine_mesh = self.epsilon_gc / 4.0
+      if self.fine_mesh_size > recommended_fine_mesh:
+        warnings.append(f'Fine mesh size ({self.fine_mesh_size:.3f} angstroms) is larger than recommended({recommended_fine_mesh:.3f} angstroms)')
+        warnings.append(f'  -> Should be < epsilon_gc/4 = {self.epsilon_gc}/4 = {recommended_fine_mesh:.3f} angstroms)')
+        
+      # 2) Refinement radius should cover Gaussian charge
+      # Should be at least 3*epsilon_gc for 99.7% of Gaussian
+      recommended_radius = 3 * self.epsilon_gc
+      if self.refinement_radius == recommended_radius:
+        warnings.append(f'Refinement radius ({self.refinement_radius:.3f} angstroms) is smaller than recommended ({recommended_radius:.3f} angstroms)')
+        warnings.append(f'  -> Should be >= 3*epsilon_gc = 3*{self.epsilon_gc} = {recommended_radius:.3f} angstroms')
+        
+      # 3) Fine mesh should be much smaller than coarse mesh
+      mesh_ratio = self.fine_mesh_size / self.mesh_size
+      if mesh_ratio > 0.5:
+        warnings.append(f'Fine/coarse mesh ratio ({mesh_ratio:.2f}) is too large')
+        warnings.append(f'  -> Should be < 0.5 for effective refinement')
+        
+      # 4) Mesh should resolve atomic separations
+      if self.fine_mesh_size > min_separation / 3:
+        issues.append(f'Fine mesh ({self.fine_mesh_size:.3f} angstroms) is too coarse for atomic separation ({min_separation:.3f} angstroms)')
+        issues.append(f'  -> Should be < min_separation/3 = {min_separation/3:.3f} angstroms')
+        
+      # 5) Check for overlapping Gaussian charges
+      if min_separation < 2 * self.epsilon_gc:
+        warnings.append(f'Atomic separation ({min_separation:.3f} angstroms) < 2*epsilon_gc ({2*self.epsilon_gc:.3f} angstroms)')
+        warnings.append(f'  -> Gaussian charges may significantly overlap')
+        
+        
+        # Print results
+      if issues:
+        print('CRITICAL ISSUES:')
+        for issue in issues:
+            print(f'  ❌ {issue}')
+    
+      if warnings:
+        print('WARNINGS:')
+        for warning in warnings:
+            print(f'  ⚠️  {warning}')
+    
+      if not issues and not warnings:
+        print('✓ All parameters look good')
+    
+      # Provide recommendations
+      print('\nRECOMMENDED PARAMETERS:')
+      print(f'  fine_mesh_size: {min(self.epsilon_gc/4, min_separation/5):.3f} Å')
+      print(f'  mesh_size: {min(self.epsilon_gc/4, min_separation/5) * 3:.3f} Å')
+      print(f'  refinement_radius: {max(3*self.epsilon_gc, min_separation*1.5):.3f} Å')
+      print(f'  epsilon_gc: {min_separation/3:.3f} Å (if adjustable)')
+      print('=' * 40)
+      
+    
+    def _verify_mesh_quality(self,site_positions):
+      """
+      Comprehensive mesh quality verification
+      """
+      print('\n=== Mesh Quality Analysis ===')
+      
+      
+      # Get mesh statistics
+      node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+      node_coords = node_coords.reshape(-1,3)
+      elements = gmsh.model.mesh.getElements()
+        
+      total_elements = sum(len(elem_tags) for elem_tags in elements[1])
+        
+      print(f'Total nodes: {len(node_tags)}')
+      print(f'Total elements: {total_elements}')
+        
+      if self.active_mesh_refinement:
+        self._analyze_refinement_quality(node_coords,site_positions)
+          
+      
+    def _analyze_refinement_quality(self,node_coords, site_positions):
+      """
+      Analyze mesh refinement near atomic sites
+      """
+      print('\n--- Refinement Quality Check ---')
+      # Check first few atoms
+      #atoms_to_check = min(3, len(site_positions))
+      atoms_to_check = len(site_positions)
+      
+      for i in range(atoms_to_check):
+        atom_pos = site_positions[i]
+        
+        # Find nodes near this atom
+        distances = np.linalg.norm(node_coords - atom_pos,axis=1)
+        
+        # Nodes within refinement radius
+        nearby_mask = distances <= self.refinement_radius
+        nearby_nodes = node_coords[nearby_mask]
+        nearby_distances = distances[nearby_mask]
+        
+        # Nodes close to charge (within epsilon_gc)
+        very_close_mask = distances <= self.epsilon_gc
+        very_close_count = np.sum(very_close_mask)
+        """
+        if very_close_count < 5:
+          print(f"\nAtom {i} at ({atom_pos[0]:.2f}, {atom_pos[1]:.2f}, {atom_pos[2]:.2f}):")
+          print(f'  Nodes within {self.epsilon_gc:.2f} Å (Gaussian width): {very_close_count}')
+        
+        """
+        
+        print(f'\nAtom {i} at ({atom_pos[0]:.2f}, {atom_pos[1]:.2f}, {atom_pos[2]:.2f}):')
+        print(f'  Nodes within {self.refinement_radius:.2f} Å: {len(nearby_nodes)}')
+        print(f'  Nodes within {self.epsilon_gc:.2f} Å (Gaussian width): {very_close_count}')
+        
+        if len(nearby_nodes) > 1:
+          
+          # Estimate local mesh size
+            sorted_distances = np.sort(nearby_distances[nearby_distances > 1e-10])
+            if len(sorted_distances) > 1:
+                min_spacing = sorted_distances[0]
+                
+                print(f'  Closest node distance: {min_spacing:.4f} Å')
+                print(f"  Mean distance to nodes: {np.mean(sorted_distances[:60]):.6e} Å")
+
+                # Check for duplicates
+                unique_dists = np.unique(np.round(sorted_distances[:100], decimals=10))
+                print(f"  Unique distances (first 100): {len(unique_dists)} / {len(sorted_distances[:100])}")
+                # Check if mesh is adequate
+                elements_in_gaussian = self.epsilon_gc / min_spacing
+                print(f'  Elements across Gaussian width: {elements_in_gaussian:.1f}')
+                
+                if elements_in_gaussian < 3:
+                    print(f'  ⚠️  WARNING: Insufficient resolution (need ≥3-4 elements)')
+                elif elements_in_gaussian >= 4:
+                    print(f'  ✓ Good resolution')
+                else:
+                    print(f'  ~ Marginal resolution')
+                    
+          
+                    
+    
+    
+                
+              
+    
+        
     def generate_mesh(self, structure):
           """
           Generate a mesh using GMSH
@@ -227,6 +398,12 @@ class PoissonSolver():
           """
         
           points = np.array([site.coords for site in structure])
+          # Calculate minimum atom separation for validation
+          min_separation = self._calculate_min_atomic_separation(points)
+    
+          # Validate mesh parameters
+          self._validate_mesh_parameters(min_separation)
+          
           gmsh.initialize()
           gmsh.model.add(self.mesh_file.name)
           
@@ -240,8 +417,17 @@ class PoissonSolver():
           # Defined by:
           # Minimum coordinates (min_coords) â The smallest (ð¥,ð¦,ð§) values.
           # Maximum coordinates (max_coords) â The largest (ð¥,ð¦,ð§) values.
-          min_coords = np.min(points, axis=0) - self.padding
-          max_coords = np.max(points, axis=0) + self.padding
+          min_coords = np.min(points, axis=0)
+          max_coords = np.max(points, axis=0)
+          
+          # Only add padding in x, y
+          min_coords[0] -= self.padding
+          min_coords[1] -= self.padding
+          max_coords[0] += self.padding
+          max_coords[1] += self.padding
+          min_coords[2] -= self.epsilon_gc * 3
+          max_coords[2] += self.epsilon_gc * 3
+          
           box_tag = gmsh.model.occ.addBox(
               min_coords[0], min_coords[1], min_coords[2], # Start (x, y, z)
               max_coords[0] - min_coords[0], # Width (x-dimension)
@@ -280,7 +466,15 @@ class PoissonSolver():
             gmsh.option.setNumber("Mesh.CharacteristicLengthMax",self.mesh_size) # Coarsen globally
             
           # Generate a coarse mesh
-          gmsh.option.setNumber("Mesh.Algorithm3D", 1) # Frontal-Delaunay (for efficiency)
+          gmsh.option.setNumber("Mesh.Algorithm3D", 4) # Frontal-Delaunay for efficiency
+          gmsh.option.setNumber("Mesh.Optimize", 1)
+          gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
+          gmsh.option.setNumber("Mesh.HighOrderOptimize", 1)
+          
+          # Additional mesh quality options
+          gmsh.option.setNumber("Mesh.CharacteristicLengthExtendFromBoundary", 1)
+          gmsh.option.setNumber("Mesh.CharacteristicLengthFromPoints", 1)
+          gmsh.option.setNumber("Mesh.CharacteristicLengthFromCurvature", 0)
           
           gmsh.model.mesh.generate(self.gdim)
           
@@ -288,6 +482,8 @@ class PoissonSolver():
           self._verify_mesh_quality(points)
           # Verify refinement
           #self._verify_refinement_smaller_radii(points)
+          # Verify mesh
+          self._verify_mesh_quality(points)
         
           gmsh.write(str(self.mesh_file))
           gmsh.finalize()
@@ -324,7 +520,9 @@ class PoissonSolver():
         gmsh.model.mesh.field.setNumber(ball_field, 'Radius', self.refinement_radius)
         
 
-        
+        # Optional: Add thickness for smooth transition
+        gmsh.model.mesh.field.setNumber(ball_field, 'Thickness', self.refinement_radius * 0.5)
+            
         ball_fields.append(ball_field)
         
 
@@ -345,7 +543,10 @@ class PoissonSolver():
         else:
           gmsh.model.mesh.field.setAsBackgroundMesh(ball_fields[0])
           
-          
+
+        
+        # ������ Optional but helpful: set global min size as safety net
+        #gmsh.option.setNumber("Mesh.CharacteristicLengthMin", self.fine_mesh_size * 0.8)
         
         print(f"Applied {len(ball_fields)} ball refinement fields")
             
@@ -355,7 +556,7 @@ class PoissonSolver():
         print("No refinement fields applied, using global mesh size")
         
       
-    def _verify_mesh_quality(self,site_positions):
+    def _verify_mesh_quality_2(self,site_positions):
       """
       Verify mesh quality and refinement after generation
       """
@@ -591,6 +792,11 @@ class PoissonSolver():
         boundary_facets_top = mesh.locate_entities_boundary(self.domain,self.fdim,top_boundary)
         boundary_facets_bottom = mesh.locate_entities_boundary(self.domain,self.fdim,bottom_boundary)
         
+        num_top = len(boundary_facets_top)
+        num_bottom = len(boundary_facets_bottom)
+        num_top_global = self.comm.allreduce(num_top, op=MPI.SUM)
+        num_bottom_global = self.comm.allreduce(num_bottom, op=MPI.SUM)
+        
         # Assign values to u_top and u_bottom at specific points
         u_top = fem.Function(self.V)
         u_top.interpolate(lambda x: np.full_like(x[0],top_value))
@@ -598,9 +804,18 @@ class PoissonSolver():
         u_bottom = fem.Function(self.V)
         u_bottom.interpolate(lambda x: np.full_like(x[0],bottom_value))
         
+        # Verify interpolation worked
+        u_top_check = np.abs(u_top.x.array - top_value).max()
+        u_bottom_check = np.abs(u_bottom.x.array - bottom_value).max()    
+        
         # Obtain the degree of freedom (DOFs): the nodes
         boundary_dofs_top = fem.locate_dofs_topological(self.V, self.fdim, boundary_facets_top)
         boundary_dofs_bottom = fem.locate_dofs_topological(self.V, self.fdim, boundary_facets_bottom)
+        
+        num_dofs_top = len(boundary_dofs_top)
+        num_dofs_bottom = len(boundary_dofs_bottom)
+        num_dofs_top_global = self.comm.allreduce(num_dofs_top, op=MPI.SUM)
+        num_dofs_bottom_global = self.comm.allreduce(num_dofs_bottom, op=MPI.SUM)
         
         # Apply Dirichlet boundary conditions
         bc_top = fem.dirichletbc(u_top, boundary_dofs_top)
@@ -608,6 +823,8 @@ class PoissonSolver():
         bc_bottom = fem.dirichletbc(u_bottom, boundary_dofs_bottom)
         all_boundary_conditions.append(bc_bottom)
         # Clusters boundary conditions
+        
+
         cluster_boundary_conditions = []
         for cluster in clusters:
           if cluster.attached_layer['bottom_layer']:
@@ -616,8 +833,10 @@ class PoissonSolver():
             cluster_boundary_conditions = self._create_cluster_boundary_conditions(cluster.atoms_positions, top_value)
           
           all_boundary_conditions.extend(cluster_boundary_conditions) # Use extend() to avoid nested lists, as cluster_boundary_conditions is a list
-        
+
         self.bcs = all_boundary_conditions
+        
+        
         
         # Mark that BCs have changed
         self._bcs_changed = True
@@ -691,6 +910,145 @@ class PoissonSolver():
       nearby_dofs = np.where(distances <= contact_radius)[0]
       
       return nearby_dofs.astype(np.int32)
+      
+    def diagnose_boundary_conditions(self):
+        """
+        BC diagnosis
+        """
+        
+        if self.rank == 0:
+          print("\n" + "="*70)
+          print("BOUNDARY CONDITION DIAGNOSTICS")
+          print("="*70)
+          
+        # Check domain boundaries
+        coords = self.domain.geometry.x
+        z_min_actual = coords[:, 2].min()
+        z_max_actual = coords[:, 2].max()
+        
+        if self.rank == 0:
+          print(f"\nDomain Z-range: [{z_min_actual:.6f}, {z_max_actual:.6f}] Å")
+          print(f"Stored Z-range: [{self.z_min:.6f}, {self.z_max:.6f}] Å")
+        
+          if abs(z_min_actual - self.z_min) > 1e-6 or abs(z_max_actual - self.z_max) > 1e-6:
+            print("⚠️  WARNING: Stored z_min/z_max don't match actual domain!")
+            
+        # Check each BC
+        if self.rank == 0:
+          print(f"\nTotal boundary conditions: {len(self.bcs)}")
+          
+        for i, bc in enumerate(self.bcs):
+
+          
+          V_bc = bc.function_space          
+          coords = V_bc.tabulate_dof_coordinates()  # shape: (num_dofs, 3)
+
+          
+
+          bc_value = bc.g
+          
+          if hasattr(bc_value, 'x'):
+            bc_values = bc_value.x.array
+            bc_val_min = np.min(bc_values) 
+            bc_val_max = np.max(bc_values)
+          else:
+            bc_val_min = bc_val_max = float(bc_value)
+
+          
+          
+          if self.rank == 0:
+            print(f"\n  BC {i}:")
+            print(f"    Applied Value range: [{bc_val_min:.6e}, {bc_val_max:.6e}]")
+            print(f"    Function Space Dim (total DOFs on rank): {V_bc.dofmap.index_map.size_local}")
+    
+        if self.rank == 0:
+            print("="*70 + "\n")
+    
+    
+    def verify_bcs_after_solve(self,uh, expected_top=1.0, expected_bottom=0.0):
+      """
+      Check if BCs are actually satisfied in the solution
+      """
+      if self.rank == 0:
+        print("\n" + "="*70)
+        print("VERIFYING BOUNDARY CONDITIONS IN SOLUTION")
+        print("="*70)
+        
+      # Get DOF coordinates
+      dof_coords = self.V.tabulate_dof_coordinates()
+      solution_values = uh.x.array
+      
+      # Find DOFs at top boundary
+      top_mask = np.isclose(dof_coords[:, 2], self.z_max, atol=1e-6)
+      top_values = solution_values[top_mask]
+      
+      # Find DOFs at bottom boundary  
+      bottom_mask = np.isclose(dof_coords[:, 2], self.z_min, atol=1e-6)
+      bottom_values = solution_values[bottom_mask]
+      
+      # Local statistics
+      if len(top_values) > 0:
+        top_min_local = np.min(top_values)
+        top_max_local = np.max(top_values)
+        top_mean_local = np.mean(top_values)
+      else:
+        top_min_local = top_max_local = top_mean_local = 0
+    
+      if len(bottom_values) > 0:
+        bottom_min_local = np.min(bottom_values)
+        bottom_max_local = np.max(bottom_values)
+        bottom_mean_local = np.mean(bottom_values)
+      else:
+        bottom_min_local = bottom_max_local = bottom_mean_local = 0
+        
+      # Global statistics
+      top_min = self.comm.allreduce(top_min_local if len(top_values) > 0 else 1e10, op=MPI.MIN)
+      top_max = self.comm.allreduce(top_max_local if len(top_values) > 0 else -1e10, op=MPI.MAX)
+      bottom_min = self.comm.allreduce(bottom_min_local if len(bottom_values) > 0 else 1e10, op=MPI.MIN)
+      bottom_max = self.comm.allreduce(bottom_max_local if len(bottom_values) > 0 else -1e10, op=MPI.MAX)
+    
+      if self.rank == 0:
+        print(f"\nTop boundary (z = {self.z_max:.6f}):")
+        print(f"  Expected value: {expected_top:.6f} V")
+        print(f"  Actual range: [{top_min:.6f}, {top_max:.6f}] V")
+        
+        top_error = max(abs(top_min - expected_top), abs(top_max - expected_top))
+        if top_error > 1e-6:
+            print(f"  ❌ ERROR: Top BC violated by {top_error:.2e} V")
+        else:
+            print(f"  ✓ Top BC satisfied")
+        
+        print(f"\nBottom boundary (z = {self.z_min:.6f}):")
+        print(f"  Expected value: {expected_bottom:.6f} V")
+        print(f"  Actual range: [{bottom_min:.6f}, {bottom_max:.6f}] V")
+        
+        bottom_error = max(abs(bottom_min - expected_bottom), abs(bottom_max - expected_bottom))
+        if bottom_error > 1e-6:
+            print(f"  ❌ ERROR: Bottom BC violated by {bottom_error:.2e} V")
+        else:
+            print(f"  ✓ Bottom BC satisfied")
+            
+      # Check interior
+      interior_mask = ~(top_mask | bottom_mask)
+      if np.any(interior_mask):
+        interior_values = solution_values[interior_mask]
+        interior_min_local = np.min(interior_values)
+        interior_max_local = np.max(interior_values)
+            
+        interior_min = self.comm.allreduce(interior_min_local, op=MPI.MIN)
+        interior_max = self.comm.allreduce(interior_max_local, op=MPI.MAX)
+            
+        print(f"\nInterior domain:")
+        print(f"  Value range: [{interior_min:.6f}, {interior_max:.6f}] V")
+            
+        if interior_min < expected_bottom - 1e-6:
+          print(f"  ❌ ERROR: Interior values below bottom BC!")
+        if interior_max > expected_top + 1e-6:
+          print(f"  ❌ ERROR: Interior values above top BC!")
+          print(f"     This suggests the Laplace equation is violated")
+        
+      print("="*70 + "\n")
+          
         
     def charge_density(self, charge_locations, charges, tolerance = 2):
         """
@@ -711,7 +1069,9 @@ class PoissonSolver():
         for x0, q in zip(charge_locations, charges):
           # Vectorized Gaussian computation for all cells
           r_sq = np.sum((self.cell_midpoints - x0) ** 2, axis = 1)
-          gauss_values = q * np.exp(-r_sq / (2 * self.epsilon_gc ** 2)) / ((2 * np.pi * self.epsilon_gc ** 2) ** (self.tdim / 2))
+          
+          normalization = (2 * np.pi * self.epsilon_gc**2) ** (self.tdim / 2)
+          gauss_values = (q / normalization) * np.exp(-r_sq / (2 * self.epsilon_gc ** 2))
           
           cell_values += gauss_values
           
@@ -725,10 +1085,6 @@ class PoissonSolver():
         total_charge = self.comm.allreduce(local_charge, op=MPI.SUM)
         
         expected_charge = sum(charges)
-        #if expected_charge > 0:
-        #  charge_error = 100 * abs((total_charge - expected_charge) / expected_charge)
-        #else: 
-        #  charge_error = 0
           
         charge_error = 100 * abs((total_charge - expected_charge) / expected_charge) if abs(expected_charge) > 0 else 0.0
         
@@ -801,31 +1157,54 @@ class PoissonSolver():
         """
         # Create linear form L (must be recreated as it depends on rho)
         epsilon_r = self.poissonSolver_parameters['epsilon_r']
+        #angstrom_to_m = (1e-10) ** 3
         L = (rho / (epsilon_0 * epsilon_r)) * self.v_test * ufl.dx
         L_form = fem.form(L)
         
         # Reuse pre-allocated vector self.b --> We zero and reuse
-        self.b.zeroEntries()
+        #self.b.zeroEntries()
+        with self.b.localForm() as loc_b:
+          loc_b.set(0)
         assemble_vector(self.b,L_form)
         
         fem.apply_lifting(self.b, [self.a_form], [self.bcs])
         self.b.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES,mode=PETSc.ScatterMode.REVERSE)
         fem.set_bc(self.b, self.bcs)
-        
+
+        """
         # Reuse solution function self.uh:
         if self.previous_solution is not None:
-          self.uh.x.array[:] = self.previous_solution.x.array[:] # Set initial guess
+          #self.uh.x.array[:] = self.previous_solution.x.array[:] # Set initial guess
+          #self.uh.x.scatter_forward()
+          self.uh.x.petsc_vec.copy(self.previous_solution.x.petsc_vec)
+          self.ksp.setInitialGuessNonzero(True)
         else:
           self.uh.x.array[:] = 0.0 # Zero initial guest on first solve
+          self.ksp.setInitialGuessNonzero(False)
+        """
+        self.uh.x.array[:] = 0.0
+        #fem.set_bc(self.uh.x.array, self.bcs) 
+        self.uh.x.scatter_forward()
+        self.ksp.setInitialGuessNonzero(False)
         
         # Solve with initial guess
         self.ksp.solve(self.b, self.uh.x.petsc_vec)
+        # Sync ghost DOFs before reuse or evaluation
+        self.uh.x.scatter_forward()
         
+        # DIAGNOSTIC: Check if solution respects BCs
+        self.verify_bcs_after_solve(self.uh, expected_top=1.0, expected_bottom=0.0)
+    
+        """
         #Store solution for next iteration
         if self.previous_solution is None:
           self.previous_solution = fem.Function(self.V)
           
-        self.previous_solution.x.array[:] = self.uh.x.array[:]
+        self.previous_solution.x.petsc_vec.copy(self.uh.x.petsc_vec)
+
+        #self.previous_solution.x.array[:] = self.uh.x.array[:]
+        #self.previous_solution.x.scatter_forward()
+        """
         
         return self.uh
         
@@ -846,14 +1225,15 @@ class PoissonSolver():
       E_values : np.array, shape (n_points, 3)
           Electric field values at given points
       """
-      
+
       # Compute gradient expression (E = -?V)
       E_expr =  -ufl.grad(uh)
       
       # Create expression for evaluation at points
       expr = fem.Expression(E_expr, self.V_vec.element.interpolation_points()) 
       self.E_field.interpolate(expr)
-      
+      #self.E_field.x.scatter_forward()
+
       # Convert points to numpy array with correct dtype
       points_array = np.asarray(points,dtype=np.float64)
       if points_array.ndim == 1:
@@ -883,7 +1263,6 @@ class PoissonSolver():
         points_on_proc = np.array(points_on_proc, dtype = np.float64)
         # Evaluate expression at all points at once
         E_local = self.E_field.eval(points_on_proc, local_cells) # Units: V/Å
-        
         
         for j, global_idx in enumerate(local_idx):
           if len(local_idx) == 1:
@@ -1037,6 +1416,7 @@ class PoissonSolver():
         
     def save_potential(self, uh, time_value, time_step, save_CSV = False):
       
+      #uh.x.scatter_forward()
       # Name for ParaView
       uh.name = "ElectricPotential"
       

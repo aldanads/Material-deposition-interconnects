@@ -34,8 +34,8 @@ def initialization(n_sim):
     
     save_data = True
     lammps_file = True
-    snapshoots_steps = int(2e2)
-    total_steps = int(2e5)
+    snapshoots_steps = int(1e0)
+    total_steps = int(3e0)
     
     simulation_parameters = {
       'save_data':save_data, 'snapshoots_steps':snapshoots_steps,
@@ -347,7 +347,7 @@ def initialization(n_sim):
         technology = technologies[0]
         id_material_Material_Project = material_selection["CeO2"]
         radius_neighbors = nearest_neighbors_distance["CeO2"]
-        crystal_size = (50,50,50) # (angstrom (Å))
+        crystal_size = (20,20,20) # (angstrom (Å))
         orientation = ['001']
         use_parallel = None
         facets_type = None
@@ -402,11 +402,11 @@ def initialization(n_sim):
         
         # Parameters for Poisson solver
         active_dipoles = 4
-        poisson_solve_frequency = int(2e2)  # Solve Poisson every N KMC steps
+        poisson_solve_frequency = int(1e0)  # Solve Poisson every N KMC steps
         solve_Poisson = True
-        save_Poisson = False
+        save_Poisson = True
         
-        screening_factor = 0.01
+        screening_factor = 0.00
         ion_charge = 1
         
 
@@ -500,7 +500,7 @@ def initialization(n_sim):
         # =============================================================================
         #P = 0.01
         #System_state.defect_gen(rng,P)
-        #System_state.deposition_specie(0,rng,test = 0)
+        #System_state.deposition_specie(0,rng,test = 1)
         
         # This timestep_limits will depend on the V/s ratio
         System_state.timestep_limits = float('inf')

@@ -939,22 +939,33 @@ class Crystal_Lattice():
         # Single particle in a determined place
         elif test == 1:
             
-            for idx,site in self.grid_crystal.items():
-              if ((self.crystal_size[0] * 0.45 < site.position[0] < self.crystal_size[0] * 0.55) 
-                and (self.crystal_size[1] * 0.45 < site.position[1] < self.crystal_size[1] * 0.55)
-                and (self.crystal_size[2] * 0.45 < site.position[2] < self.crystal_size[2] * 0.55)): 
-                break 
-                
+            # Compute geometric center of the domain
+            center = np.array(self.crystal_size) * [0.5,0.5,1]  # assumes crystal_size = [Lx, Ly, Lz]
+            min_dist = float('inf')
+            central_site = None
+            central_idx = None
+            
+            for idx, site in self.grid_crystal.items():
+                pos = np.array(site.position)
+                dist = np.linalg.norm(pos - center)
+                #print(f'Dist {dist} and min. dist. {min_dist}')
+                if dist < min_dist:
+                    min_dist = dist
+                    central_site = site
+                    central_idx = idx   
+                    
+                     
             # Introduce specie in the site
-            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
+            update_specie_events,update_supp_av = self.introduce_specie_site(central_idx,update_specie_events,update_supp_av,1)
             # Update sites availables, the support to each site and available migrations
             self.update_sites(update_specie_events,update_supp_av)
                 
-            print('Particle in position: ',idx, ' is a ', self.grid_crystal[idx].chemical_specie)
-            print('Neighbors of that particle: ', self.grid_crystal[idx].nearest_neighbors_idx)
+            print('Particle in position: ',central_site.position, ' is a ', central_site.chemical_specie)
+            print('Neighbors of that particle: ', central_site.nearest_neighbors_idx)
             print('Neighbors are supported by: ')
-            for idx_3 in self.grid_crystal[idx].nearest_neighbors_idx:
+            for idx_3 in central_site.nearest_neighbors_idx:
                 print(self.grid_crystal[idx_3].supp_by)
+                
                 
         # Two adjacent particles
         elif test == 2:
@@ -1249,6 +1260,7 @@ class Crystal_Lattice():
       # Update System_state based on electric field
       
         for site, E_site_field in zip(self.sites_occupied + self.adsorption_sites,E_field):
+          print(f'For the site {self.grid_crystal[site].position} ({self.grid_crystal[site].chemical_specie}) the electric field is {E_site_field})')
           self.grid_crystal[site].transition_rates(E_site_field = E_site_field, migration_pathways = self.migration_pathways)   
     
 # =============================================================================
