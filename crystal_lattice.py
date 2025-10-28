@@ -940,7 +940,7 @@ class Crystal_Lattice():
         elif test == 1:
             
             # Compute geometric center of the domain
-            center = np.array(self.crystal_size) * [0.5,0.5,1]  # assumes crystal_size = [Lx, Ly, Lz]
+            center = np.array(self.crystal_size) * [0.5,0.5,0.5]  # assumes crystal_size = [Lx, Ly, Lz]
             min_dist = float('inf')
             central_site = None
             central_idx = None
@@ -1260,7 +1260,7 @@ class Crystal_Lattice():
       # Update System_state based on electric field
       
         for site, E_site_field in zip(self.sites_occupied + self.adsorption_sites,E_field):
-          print(f'For the site {self.grid_crystal[site].position} ({self.grid_crystal[site].chemical_specie}) the electric field is {E_site_field})')
+          #print(f'For the site {self.grid_crystal[site].position} ({self.grid_crystal[site].chemical_specie}) the electric field is {E_site_field})')
           self.grid_crystal[site].transition_rates(E_site_field = E_site_field, migration_pathways = self.migration_pathways)   
     
 # =============================================================================

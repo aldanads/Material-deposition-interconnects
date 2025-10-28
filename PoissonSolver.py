@@ -68,9 +68,9 @@ class PoissonSolver():
         self.epsilon_gc = kwargs.get("epsilon_gaussian_charge",0.8) #(Ã…)
         # Set parameters for mesh refinement
         self.active_mesh_refinement = kwargs.get("activate_mesh_refinement",True)
-        if self.active_mesh_refinement:
-          self.fine_mesh_size = kwargs.get("fine_mesh_size",0.4) #(Ã…)
-          self.refinement_radius = kwargs.get("refinement_radius",1.5) #(Ã…)
+        #if self.active_mesh_refinement:
+        self.fine_mesh_size = kwargs.get("fine_mesh_size",0.2) #(Ã…)
+        self.refinement_radius = kwargs.get("refinement_radius",1.2) #(Ã…)
         
         # Poisson parameters
         self.poissonSolver_parameters = poissonSolver_parameters
@@ -128,7 +128,7 @@ class PoissonSolver():
         
       # Example: V ('Lagrange',1) are functions defined in domain, continuous (because Lagrange elements enforce continuity) and degree 1
       self.V = functionspace(self.domain, ('Lagrange',1))
-        # Create vector function space for electric field evaluation
+      # Create vector function space for electric field evaluation
       self.V_vec = functionspace(self.domain, ("Lagrange",1, (self.domain.topology.dim,)))
         
         
@@ -203,9 +203,19 @@ class PoissonSolver():
     def _precompute_domain_geometry(self):
 
       coords = self.domain.geometry.x
-      x_min, x_max = coords[:,0].min(), coords[:,0].max()
-      y_min, y_max = coords[:,1].min(), coords[:,1].max()
-      self.z_min, self.z_max = coords[:,2].min(), coords[:,2].max()
+      local_x_min, local_x_max = coords[:,0].min(), coords[:,0].max()
+      local_y_min, local_y_max = coords[:,1].min(), coords[:,1].max()
+      #self.z_min, self.z_max = coords[:,2].min(), coords[:,2].max()
+      local_z_min, local_z_max = coords[:,2].min(), coords[:,2].max()
+      
+      x_min = self.comm.allreduce(local_x_min,op=MPI.MIN) 
+      x_max = self.comm.allreduce(local_x_max,op=MPI.MAX)  
+      
+      y_min = self.comm.allreduce(local_y_min,op=MPI.MIN) 
+      y_max = self.comm.allreduce(local_y_max,op=MPI.MAX) 
+      
+      self.z_min = self.comm.allreduce(local_z_min,op=MPI.MIN) 
+      self.z_max = self.comm.allreduce(local_z_max,op=MPI.MAX) 
       
       self.Lx = x_max - x_min
       self.Ly = y_max - y_min
@@ -258,7 +268,7 @@ class PoissonSolver():
       # 2) Refinement radius should cover Gaussian charge
       # Should be at least 3*epsilon_gc for 99.7% of Gaussian
       recommended_radius = 3 * self.epsilon_gc
-      if self.refinement_radius == recommended_radius:
+      if self.refinement_radius < recommended_radius:
         warnings.append(f'Refinement radius ({self.refinement_radius:.3f} angstroms) is smaller than recommended ({recommended_radius:.3f} angstroms)')
         warnings.append(f'  -> Should be >= 3*epsilon_gc = 3*{self.epsilon_gc} = {recommended_radius:.3f} angstroms')
         
@@ -381,12 +391,6 @@ class PoissonSolver():
                 else:
                     print(f'  ~ Marginal resolution')
                     
-          
-                    
-    
-    
-                
-              
     
         
     def generate_mesh(self, structure):
@@ -472,17 +476,13 @@ class PoissonSolver():
           gmsh.option.setNumber("Mesh.HighOrderOptimize", 1)
           
           # Additional mesh quality options
-          gmsh.option.setNumber("Mesh.CharacteristicLengthExtendFromBoundary", 1)
-          gmsh.option.setNumber("Mesh.CharacteristicLengthFromPoints", 1)
+          gmsh.option.setNumber("Mesh.CharacteristicLengthExtendFromBoundary", 0)
+          gmsh.option.setNumber("Mesh.CharacteristicLengthFromPoints", 0)
           gmsh.option.setNumber("Mesh.CharacteristicLengthFromCurvature", 0)
           
           gmsh.model.mesh.generate(self.gdim)
           
           # Verify mesh quality
-          self._verify_mesh_quality(points)
-          # Verify refinement
-          #self._verify_refinement_smaller_radii(points)
-          # Verify mesh
           self._verify_mesh_quality(points)
         
           gmsh.write(str(self.mesh_file))
@@ -521,7 +521,7 @@ class PoissonSolver():
         
 
         # Optional: Add thickness for smooth transition
-        gmsh.model.mesh.field.setNumber(ball_field, 'Thickness', self.refinement_radius * 0.5)
+        #gmsh.model.mesh.field.setNumber(ball_field, 'Thickness', self.refinement_radius * 0.2)
             
         ball_fields.append(ball_field)
         
@@ -545,14 +545,15 @@ class PoissonSolver():
           
 
         
-        # í ½í´‘ Optional but helpful: set global min size as safety net
-        #gmsh.option.setNumber("Mesh.CharacteristicLengthMin", self.fine_mesh_size * 0.8)
+        # Optional but helpful: set global min size as safety net
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMin", self.fine_mesh_size * 0.5)
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", self.mesh_size)
         
         print(f"Applied {len(ball_fields)} ball refinement fields")
             
       else:
         # Fallback to global mesh size if no refinement fields
-        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", self.mesh_size)
+        #gmsh.option.setNumber("Mesh.CharacteristicLengthMax", self.mesh_size)
         print("No refinement fields applied, using global mesh size")
         
       
@@ -779,10 +780,10 @@ class PoissonSolver():
         all_boundary_conditions = []  
 
         def top_boundary(x):
-            return np.isclose(x[2],self.z_max)
+            return np.isclose(x[2],self.z_max, atol=1e-8)
         
         def bottom_boundary(x):
-            return np.isclose(x[2],self.z_min)
+            return np.isclose(x[2],self.z_min, atol=1e-8)
         
         # Find boundaries in domain where top_boundary returns True
         # - domain: finite element mesh
@@ -791,11 +792,6 @@ class PoissonSolver():
         # + return boundary_facets_top: NumPy array with indices of facets that satisfy the condition
         boundary_facets_top = mesh.locate_entities_boundary(self.domain,self.fdim,top_boundary)
         boundary_facets_bottom = mesh.locate_entities_boundary(self.domain,self.fdim,bottom_boundary)
-        
-        num_top = len(boundary_facets_top)
-        num_bottom = len(boundary_facets_bottom)
-        num_top_global = self.comm.allreduce(num_top, op=MPI.SUM)
-        num_bottom_global = self.comm.allreduce(num_bottom, op=MPI.SUM)
         
         # Assign values to u_top and u_bottom at specific points
         u_top = fem.Function(self.V)
@@ -812,10 +808,6 @@ class PoissonSolver():
         boundary_dofs_top = fem.locate_dofs_topological(self.V, self.fdim, boundary_facets_top)
         boundary_dofs_bottom = fem.locate_dofs_topological(self.V, self.fdim, boundary_facets_bottom)
         
-        num_dofs_top = len(boundary_dofs_top)
-        num_dofs_bottom = len(boundary_dofs_bottom)
-        num_dofs_top_global = self.comm.allreduce(num_dofs_top, op=MPI.SUM)
-        num_dofs_bottom_global = self.comm.allreduce(num_dofs_bottom, op=MPI.SUM)
         
         # Apply Dirichlet boundary conditions
         bc_top = fem.dirichletbc(u_top, boundary_dofs_top)
@@ -982,9 +974,11 @@ class PoissonSolver():
       top_mask = np.isclose(dof_coords[:, 2], self.z_max, atol=1e-6)
       top_values = solution_values[top_mask]
       
+      
       # Find DOFs at bottom boundary  
       bottom_mask = np.isclose(dof_coords[:, 2], self.z_min, atol=1e-6)
       bottom_values = solution_values[bottom_mask]
+      
       
       # Local statistics
       if len(top_values) > 0:
@@ -1000,6 +994,7 @@ class PoissonSolver():
         bottom_mean_local = np.mean(bottom_values)
       else:
         bottom_min_local = bottom_max_local = bottom_mean_local = 0
+        
         
       # Global statistics
       top_min = self.comm.allreduce(top_min_local if len(top_values) > 0 else 1e10, op=MPI.MIN)
@@ -1162,7 +1157,6 @@ class PoissonSolver():
         L_form = fem.form(L)
         
         # Reuse pre-allocated vector self.b --> We zero and reuse
-        #self.b.zeroEntries()
         with self.b.localForm() as loc_b:
           loc_b.set(0)
         assemble_vector(self.b,L_form)
@@ -1171,39 +1165,39 @@ class PoissonSolver():
         self.b.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES,mode=PETSc.ScatterMode.REVERSE)
         fem.set_bc(self.b, self.bcs)
 
+
+        #---------------
+        # Initial guess: Not significant improvement for linear problems. It might be relevant if we have a with voltage-dependent permitivity 
+        # I can check layer the convergence
+        # num_its = self.ksp.getIterationNumber()
+        # --------------
         """
         # Reuse solution function self.uh:
         if self.previous_solution is not None:
-          #self.uh.x.array[:] = self.previous_solution.x.array[:] # Set initial guess
-          #self.uh.x.scatter_forward()
-          self.uh.x.petsc_vec.copy(self.previous_solution.x.petsc_vec)
+          self.uh.x.array[:] = self.previous_solution.x.array[:] # Set initial guess
           self.ksp.setInitialGuessNonzero(True)
         else:
           self.uh.x.array[:] = 0.0 # Zero initial guest on first solve
           self.ksp.setInitialGuessNonzero(False)
         """
         self.uh.x.array[:] = 0.0
-        #fem.set_bc(self.uh.x.array, self.bcs) 
+        fem.set_bc(self.uh.x.array, self.bcs) 
         self.uh.x.scatter_forward()
         self.ksp.setInitialGuessNonzero(False)
         
         # Solve with initial guess
         self.ksp.solve(self.b, self.uh.x.petsc_vec)
-        # Sync ghost DOFs before reuse or evaluation
         self.uh.x.scatter_forward()
+
         
         # DIAGNOSTIC: Check if solution respects BCs
-        self.verify_bcs_after_solve(self.uh, expected_top=1.0, expected_bottom=0.0)
-    
+        #self.verify_bcs_after_solve(self.uh, expected_top=1.0, expected_bottom=0.0)
         """
         #Store solution for next iteration
         if self.previous_solution is None:
           self.previous_solution = fem.Function(self.V)
-          
-        self.previous_solution.x.petsc_vec.copy(self.uh.x.petsc_vec)
 
-        #self.previous_solution.x.array[:] = self.uh.x.array[:]
-        #self.previous_solution.x.scatter_forward()
+        self.previous_solution.x.array[:] = self.uh.x.array[:]
         """
         
         return self.uh
@@ -1276,19 +1270,65 @@ class PoissonSolver():
              
       return E_values_global * 1e10 * self.bond_polarization_factor # Units: V/m
       
-    def test_point_charge_analytical(self,charge_location,charges):
+    def test_PointCharge_UniformField_analytical(self,charge_location,charges):
       """
       Test electric field against analytical point charge solution
       """
+      
+      uh = self.solve(charge_location,charges)
+      
+      # --- 1. Define expected uniform field ---
+      Lz = self.z_max - self.z_min
+        
+      # Get DOF coordinates
+      dof_coords = self.V.tabulate_dof_coordinates()
+      solution_values = uh.x.array
+        
+      # Find DOFs at top boundary
+      top_mask = np.isclose(dof_coords[:, 2], self.z_max, atol=1e-6)
+      top_values = solution_values[top_mask]
+        
+      # Find DOFs at bottom boundary  
+      bottom_mask = np.isclose(dof_coords[:, 2], self.z_min, atol=1e-6)
+      bottom_values = solution_values[bottom_mask]
+        
+      # Local statistics
+      if len(top_values) > 0:
+        top_max_local = np.max(top_values)
+      else:
+        top_max_local = 0
+      
+      if len(bottom_values) > 0:
+        bottom_max_local = np.max(bottom_values)    
+      else:
+        bottom_max_local = 0
+          
+      top_max = self.comm.allreduce(top_max_local if len(top_values) > 0 else -1e10, op=MPI.MAX)
+      bottom_max = self.comm.allreduce(bottom_max_local if len(bottom_values) > 0 else -1e10, op=MPI.MAX)
+        
+      V_difference = top_max - bottom_max
+      
+      if abs(V_difference) > 0: 
+        E_exact_z = - V_difference / (Lz * 1e-10) * self.bond_polarization_factor # in V/m
+        E_uniform_exact = np.array([0.0, 0.0, E_exact_z]) 
+      else:
+        E_uniform_exact = np.array([0.0, 0.0, 0.0])
+        E_exact_z = 0
+      
+      print(f'Expected uniform field generated by the electrodes: {E_uniform_exact}')
+        
+      # --- 2. Define point charge ---
       epsilon_r = self.poissonSolver_parameters['epsilon_r']
       
       actual_center = self.find_actual_charge_center(charge_location)
             
-      uh = self.solve(charge_location,charges)
+      #uh = self.solve(charge_location,charges)
       
       # Test points at varios distances
       
       test_distances = np.linspace(-0.5,0.5,11)
+      
+      rel_errors = []
       
       for r in test_distances:
       
@@ -1296,27 +1336,25 @@ class PoissonSolver():
         E_computed = self.evaluate_electric_field_at_points(uh,test_point)
         E_magnitude = np.linalg.norm(E_computed[0])
         
-        # Analytical solution
-        E_analytical = self.bond_polarization_factor * charges[0] * (r * 1e-10) / (4 * np.pi * epsilon_0 * epsilon_r * ((r * 1e-10)**2 + (self.epsilon_gc * 1e-10)**2)**1.5)
+        E_particle_exact = - self.bond_polarization_factor * charges[0] * (r * 1e-10) / (4 * np.pi * epsilon_0 * epsilon_r * ((r * 1e-10)**2 + (self.epsilon_gc * 1e-10)**2)**1.5)
         
-        proportion_E_computed_analytical = abs(E_magnitude / E_analytical)
+        # Analytical solution
+        E_analytical_mag = np.sqrt(E_particle_exact**2 + E_exact_z**2)
+        
+        # Relative error (safe from division by zero)
+        rel_error = abs(E_magnitude - E_analytical_mag) / (E_analytical_mag + 1e-20)
+        rel_errors.append(rel_error)
         
         if self.rank == 0:
-          print(f"Distance {r} angstrom: Computed={E_magnitude:.2e}, Analytical={E_analytical:.2e}, Proportion E (computed/analytical)={proportion_E_computed_analytical:.2e}")
+          print(f"Distance {r} angstrom: Computed={E_magnitude:.2e}, Analytical={E_analytical_mag:.2e}, Rel. error ={rel_error:.2e}")
           print(f"Computed(x,y,z)=({E_computed[0][0]:.2e},{E_computed[0][1]:.2e},{E_computed[0][2]:.2e})")
-
-        
-        
+          
+      rms_rel_err = np.sqrt(np.mean(np.array(rel_errors)**2))
+      print(f'RMS relative error: {rms_rel_err}')
+          
+          
       return uh
-      
     
-    def test_uniform_field(self):
-      """
-      Test with linear potential (should give uniform field)
-      Set up linear boundary conditions that should create uniform field
-      For example: V(x) = -E0 * x should give E = E0 in x-direction
-      """
-      pass
       
       
       
