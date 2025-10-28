@@ -249,13 +249,15 @@ def main():
                           
                         if rank == 0: print(f"Poisson solved at step {i}")
 
-
+                  run_start_time = MPI.Wtime()
                   E_field = poisson_solver.evaluate_electric_field_at_points(uh,E_field_points)      
                   if rank == 0:
-                      print(f'Calculated electric field at step {i}')
+                      #print(f'Calculated electric field at step {i}')
                       System_state.update_transition_rates_with_electric_field(E_field)
                       #print(f'E field: ({E_field})')
-                      
+                  run_time = MPI.Wtime() - run_start_time
+                  
+                  if rank == 0: print(f'Run time to evaluate electric field and update TR: {run_time}')
 
                 # kMC steps after solving Poisson equation, calculating the electric field and the impact in the transition rates
                 if rank == 0:   

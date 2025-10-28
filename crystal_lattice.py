@@ -42,32 +42,32 @@ class Crystal_Lattice():
                  lammps_file,superbasin_parameters,**kwargs):
         
         # Crystal features
-        self.id_material = crystal_features[0]
-        self.crystal_size = crystal_features[1]
-        self.latt_orientation = crystal_features[2]
-        api_key = crystal_features[3]
-        use_parallel = crystal_features[4]
-        self.facets_type = crystal_features[5]
-        self.affected_site = crystal_features[6]
-        self.mode = crystal_features[7]
-        self.radius_neighbors = crystal_features[8]
-        self.sites_generation_layer = crystal_features[9]
-        self.available_events = crystal_features[10]
+        self.id_material = crystal_features['id_material_Material_Project']
+        self.crystal_size = crystal_features['crystal_size']
+        self.latt_orientation = crystal_features['orientation']
+        api_key = crystal_features['api_key']
+        use_parallel = crystal_features['use_parallel']
+        self.facets_type = crystal_features['facets_type']
+        self.affected_site = crystal_features['affected_site']
+        self.mode = crystal_features['mode']
+        self.radius_neighbors = crystal_features['radius_neighbors']
+        self.sites_generation_layer = crystal_features['sites_generation_layer']
+        self.available_events = crystal_features['available_events']
         self.interstitial_specie = kwargs.get('interstitial_specie', None)
         
         # Deposition
-        self.sticking_coefficient = experimental_conditions[0]
-        self.partial_pressure = experimental_conditions[1]
-        self.temperature = experimental_conditions[2]
-        self.experiment = experimental_conditions[3]
+        self.sticking_coefficient = experimental_conditions['sticking_coeff']
+        self.partial_pressure = experimental_conditions['partial_pressure']
+        self.temperature = experimental_conditions['T']
+        self.experiment = experimental_conditions['experiment']
         # Activation energies
         self.activation_energies = Act_E_list
         
         #Superbasin parameters
-        self.n_search_superbasin = superbasin_parameters[0]
-        self.time_step_limits = superbasin_parameters[1]
-        self.E_min = superbasin_parameters[2]
-        self.energy_step = superbasin_parameters[3]
+        self.n_search_superbasin = superbasin_parameters['n_search_superbasin']
+        self.time_step_limits = superbasin_parameters['time_step_limits']
+        self.E_min = superbasin_parameters['E_min']
+        self.energy_step = superbasin_parameters['energy_step']
         self.superbasin_dict = {}
         
         # Poisson solver parameters
@@ -94,7 +94,7 @@ class Crystal_Lattice():
         
         #Transition rate for adsortion of chemical species
         if self.experiment != 'ECM memristor':
-            self.transition_rate_adsorption(experimental_conditions[0:3])
+            self.transition_rate_adsorption(experimental_conditions)
             # self.E_min_lim_superbasin = self.Act_E_gen * 0.9 # Don't create superbasin that include the deposition process
             self.E_min_lim_superbasin = 0.25 # Don't create superbasin that include the deposition process
             # Wulff shape and edge types for this kind of material
@@ -871,7 +871,7 @@ class Crystal_Lattice():
 # =============================================================================
         
         # Maxwell-Boltzman statistics for transition rate of adsorption rate
-        sticking_coeff, partial_pressure, T = experimental_conditions
+        sticking_coeff, partial_pressure, T = experimental_conditions['sticking_coeff'], experimental_conditions['partial_pressure'], experimental_conditions['T'] 
         self.mass_specie = Element(self.chemical_specie).atomic_mass
 
         # The mass in kg of a unit of the chemical specie

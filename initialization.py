@@ -34,8 +34,8 @@ def initialization(n_sim):
     
     save_data = True
     lammps_file = True
-    snapshoots_steps = int(1e0)
-    total_steps = int(1e2)
+    snapshoots_steps = int(1e2)
+    total_steps = int(1e4)
     
     simulation_parameters = {
       'save_data':save_data, 'snapshoots_steps':snapshoots_steps,
@@ -126,12 +126,19 @@ def initialization(n_sim):
             
             material_summary = mpr.materials.summary.search(material_ids=[id_material_Material_Project])
             formula = material_summary[0].formula_pretty
-
-
-            
-        crystal_features = [id_material_Material_Project,crystal_size,orientation[1],
-                            api_key,use_parallel,
-                            facets_type,affected_site,mode[0],radius_neighbors,sites_generation_layer[0]]
+        
+        crystal_features = {
+          'id_material_Material_Project': id_material_Material_Project,
+          'crystal_size': crystal_size,
+          'orientation': orientation[1],
+          'api_key': api_key,
+          'use_parallel': use_parallel,
+          'facets_type': facets_type,
+          'affected_site': affected_site,
+          'mode': mode[0],
+          'radius_neighbors': radius_neighbors,
+          'sites_generation_layer': sites_generation_layer[0]
+        }
         
 # =============================================================================
 #             Superbasin parameters
@@ -334,7 +341,7 @@ def initialization(n_sim):
         temp = 300
         T = temp # (K)
         
-        experimental_conditions = [sticking_coeff,partial_pressure,T,experiment]
+        experimental_conditions = {'sticking_coeff':sticking_coeff,'partial_pressure':partial_pressure,'T':T,'experiment':experiment}
         
         
         # =============================================================================
@@ -376,12 +383,20 @@ def initialization(n_sim):
             # Retrieve material summary information
             material_summary = mpr.materials.summary.search(material_ids=[id_material_Material_Project])
             formula = material_summary[0].formula_pretty
-            
-
-
-        crystal_features = [id_material_Material_Project,crystal_size,orientation[0],
-                            api_key,use_parallel,
-                            facets_type,affected_site,mode[0],radius_neighbors,sites_generation_layer[1],available_events]
+                            
+        crystal_features = {
+          'id_material_Material_Project': id_material_Material_Project,
+          'crystal_size': crystal_size,
+          'orientation': orientation[0],
+          'api_key': api_key,
+          'use_parallel': use_parallel,
+          'facets_type': facets_type,
+          'affected_site': affected_site,
+          'mode': mode[0],
+          'radius_neighbors': radius_neighbors,
+          'sites_generation_layer': sites_generation_layer[1],
+          'available_events': available_events
+        }
 
 
         # =============================================================================
@@ -392,7 +407,7 @@ def initialization(n_sim):
         time_step_limits = 1e-7 # Time needed for efficient evolution of the system
         E_min = 0.0
         energy_step = 0.05
-        superbasin_parameters = [n_search_superbasin,time_step_limits,E_min,energy_step]
+        superbasin_parameters = {'n_search_superbasin':n_search_superbasin, 'time_step_limits':time_step_limits, 'E_min':E_min, 'energy_step':energy_step}
         
         # =============================================================================
         #             Electric field parameters: Required for the Poisson Solver
@@ -402,7 +417,7 @@ def initialization(n_sim):
         
         # Parameters for Poisson solver
         active_dipoles = 4
-        poisson_solve_frequency = int(1e0)  # Solve Poisson every N KMC steps
+        poisson_solve_frequency = int(1e2)  # Solve Poisson every N KMC steps
         solve_Poisson = True
         save_Poisson = False
         
@@ -500,7 +515,7 @@ def initialization(n_sim):
         # =============================================================================
         #P = 0.01
         #System_state.defect_gen(rng,P)
-        System_state.deposition_specie(0,rng,test = 1)
+        #System_state.deposition_specie(0,rng,test = 1)
         
         # This timestep_limits will depend on the V/s ratio
         System_state.timestep_limits = float('inf')
