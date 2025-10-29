@@ -248,16 +248,14 @@ def main():
                           poisson_solver.save_potential(uh,System_state.time,j+1)
                           
                         if rank == 0: print(f"Poisson solved at step {i}")
-
-                  run_start_time = MPI.Wtime()
+                        run_time = 0
+                        
                   E_field = poisson_solver.evaluate_electric_field_at_points(uh,E_field_points)      
                   if rank == 0:
                       #print(f'Calculated electric field at step {i}')
                       System_state.update_transition_rates_with_electric_field(E_field)
                       #print(f'E field: ({E_field})')
-                  run_time = MPI.Wtime() - run_start_time
-                  
-                  if rank == 0: print(f'Run time to evaluate electric field and update TR: {run_time}')
+
 
                 # kMC steps after solving Poisson equation, calculating the electric field and the impact in the transition rates
                 if rank == 0:   
@@ -280,11 +278,6 @@ def main():
                         print(str(j)+"/"+str(int(total_steps/snapshoots_steps)),'| Total time: ',System_state.list_time[-1])
                         end_time = time.time()
                         
-                        print(f'Track events frequency: {events_tracking}')
-                        print(f'Event 1 ({events_tracking[1]}) should be the same as event 7 ({events_tracking[7]})')
-                        print(f'Event 4 ({events_tracking[4]}) should be the same as event 8 ({events_tracking[8]})')
-                        print(f'Event 0 ({events_tracking[0]}) should be the same as event 11 ({events_tracking[11]})')
-                        print(f'Event 3 ({events_tracking[3]}) should be the same as event 6 ({events_tracking[6]})')
                         # if save_data:
                             # Results.measurements_crystal(System_state.list_time[-1],System_state.mass_gained,System_state.fraction_sites_occupied,
                             #                               System_state.thickness,np.mean(np.array(System_state.terraces)[np.array(System_state.terraces) > 0]),np.std(np.array(System_state.terraces)[np.array(System_state.terraces) > 0]),max(System_state.terraces),

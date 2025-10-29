@@ -44,7 +44,7 @@ class Crystal_Lattice():
         # Crystal features
         self.id_material = crystal_features['id_material_Material_Project']
         self.crystal_size = crystal_features['crystal_size']
-        self.latt_orientation = crystal_features['orientation']
+        self.miller_indices = crystal_features['miller_indices']
         api_key = crystal_features['api_key']
         use_parallel = crystal_features['use_parallel']
         self.facets_type = crystal_features['facets_type']
@@ -85,7 +85,7 @@ class Crystal_Lattice():
         self.list_time = []
         
         # Crystal_grid generation
-        self.lattice_model(api_key, self.mode, self.affected_site, self.radius_neighbors)
+        self.lattice_model(api_key, self.mode, self.affected_site, self.miller_indices)
         grid_crystal = kwargs.get('grid_crystal', None)
         self.crystal_grid(grid_crystal,self.radius_neighbors,self.mode,self.affected_site,use_parallel)
 
@@ -105,6 +105,7 @@ class Crystal_Lattice():
             self.wulff_facets = None
             self.dir_edge_facets = None
             self.Act_E_gen = self.activation_energies['E_gen_defect']
+            self._initialize_cluster_tracking()
             
             kb = constants.physical_constants['Boltzmann constant in eV/K'][0]
             nu0=7E12;  # nu0 (s^-1) bond vibration frequency
@@ -129,7 +130,252 @@ class Crystal_Lattice():
     def has_interstitial(self):
         return self.interstitial_specie is not None
         
-    def lattice_model(self, api_key, mode, affected_site=None, radius_neighbors=None):
+        
+    def lattice_model(self, api_key, mode, affected_site=None, miller_indices=(0, 0, 1)):
+        """
+        Generate a lattice model based on the specified mode.
+        
+        Parameters:
+            api_key (str): API key for the Materials Project.
+            mode (str): 'regular', 'interstitial', or 'vacancy'.
+            affected_site (str, optional): Species symbol for vacancy mode.
+            radius_neighbors (float, optional): Neighbor radius for future vacancy/interstitial detection.
+            
+        Attributes set:
+            self.structure: Final supercell structure
+            self.structure_basic: Basic unit cell (oriented)
+            self.chemical_specie: Chemical formula or defect notation
+            self.lattice_constants: Lattice parameters in nm (a, b, c)
+            self.basis_vectors: Scaled basis vectors for KMC grid
+        """
+        # Download structure from Materials Project
+        with MPRester(api_key) as mpr:
+            structure = mpr.get_structure_by_material_id(self.id_material)# Download structure from Materials Project
+    
+            # Handle interstitial mode: get defect structure
+            if mode == 'interstitial':
+                chgcar = mpr.get_charge_density_from_material_id(self.id_material)
+                cig = ChargeInterstitialGenerator()
+                defects = cig.generate(chgcar, insert_species=[self.interstitial_specie])
+                structure = next(defects).defect_structure
+
+        # Get conventional structure and apply orientation
+        sga = SpacegroupAnalyzer(structure)
+        structure_conv = sga.get_conventional_standard_structure()
+    
+        # Apply crystallographic orientation using Miller indices
+        self.miller_indices = miller_indices
+        structure_oriented = self._apply_miller_orientation(structure_conv, miller_indices)
+        
+        self.structure_basic = structure_oriented
+        self.lattice_constants = tuple(np.array(structure_oriented.lattice.abc) / 10)  # nm
+
+        # Set chemical species notation
+        if mode == 'vacancy':
+            self.chemical_specie = f"V_{affected_site}"
+        elif mode == 'interstitial':
+            self.chemical_specie = self.interstitial_specie
+        else:
+            self.chemical_specie = structure_oriented.composition.reduced_formula
+
+        # Create supercell with precise dimension control
+        self.structure = self._create_supercell(structure_oriented, mode, affected_site)
+        self.crystal_size = self.structure.lattice.abc
+
+        # Compute basis vectors for KMC grid
+        self._compute_basis_vectors()
+        
+
+    def _apply_miller_orientation(self, structure, miller_indices):
+        """
+        Orient structure so that the specified Miller direction aligns with the z-axis.
+        
+        This method:
+        1. Converts Miller indices to Cartesian coordinates
+        2. Creates a rotation matrix to align this direction with z-axis
+        3. Chooses an appropriate in-plane orientation for x and y
+        4. Applies the rotation to the structure
+        
+        Parameters:
+            structure: Input pymatgen Structure
+            miller_indices (tuple): (h, k, l) Miller indices
+            
+        Returns:
+            Structure: Rotated structure with [hkl] along z-axis
+        """
+
+        h, k, l = miller_indices
+    
+        # Handle special case: (0,0,0) or default to no rotation
+        if h == 0 and k == 0 and l == 0:
+            return structure.copy()
+
+        # Convert Miller indices to Cartesian direction in the original lattice
+        # [hkl] in fractional coordinates -> Cartesian
+        miller_direction = structure.lattice.get_cartesian_coords([h, k, l])
+        miller_direction = miller_direction / np.linalg.norm(miller_direction)
+
+        # Target: align miller_direction with z-axis [0, 0, 1]
+        z_axis = np.array([0, 0, 1])
+
+        # Create rotation matrix using Rodrigues' rotation formula
+        # We need to rotate miller_direction onto z_axis
+        rotation_matrix = self._get_rotation_matrix(miller_direction, z_axis)
+
+        # Apply rotation to structure
+        symm_op = SymmOp.from_rotation_and_translation(rotation_matrix, [0, 0, 0])
+        structure_rotated = structure.copy()
+        structure_rotated.apply_operation(symm_op)
+    
+        return structure_rotated
+     
+        
+    def _get_rotation_matrix(self, vec1, vec2):
+        """
+        Calculate rotation matrix that rotates vec1 to align with vec2.
+        
+        Uses Rodrigues' rotation formula. Handles the special case where
+        vectors are parallel or anti-parallel.
+        
+        Parameters:
+            vec1 (array): Starting vector (will be rotated)
+            vec2 (array): Target vector (destination)
+            
+        Returns:
+            np.ndarray: 3x3 rotation matrix
+        """
+
+        # Normalize vectors
+        v1 = vec1 / np.linalg.norm(vec1)
+        v2 = vec2 / np.linalg.norm(vec2)
+
+        # Check if vectors are already aligned
+        if np.allclose(v1, v2):
+            return np.eye(3)
+
+        # Check if vectors are opposite (anti-parallel)
+        if np.allclose(v1, -v2):
+            # Rotate 180° around any perpendicular axis
+            # Find a perpendicular vector
+            perp = np.array([1, 0, 0]) if abs(v1[0]) < 0.9 else np.array([0, 1, 0])
+            perp = np.cross(v1, perp)
+            perp = perp / np.linalg.norm(perp)
+            # 180° rotation around perp
+            return 2 * np.outer(perp, perp) - np.eye(3)
+        
+        # Rodrigues' rotation formula
+        # Rotation axis (perpendicular to both vectors)
+        axis = np.cross(v1, v2)
+        axis = axis / np.linalg.norm(axis)
+
+        # Rotation angle
+        cos_angle = np.dot(v1, v2)
+        sin_angle = np.linalg.norm(np.cross(v1, v2))
+
+        # Rotation matrix using Rodrigues' formula
+        K = np.array([
+            [0, -axis[2], axis[1]],
+            [axis[2], 0, -axis[0]],
+            [-axis[1], axis[0], 0]
+        ])
+        
+        R = np.eye(3) + sin_angle * K + (1 - cos_angle) * np.dot(K, K)
+        
+        return R
+
+
+    def _create_supercell(self, unit_cell, mode, affected_site=None):
+        """
+        Create supercell with dimensional control
+    
+        Parameters:
+            unit_cell: Oriented unit cell structure
+            mode (str): 'regular', 'interstitial', or 'vacancy'
+            affected_site (str): Vacancy or interstitial
+    
+        Returns:
+            Structure: Supercell with requested dimensions and defects
+        """
+        # Calculate required repetitions for each direction
+        lattice_params = np.array(unit_cell.lattice.abc)  # Convert to nm
+        # Target dimensions from self.crystal_size (should be in nm)
+        target_dims = np.array(self.crystal_size)
+        # Calculate number of repetitions (round up to ensure size >= target)
+        repetitions = np.ceil(target_dims / lattice_params).astype(int)
+        repetitions = np.maximum(repetitions, 1)  # At least 1 repetition
+
+        # Create supercell using scaling matrix (efficient method)
+        scaling_matrix = np.diag(repetitions)
+        supercell = unit_cell * scaling_matrix
+
+        # Filter sites based on mode
+        if mode == 'interstitial':
+            # Keep only interstitial species
+            sites_to_keep = [
+                site for site in supercell 
+                if site.specie.symbol == self.interstitial_specie
+            ]
+        elif mode == 'vacancy':
+            # Remove affected sites (create vacancies)
+            if affected_site is None:
+                raise ValueError("affected_site must be specified for vacancy mode")
+            sites_to_keep = [
+                site for site in supercell 
+                if site.specie.symbol == affected_site
+            ]
+        else: # Regular mode
+            sites_to_keep = list(supercell)
+
+        # Create filtered structure
+        if mode != 'regular':
+            filtered_structure = Structure(
+                supercell.lattice,
+                [site.specie for site in sites_to_keep],
+                [site.frac_coords for site in sites_to_keep]
+            )
+            return filtered_structure
+            
+        return supercell
+        
+    def _compute_basis_vectors(self):
+        """
+        Compute basis vectors for KMC grid based on minimum fractional coordinate spacing.
+        
+        Sets self.basis_vectors to lattice vectors scaled by minimum atomic spacing.
+        This creates a grid where integer multiples correspond to atomic positions.
+        """
+        # Find minimum non-zero fractional coordinate spacing
+        frac_coords = np.array([site.frac_coords for site in self.structure_basic])
+        
+        # Get unique sorted fractional coordinates for each direction
+        min_spacing = []
+    
+        for dim in range(3):
+            coords = np.sort(np.unique(np.round(frac_coords[:, dim], decimals=10)))
+            coords = coords[coords > 1e-10]  # Remove zeros
+            
+            if len(coords) > 1:
+                # Minimum spacing between adjacent positions
+                spacings = np.diff(coords)
+                min_spacing.append(np.min(spacings[spacings > 1e-10]))
+            elif len(coords) == 1:
+                # Single position means spacing is the coordinate itself
+                min_spacing.append(coords[0])
+            else:
+                # Fallback: use 1.0 (full lattice vector)
+                min_spacing.append(1.0)
+        
+        # Use minimum spacing across all dimensions for uniform scaling
+        min_non_zero_element = min(min_spacing)
+        
+        # Scale lattice vectors by minimum spacing
+        # This gives basis vectors where integer steps land on atomic sites
+        self.basis_vectors = np.array(self.structure_basic.lattice.matrix) * min_non_zero_element
+            
+    """
+    DEPRECATING lattice_model_2 2025/10/29
+    """      
+    def lattice_model_2(self, api_key, mode, affected_site=None, radius_neighbors=None):
         """
         Generate a lattice model based on the specified mode:
         - 'regular': Uses the conventional crystal structure.
@@ -217,71 +463,10 @@ class Crystal_Lattice():
         
         self.basis_vectors = np.array(self.structure_basic.lattice.matrix) * min_non_zero_element  # Basis vector in nm scaled to the closest element
 
-    
-    def lattice_model_2(self,api_key, mode, affected_site,radius_neighbors):
 
-        with MPRester(api_key) as mpr:
-            structure = mpr.get_structure_by_material_id(self.id_material)
-            
-            # If we want to include interstitial sites
-            if mode == 'interstitial':
-                chgcar = mpr.get_charge_density_from_material_id(self.id_material) #Download charge density from MP
-                cig = ChargeInterstitialGenerator() # Defect generator based on charge density
-                defects = cig.generate(chgcar, insert_species=[self.interstitial_specie]) # Generate interstitial specie
-                structure_with_interstitial = next(defects).defect_structure # Select one defect to obtain the structure including the defect
-        
-        # Symmetry operation
-        symm_op = SymmOp.from_rotation_and_translation(self.rot_matrix(self.latt_orientation), [0, 0, 0])
-
-        # If we are interested in the crystal structure (interstitial == False)
-        if mode != 'interstitial':
-            sga = SpacegroupAnalyzer(structure)
-            self.structure_basic = sga.get_conventional_standard_structure()
-            self.chemical_specie = self.structure_basic.composition.reduced_formula
-
-        # If we are interested in the interstitial sites (interstitial == True)
-        else:
-            sga = SpacegroupAnalyzer(structure_with_interstitial)
-            self.structure_basic = sga.get_conventional_standard_structure()
-            self.chemical_specie = affected_site
-        
-        
-
-        self.lattice_constants = tuple(np.array(self.structure_basic.lattice.abc)/10)
-
-        # Apply the rotation to the structure
-        self.structure_basic.apply_operation(symm_op)
-        
-        self.structure = self.structure_basic.copy()
-
-            
-        # Apply the CubicSupercellTransformation
-        min_dimension = max(self.crystal_size) 
-        transformation = CubicSupercellTransformation(min_length=min_dimension,force_90_degrees = True,step_size=0.3)
-        
-        if mode != 'interstitial':
-            self.structure = transformation.apply_transformation(self.structure)
-            self.crystal_size = self.structure.lattice.abc
-
-        else:
-            self.structure_with_interstitial = transformation.apply_transformation(self.structure)
-            self.structure = Structure(self.structure_with_interstitial.lattice, [], [])
-            
-            for site in self.structure_with_interstitial:
-                if site.specie.symbol == affected_site:
-                    self.structure.append(site.specie, site.frac_coords)
-            self.crystal_size = self.structure_with_interstitial.lattice.abc
-            
-
-        # Scaling factor for the basis_vectors
-        # Find the minimum non-zero element of fractional coordinates greater than zero to find the scaling factor
-        # Scaling factor so integer times the basis vectors correspond to the sites
-        min_non_zero_element = min([
-            np.min(site.frac_coords[site.frac_coords > 1e-10]) for site in self.structure_basic if np.any(site.frac_coords > 1e-10)
-            ])
-        
-        self.basis_vectors = np.array(self.structure_basic.lattice.matrix) * min_non_zero_element  # Basis vector in nm scaled to the closest element
-        
+    """
+    DEPRECATING rot_matrix 2025/10/29
+    """         
     def rot_matrix(self,latt_orientation):
         if latt_orientation == '001':
             
@@ -1259,9 +1444,10 @@ class Crystal_Lattice():
     def update_transition_rates_with_electric_field(self,E_field):
       # Update System_state based on electric field
       
-        for site, E_site_field in zip(self.sites_occupied + self.adsorption_sites,E_field):
+        for site in (self.sites_occupied + self.adsorption_sites):
           #print(f'For the site {self.grid_crystal[site].position} ({self.grid_crystal[site].chemical_specie}) the electric field is {E_site_field})')
-          self.grid_crystal[site].transition_rates(E_site_field = E_site_field, migration_pathways = self.migration_pathways)   
+          E_field_key = tuple(np.round(self.grid_crystal[site].position, 6))
+          self.grid_crystal[site].transition_rates(E_site_field = E_field[E_field_key], migration_pathways = self.migration_pathways)   
     
 # =============================================================================
 #             Introduce particle
@@ -1651,10 +1837,42 @@ class Crystal_Lattice():
     #    Metal clusters and islands calculations
     # ----------------------------------------------------
     
+    def _initialize_cluster_tracking(self):
+      """ Call once at simulation start """
+      self.atom_to_cluster = {} # Mapping from site_id to cluster_id
+      self.clusters = {}
+      self.next_cluster_id = 0
+      
+    def _add_metal_atom_to_clusters(self,site_id):
+      """
+      Add a newly reduced metal atom at site_id to cluster system.
+      """
+      
+      # Get metal neighbors (only neutral atoms)
+      metal_neighbors = []
+      for neighbor in self.grid_crystal[site_id].supp_by:
+        if self.grid_crystal[neighbor].ion_charge == 0:
+          metal_neighbors.append(neighbor)
+          
+      # Find unique clusters among neighbors
+      neighbor_cluster_ids = set()
+      for neighbor in metal_neighbors:
+        if neighbor in self.atom_to_cluster:
+          neighbor_cluster_ids.add(self.atom_to_cluster[neighbor])
+          
+      if not neighbor_cluter_ids:
+        # No neighboring clusters
+        return 
+        
+      elif len(neighbor_cluster_ids) == 1:
+        
+          pass
+          
+      
     def metal_clusters_analysis(self):
-    
-      atoms_idx = self._get_atoms()
-      self._find_clusters(atoms_idx)
+      
+        atoms_idx = self._get_atoms()
+        self._find_clusters(atoms_idx)
       
     def _get_atoms(self):
         """

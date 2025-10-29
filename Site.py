@@ -529,9 +529,9 @@ class Site():
                 
 class Cluster:
     def __init__(self,cluster_atoms,atoms_positions,attached_layer):
-      self.atoms_id = cluster_atoms
+      self.atoms_id = set(cluster_atoms)
       self.atoms_positions = atoms_positions
-      self.size = len(cluster_atoms)
+      self.size = len(self.atoms_id)
       self.attached_layer = attached_layer
       
                                 

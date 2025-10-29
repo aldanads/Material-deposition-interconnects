@@ -1200,6 +1200,8 @@ class PoissonSolver():
         self.previous_solution.x.array[:] = self.uh.x.array[:]
         """
         
+        self.new_field_cache = True
+        
         return self.uh
         
 
@@ -1219,7 +1221,50 @@ class PoissonSolver():
       E_values : np.array, shape (n_points, 3)
           Electric field values at given points
       """
+      #self.new_field_cache = True
+      if self.new_field_cache:
+        self._field_cache = {}
+        self.new_field_cache = False
+        
+      # Convert points to numpy array with correct dtype
+      points_array = np.asarray(points,dtype=np.float64)
+      if points_array.ndim == 1:
+        points_array = points_array.reshape(1, -1)
+        
+      # Separate points into cached and new
+      cached_points = []
+      new_points = []  
+      
+      for point in points_array:
+        point_key = tuple(np.round(point,6))
+        if point_key in self._field_cache:
+          cached_points.append(point_key)
+        else:
+          new_points.append(point)
+          
+      # Initialize E_values_global
+      E_values_global = {}
+      
+      for point_key in cached_points:
+        E_values_global[point_key] = self._field_cache[point_key]
+        
+      # Compute values for new points
+      if new_points:
+        new_points_array = np.array(new_points, dtype=np.float64)
+        new_field_values = self._compute_field(uh,new_points_array)
+        
+        # Fill in new values and update cache
+        for point,field_val in zip(new_points,new_field_values):
+          point_key = tuple(np.round(point,6))
+          E_values_global[point_key] = field_val
+          self._field_cache[point_key] = field_val
+          
+      return E_values_global
+      
+      
+        
 
+    def _compute_field(self,uh,points_array):
       # Compute gradient expression (E = -?V)
       E_expr =  -ufl.grad(uh)
       
@@ -1228,10 +1273,7 @@ class PoissonSolver():
       self.E_field.interpolate(expr)
       #self.E_field.x.scatter_forward()
 
-      # Convert points to numpy array with correct dtype
-      points_array = np.asarray(points,dtype=np.float64)
-      if points_array.ndim == 1:
-        points_array = points_array.reshape(1, -1)
+      
         
       # Find cells whose bounding-box collide with the points
       cell_candidates = geometry.compute_collisions_points(self.bb_tree,points_array)
