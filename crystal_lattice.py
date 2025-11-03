@@ -1191,44 +1191,62 @@ class Crystal_Lattice():
             self.update_sites(update_specie_events,update_supp_av)
             
 
-        # Hexagonal seed - 7 particles in plane
+        # Cluster - particles in plane, one on bottom
         elif test == 4:
             
-            update_supp_av = set()
-            update_specie_events = []
+            min_dist_xy = float('inf')
+            idx = None
+          
             for site_idx in self.adsorption_sites:
-                if (self.crystal_size[0] * 0.45 < self.grid_crystal[site_idx].position[0] < self.crystal_size[0] * 0.55) and (self.crystal_size[1] * 0.45 < self.grid_crystal[site_idx].position[1] < self.crystal_size[1] * 0.55):
-                    idx = site_idx
-                    break            # Introduce specie in the site
-            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
+              pos = np.array(self.grid_crystal[site_idx].position)
+              # Compute distance to (center_x, center_y) in xy-plane
+              dx = pos[0] - self.crystal_size[0] * 0.5
+              dy = pos[1] - self.crystal_size[1] * 0.5
+              dist_xy = np.sqrt(dx**2 + dy**2)
+              if dist_xy < min_dist_xy:
+                min_dist_xy = dist_xy
+                idx = site_idx
+
+            # Introduce central atom at bottom center
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av,1)
             self.update_sites(update_specie_events,update_supp_av)
 
+            # Add in-plane neighbors (same layer)
             for neighbor in self.grid_crystal[idx].migration_paths['Plane']:
-                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
+                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av,1)
                 self.update_sites(update_specie_events,update_supp_av)
                 
-            idx_neighbor_plane = self.grid_crystal[neighbor[0]].migration_paths['Plane'][1][0]
-            update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_plane,update_specie_events,update_supp_av)
+            idx_neighbor_top = self.grid_crystal[neighbor[0]].migration_paths['Down'][1][0]
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_top,update_specie_events,update_supp_av,1)
             self.update_sites(update_specie_events,update_supp_av)
         
-        # Hexagonal seed - 7 particles in plane, one on top
+        # Cluster - particles in plane, one on top
         elif test == 5:
             
-            update_supp_av = set()
-            update_specie_events = set()
+            min_dist_xy = float('inf')
+            idx = None
+          
             for site_idx in self.adsorption_sites:
-                if (self.crystal_size[0] * 0.45 < self.grid_crystal[site_idx].position[0] < self.crystal_size[0] * 0.55) and (self.crystal_size[1] * 0.45 < self.grid_crystal[site_idx].position[1] < self.crystal_size[1] * 0.55):
-                    idx = site_idx
-                    break            # Introduce specie in the site
-            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
+              pos = np.array(self.grid_crystal[site_idx].position)
+              # Compute distance to (center_x, center_y) in xy-plane
+              dx = pos[0] - self.crystal_size[0] * 0.5
+              dy = pos[1] - self.crystal_size[1] * 0.5
+              dist_xy = np.sqrt(dx**2 + dy**2)
+              if dist_xy < min_dist_xy:
+                min_dist_xy = dist_xy
+                idx = site_idx
+
+            # Introduce central atom at bottom center
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av,1)
             self.update_sites(update_specie_events,update_supp_av)
 
+            # Add in-plane neighbors (same layer)
             for neighbor in self.grid_crystal[idx].migration_paths['Plane']:
-                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
+                update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av,1)
                 self.update_sites(update_specie_events,update_supp_av)
                 
             idx_neighbor_top = self.grid_crystal[neighbor[0]].migration_paths['Up'][1][0]
-            update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_top,update_specie_events,update_supp_av)
+            update_specie_events,update_supp_av = self.introduce_specie_site(idx_neighbor_top,update_specie_events,update_supp_av,1)
             self.update_sites(update_specie_events,update_supp_av)
             
         # 2 hexagonal seeds - 2 layers and one particle on the top 
@@ -1358,6 +1376,12 @@ class Crystal_Lattice():
             if self.poissonSolver_parameters['solve_Poisson']: update_specie_events = self.sites_occupied
             # Update sites availables, the support to each site and available migrations
             self.update_sites(update_specie_events,update_supp_av)
+            
+            # In case the metal atom migrate, it can modify the clusters
+            if self.grid_crystal[chosen_event[1]].ion_charge == 0:
+              self._add_metal_atom_to_clusters(chosen_event[1])
+              self._remove_metal_atom_from_clusters(chosen_event[-1])
+            
 
 # =============================================================================
 #         Specie generation
@@ -1372,23 +1396,29 @@ class Crystal_Lattice():
             # Update sites availables, the support to each site and available migrations
             self.update_sites(update_specie_events,update_supp_av)
             
+            
 # =============================================================================
 #         Redox reactions
 # =============================================================================         
         elif chosen_event[2] == 'reduction':
-            if np.isclose(self.grid_crystal[chosen_event[1]].position[2], self.crystal_size[2]):
+            if np.isclose(self.grid_crystal[chosen_event[1]].position[2], self.crystal_size[2]) and False:
               # Remove particle --> Re-adsorbed at the interface
               update_specie_events,update_supp_av = self.remove_specie_site(chosen_event[-1],update_specie_events,update_supp_av)
             else:
+              
               self.grid_crystal[chosen_event[1]].ion_charge -= 1
               update_specie_events.add(chosen_event[1])
               self.update_sites(update_specie_events,set())
+              self._add_metal_atom_to_clusters(chosen_event[1])
             
         elif chosen_event[2] == 'oxidation':
             
             self.grid_crystal[chosen_event[1]].ion_charge += 1
             update_specie_events.add(chosen_event[1])
             self.update_sites(update_specie_events,set())
+            self._remove_metal_atom_from_clusters(chosen_event[1])
+            
+            
 # =============================================================================
 # At every kMC step we have to check if we destroy any superbasin                      
 # =============================================================================
@@ -1419,6 +1449,7 @@ class Crystal_Lattice():
                 self.grid_crystal[idx].supported_by(self.grid_crystal,self.wulff_facets,
                                                     self.dir_edge_facets,self.chemical_specie,self.affected_site,
                                                     self.domain_height,self.sites_generation_layer)
+                  
         update_gen_sites = self.available_generation_sites(update_supp_av)
 
         if update_specie_events: 
@@ -1447,7 +1478,10 @@ class Crystal_Lattice():
         for site in (self.sites_occupied + self.adsorption_sites):
           #print(f'For the site {self.grid_crystal[site].position} ({self.grid_crystal[site].chemical_specie}) the electric field is {E_site_field})')
           E_field_key = tuple(np.round(self.grid_crystal[site].position, 6))
-          self.grid_crystal[site].transition_rates(E_site_field = E_field[E_field_key], migration_pathways = self.migration_pathways)   
+          self.grid_crystal[site].transition_rates(
+            E_site_field = E_field[E_field_key], migration_pathways = self.migration_pathways, 
+            clusters = self.clusters, atom_to_cluster = self.atom_to_cluster
+          )   
     
 # =============================================================================
 #             Introduce particle
@@ -1650,7 +1684,7 @@ class Crystal_Lattice():
                                                     'Partial pressure':self.partial_pressure,
                                                     'Sticking coefficient':self.sticking_coefficient}
                 metadata_simulation_setup = {'Simulation domain (Angstroms)':self.crystal_size,
-                                             'Growth direction':self.latt_orientation,
+                                             'Growth direction':self.miller_indices,
                                              'Material id (Materials Project)':self.id_material,
                                              'Search superbasin after n steps with small time steps': self.n_search_superbasin,
                                              'Time limitation to search superbasin': self.time_step_limits,
@@ -1849,25 +1883,115 @@ class Crystal_Lattice():
       """
       
       # Get metal neighbors (only neutral atoms)
-      metal_neighbors = []
-      for neighbor in self.grid_crystal[site_id].supp_by:
-        if self.grid_crystal[neighbor].ion_charge == 0:
-          metal_neighbors.append(neighbor)
+      metal_neighbors = [
+        nb for nb in self.grid_crystal[site_id].supp_by 
+        if not isinstance(nb, str) and self.grid_crystal[nb].ion_charge == 0
+      ]
+      
+      # Separate neighbors into: in-cluster vs. singletons
+      in_cluster_neighbors = []
+      singleton_neighbors = []
+      for nb in metal_neighbors:
+        if nb in self.atom_to_cluster:
+          in_cluster_neighbors.append(nb)
+        else:
+          singleton_neighbors.append(nb)
           
-      # Find unique clusters among neighbors
-      neighbor_cluster_ids = set()
-      for neighbor in metal_neighbors:
-        if neighbor in self.atom_to_cluster:
-          neighbor_cluster_ids.add(self.atom_to_cluster[neighbor])
+      # Get unique clusters from in-clusters neighbors
+      neighbor_cluster_ids = {self.atom_to_cluster[nb] for nb in in_cluster_neighbors}  
           
-      if not neighbor_cluter_ids:
-        # No neighboring clusters
+      # Case 1: No in-cluster neighbors and no singletons --> Isolated atom
+      if not neighbor_cluster_ids and not singleton_neighbors:
+        return  
+          
+      # Case 2: Only singletons --> Create a new cluster
+      if not neighbor_cluster_ids:
+        all_atoms = [site_id] + singleton_neighbors
+        
+        # Create new cluster
+        positions = [self.grid_crystal[atom].position for atom in all_atoms]
+        cid = self.next_cluster_id
+        self.next_cluster_id += 1
+        new_cluster = Cluster(all_atoms,positions,{})
+        new_cluster.update_electrode_contact(self.grid_crystal)
+        self.clusters[cid] = new_cluster
+        for atom in all_atoms:
+          self.atom_to_cluster[atom] = cid
+        return
+        
+      # Case 3: Connect atom to existing cluster
+      if len(neighbor_cluster_ids) == 1 and not singleton_neighbors:
+        # Attach to existing cluster
+        cid = neighbor_cluster_ids.pop()
+        cluster = self.clusters[cid]
+        cluster.atoms_id.add(site_id)
+        cluster.atoms_positions.append(self.grid_crystal[site_id].position)
+        cluster.size += 1
+        self.atom_to_cluster[site_id] = cid 
+        cluster.update_electrode_contact(self.grid_crystal)
         return 
         
-      elif len(neighbor_cluster_ids) == 1:
+      # Case 4: Merging existing cluster
+      # Merge clusters + new atom + singleton neighbors
+      all_atoms = set([site_id] + singleton_neighbors)
+      all_positions = [self.grid_crystal[site_id].position]
+      all_positions.extend(
+        self.grid_crystal[atom].position for atom in singleton_neighbors
+      )
+      
+      
+      # Absorb existing clusters
+      for cid in neighbor_cluster_ids:
+        old_cluster = self.clusters[cid]
+        all_atoms.update(old_cluster.atoms_id)
+        all_positions.extend(old_cluster.atoms_positions)
+        # Remove old mappings
+        for atom in old_cluster.atoms_id:
+          del self.atom_to_cluster[atom]
+        del self.clusters[cid]
         
-          pass
-          
+      # Create merged cluster
+      new_cid = self.next_cluster_id
+      self.next_cluster_id += 1
+      new_cluster = Cluster(all_atoms, all_positions, {})
+      new_cluster.update_electrode_contact(self.grid_crystal)
+      self.clusters[new_cid] = new_cluster
+      for atom in all_atoms:
+        self.atom_to_cluster[atom] = new_cid     
+      
+      
+    def _remove_metal_atom_from_clusters(self,site_id):
+       if site_id not in self.atom_to_cluster:
+         return
+        
+
+       # Identify the cluster id of the atom
+       cid = self.atom_to_cluster[site_id]
+       cluster = self.clusters[cid]
+       
+       # Remove atom from cluster
+       cluster.atoms_id.discard(site_id)
+       cluster.size -= 1
+       del self.atom_to_cluster[site_id]
+       
+       # Remove the corresponding atom position
+       cluster.atoms_positions = [
+        pos for pos in cluster.atoms_positions
+        if not np.allclose(pos, self.grid_crystal[site_id].position)
+       ]
+            
+       # Reset the site's electrode flag (no longer in any cluster)
+       self.grid_crystal[site_id].in_cluster_electrode = {'bottom_layer': False, 'top_layer': False}   
+       if cluster.size <= 1:
+         # Remove cluster
+         for atom in list(cluster.atoms_id):
+           del self.atom_to_cluster[atom]
+           self.grid_crystal[atom].in_cluster_with_electrode = {'bottom_layer': False, 'top_layer': False}
+         del self.clusters[cid]
+       else:
+         # Update cluster contact with electrodes (may have lost electrode contact)
+         
+         cluster.update_electrode_contact(self.grid_crystal)  
       
     def metal_clusters_analysis(self):
       

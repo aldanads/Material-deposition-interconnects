@@ -183,7 +183,7 @@ def main():
                 
                 # Initialize Poisson solver on all MPI ranks
                 poisson_solver = PoissonSolver(mesh_file,System_state.poissonSolver_parameters, structure=System_state.structure,path_results = paths["results"])
-                poisson_solver.set_boundary_conditions(top_value=1.0, bottom_value=0.0)  # Set appropriate BCs
+                poisson_solver.set_boundary_conditions(top_value=0.0, bottom_value=0.0)  # Set appropriate BCs
                 poisson_solve_frequency = System_state.poissonSolver_parameters['poisson_solve_frequency']  # Solve Poisson every N KMC steps
                 
                 
@@ -227,14 +227,17 @@ def main():
                   if i%poisson_solve_frequency == 0:
                   
                         # Calculate clusters for include BC in the cluster --> Virtual electrode
+                        """
                         if rank == 0:
                           System_state.metal_clusters_analysis()
                           clusters = System_state.clusters
                         else:
                           clusters = None
-                          
+                        """  
+                        clusters = []
                         clusters = comm.bcast(clusters, root=0)
-                        #poisson_solver.set_boundary_conditions(top_value=1.0, bottom_value=0.0, clusters = clusters)
+                        if i == 6:
+                          poisson_solver.set_boundary_conditions(top_value=-1.0, bottom_value=0.0, clusters = clusters)
                         run_start_time = MPI.Wtime()
 
                         uh = poisson_solver.solve(particle_locations,charges)
@@ -252,21 +255,33 @@ def main():
                         
                   E_field = poisson_solver.evaluate_electric_field_at_points(uh,E_field_points)      
                   if rank == 0:
-                      #print(f'Calculated electric field at step {i}')
                       System_state.update_transition_rates_with_electric_field(E_field)
-                      #print(f'E field: ({E_field})')
+                      
 
 
                 # kMC steps after solving Poisson equation, calculating the electric field and the impact in the transition rates
                 if rank == 0:   
+                  for cluster in System_state.clusters.values():
+                    print(f'Clusters: {cluster.atoms_positions}')
+                  for site in System_state.sites_occupied:
+                      print(f'Atom ({site}) in position: {System_state.grid_crystal[site].position}')
+                      print(f'Supp by: {System_state.grid_crystal[site].supp_by}')
+                      print(f'CN contribution redox: {System_state.grid_crystal[site].CN_redox_energy}')
+                      for event in System_state.grid_crystal[site].site_events:
+                        if event[-2] == 'oxidation' or event[-2] == 'reduction': 
+                          print(f'Site events: {event}')
                   System_state,KMC_time_step, chosen_event = KMC(System_state,rng)  
                   events_tracking[chosen_event[2]] += 1
+                  
+                  
+                  print(f'Chosen event: {chosen_event}')
                       
                 # Synchronize before continuing
                 if comm is not None:
                   comm.Barrier()
                      
                 i+=1
+                if i%(snapshoots_steps*30) == 0: exit()
                 if i%snapshoots_steps== 0:
                 
                     j+=1

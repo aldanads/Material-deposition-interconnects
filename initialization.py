@@ -34,8 +34,8 @@ def initialization(n_sim):
     
     save_data = True
     lammps_file = True
-    snapshoots_steps = int(4e2)
-    total_steps = int(4e4)
+    snapshoots_steps = int(1e0)
+    total_steps = int(1e1)
     
     simulation_parameters = {
       'save_data':save_data, 'snapshoots_steps':snapshoots_steps,
@@ -417,7 +417,7 @@ def initialization(n_sim):
         
         # Parameters for Poisson solver
         active_dipoles = 4
-        poisson_solve_frequency = int(4e2)  # Solve Poisson every N KMC steps
+        poisson_solve_frequency = int(1e0)  # Solve Poisson every N KMC steps
         solve_Poisson = True
         save_Poisson = False
         
@@ -515,7 +515,7 @@ def initialization(n_sim):
         # =============================================================================
         #P = 0.01
         #System_state.defect_gen(rng,P)
-        #System_state.deposition_specie(0,rng,test = 1)
+        System_state.deposition_specie(0,rng,test = 4)
         
         # This timestep_limits will depend on the V/s ratio
         System_state.timestep_limits = float('inf')

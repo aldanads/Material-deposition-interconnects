@@ -33,6 +33,8 @@ class Site():
         self.nu0=7E12  # nu0 (s^-1) bond vibration frequency
         
         self.ion_charge = 0
+        self.in_cluster_with_electrode = {'bottom_layer': False, 'top_layer': False}
+
 # =============================================================================
 #     We only consider the neighbors within the lattice domain            
 # =============================================================================
@@ -199,7 +201,7 @@ class Site():
         self.CN_redox_energy = self.Act_E_list['CN_redox_energy'][len(self.supp_by) + 1]
         
       self.cache_CN_contr_redox_energy[cache_key] = self.CN_redox_energy
-   
+    
 
    
 # =============================================================================
@@ -352,7 +354,7 @@ class Site():
             
     def available_oxidation(self,idx_origin):
         
-        if self.ion_charge == 0:   
+        if self.ion_charge == 0:  
             self.site_events.append([idx_origin, 'oxidation', self.Act_E_list['E_oxidation'] + self.CN_redox_energy])
 
         
@@ -484,39 +486,75 @@ class Site():
         E_site_field = kwargs.get("E_site_field", np.array([0.0, 0.0, 0.0]))
         migration_pathways =  kwargs.get("migration_pathways")
         
+        
         relevant_field = np.any(abs(E_site_field) > 1e6)
         
         # Iterate over site_events directly, no need to use range(len(...))
         for event in self.site_events:
           
             if relevant_field:
+              
+              # Ions in contact with the virtual electrode will have the reduction rate affected
+              clusters = kwargs.get("clusters")
+              atom_to_cluster = kwargs.get("atom_to_cluster")
+              
+              if len(atom_to_cluster) > 0 and self.ion_charge > 0:
+                self.in_cluster_with_electrode = {'bottom_layer': False, 'top_layer': False}
+                
+                for nb in self.supp_by:
+                  if (not isinstance(nb, str) and nb in atom_to_cluster):    
+                    cid = atom_to_cluster[nb]
+                    cluster = clusters[cid]
+                    if cluster.attached_layer['bottom_layer']:
+                      self.in_cluster_with_electrode['bottom_layer'] = True
+                    if cluster.attached_layer['top_layer']:
+                      self.in_cluster_with_electrode['top_layer'] = True
+              
               if event[-2] == 'generation':
-                event[-1] = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
+                Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
                 
               elif event[-2] == 'reduction':
-                if 'top_layer' in self.supp_by: 
+                print(f'REDUCTION: Atom in {self.position} is in a cluster in contact with the electrodes? {self.in_cluster_with_electrode}')
+                print(f'Effect of electric field: {0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3)}')
+                print(f'Act energy in E=0: {event[-1]}')
+                if self.in_cluster_with_electrode['top_layer'] or 'top_layer' in self.supp_by: 
                   # Positive bias hinder reduction --> Field helps remove electrons
-                  event[-1] = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0)
-                elif 'bottom_layer' in self.supp_by:
+                  Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0)
+                elif self.in_cluster_with_electrode['bottom_layer'] or 'bottom_layer' in self.supp_by:
                   # Positive bias facilitate reduction --> Field helps add electrons
-                  event[-1] = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0)
+                  Act_E = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0)
+                else:
+                  Act_E = event[-1]
+                print(f'Event: {event}, Effective Act E: {Act_E}')
                   
               elif event[-2] == 'oxidation':
-                if 'top_layer' in self.supp_by: 
-                  event[-1] = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
-                elif 'bottom_layer' in self.supp_by:
-                  event[-1] = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
+                print(f'OXIDATION: Atom in {self.position} is in a cluster in contact with the electrodes? {self.in_cluster_with_electrode}')
+                print(f'Effect of electric field: {0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3)}')
+                print(f'Act energy in E=0: {event[-1]}')
+                if self.in_cluster_with_electrode['top_layer'] or 'top_layer' in self.supp_by: 
+                  Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
+                elif self.in_cluster_with_electrode['bottom_layer'] or 'bottom_layer' in self.supp_by:
+                  Act_E = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
+                else:
+                  Act_E = event[-1]
+                print(f'Event: {event}, Effective Act E: {Act_E}')
               
               else:
                 mig_vec = migration_pathways[event[-2]]
-                event[-1] = max(event[-1] - self.ion_charge * round(np.dot(E_site_field,mig_vec) * 1e-10,3),self.Act_E_list['E_min_mig'])
+                Act_E = max(event[-1] - self.ion_charge * round(np.dot(E_site_field,mig_vec) * 1e-10,3),self.Act_E_list['E_min_mig'])
+                
+            else:
+              Act_E = event[-1]
               
-            if event[-1] in self.cache_TR:
-                tr_value = self.cache_TR[event[-1]]
+            # Fallback: Act. energy should be >= 0
+            Act_E = max(Act_E,0)
+            
+            if Act_E in self.cache_TR:
+                tr_value = self.cache_TR[Act_E]
 
             else:
-                tr_value = self.nu0 * np.exp(-event[-1] / (self.kb * T))
-                self.cache_TR[event[-1]] = tr_value
+                tr_value = self.nu0 * np.exp(-Act_E / (self.kb * T))
+                self.cache_TR[Act_E] = tr_value
                 
             # Use the length of event to determine the appropriate action
             if len(event) == 3:
@@ -534,6 +572,29 @@ class Cluster:
       self.size = len(self.atoms_id)
       self.attached_layer = attached_layer
       
+    def update_electrode_contact(self,grid_crystal):
+      """Update whether this cluster touches top/bottom electrode layers."""
+      touches_bottom = False
+      touches_top = False
+      
+      for site in self.atoms_id:
+        site_obj = grid_crystal[site]
+        if 'bottom_layer' in site_obj.supp_by:
+          touches_bottom = True
+        elif 'top_layer' in site_obj.supp_by:
+          touches_top = True
+          
+        if touches_bottom and touches_top:
+          break
+        
+      self.attached_layer = {'bottom_layer': touches_bottom, 'top_layer': touches_top}
+      
+      # Propagate to every atom in the cluster
+      for site_id in self.atoms_id:
+        grid_crystal[site_id].in_cluster_with_electrode['bottom_layer'] = touches_bottom
+        grid_crystal[site_id].in_cluster_with_electrode['top_layer'] = touches_top
+        
+            
                                 
         
 class Island:
