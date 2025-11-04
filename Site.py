@@ -514,9 +514,6 @@ class Site():
                 Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
                 
               elif event[-2] == 'reduction':
-                print(f'REDUCTION: Atom in {self.position} is in a cluster in contact with the electrodes? {self.in_cluster_with_electrode}')
-                print(f'Effect of electric field: {0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3)}')
-                print(f'Act energy in E=0: {event[-1]}')
                 if self.in_cluster_with_electrode['top_layer'] or 'top_layer' in self.supp_by: 
                   # Positive bias hinder reduction --> Field helps remove electrons
                   Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0)
@@ -525,19 +522,15 @@ class Site():
                   Act_E = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0)
                 else:
                   Act_E = event[-1]
-                print(f'Event: {event}, Effective Act E: {Act_E}')
                   
               elif event[-2] == 'oxidation':
-                print(f'OXIDATION: Atom in {self.position} is in a cluster in contact with the electrodes? {self.in_cluster_with_electrode}')
-                print(f'Effect of electric field: {0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3)}')
-                print(f'Act energy in E=0: {event[-1]}')
                 if self.in_cluster_with_electrode['top_layer'] or 'top_layer' in self.supp_by: 
                   Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
                 elif self.in_cluster_with_electrode['bottom_layer'] or 'bottom_layer' in self.supp_by:
                   Act_E = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
                 else:
                   Act_E = event[-1]
-                print(f'Event: {event}, Effective Act E: {Act_E}')
+                
               
               else:
                 mig_vec = migration_pathways[event[-2]]

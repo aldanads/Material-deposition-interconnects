@@ -515,7 +515,7 @@ def initialization(n_sim):
         # =============================================================================
         #P = 0.01
         #System_state.defect_gen(rng,P)
-        System_state.deposition_specie(0,rng,test = 4)
+        System_state.deposition_specie(0,rng,test = 1)
         
         # This timestep_limits will depend on the V/s ratio
         System_state.timestep_limits = float('inf')

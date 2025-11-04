@@ -797,6 +797,9 @@ class Crystal_Lattice():
 # =============================================================================
 # Get coordinates of particles for solving Poisson and points to evaluate electric field
 # =============================================================================
+    def save_electric_bias(self,V):
+      self.V = V
+    
     def get_evaluation_points(self):
       # Get charge locations and charges from System_state
       particle_locations, charges = self._extract_particles_charges()
@@ -1362,6 +1365,18 @@ class Crystal_Lattice():
 # =============================================================================
         if isinstance(chosen_event[2], int): # If is int: migration or superbasin
             
+            if np.isclose(self.grid_crystal[chosen_event[1]].position[2], self.crystal_size[2]) and self.V < 0 and self.grid_crystal[chosen_event[-1]].ion_charge != 0:
+              # Remove particle
+              print('Remove particle')
+              print(f'Specie: {self.grid_crystal[chosen_event[-1]].chemical_specie}')
+              update_specie_events,update_supp_av = self.remove_specie_site(chosen_event[-1],update_specie_events,update_supp_av)
+              # We have to update every activation energy affected by the electric field            
+              if self.poissonSolver_parameters['solve_Poisson']: update_specie_events = self.sites_occupied
+              # Update sites availables, the support to each site and available migrations
+              self.update_sites(update_specie_events,update_supp_av)
+              print(f'Specie: {self.grid_crystal[chosen_event[-1]].chemical_specie}')
+              return
+              
             # Introduce specie in the site
             update_specie_events,update_supp_av = self.introduce_specie_site(
                 chosen_event[1],update_specie_events,update_supp_av,
