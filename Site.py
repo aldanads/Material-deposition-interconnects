@@ -8,6 +8,7 @@ from scipy import constants
 import numpy as np
 from sklearn.decomposition import PCA
 import os
+import copy
 
 
 class Site():
@@ -18,7 +19,7 @@ class Site():
         self.position = position
         self.nearest_neighbors_idx = [] # Nearest neighbors indexes
         self.nearest_neighbors_cart = [] # Nearest neighbors cartesian coordinates
-        self.Act_E_list = Act_E_list
+        self.Act_E_list = copy.deepcopy(Act_E_list)
         self.site_events = [] # Possible events corresponding to this node
         self.migration_paths = {'Plane':[],'Up':[],'Down':[]} # Possible migration sites with the corresponding label
 
@@ -361,8 +362,8 @@ class Site():
     def deposition_event(self,TR,idx_origin,num_event,Act_E):
         self.site_events.append([TR,idx_origin, num_event, Act_E])
         
-    def ion_generation_interface(self,idx_origin,Act_E):
-        self.site_events.append([idx_origin, 'generation', Act_E])
+    def ion_generation_interface(self,idx_origin):
+        self.site_events.append([idx_origin, 'generation', self.Act_E_list['E_gen_defect']])
         
     def remove_event_type(self,num_event):
         
@@ -512,24 +513,29 @@ class Site():
               
               if event[-2] == 'generation':
                 Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
-                
+                            
               elif event[-2] == 'reduction':
+                
+                Act_E = event[-1]
                 if self.in_cluster_with_electrode['top_layer'] or 'top_layer' in self.supp_by: 
                   # Positive bias hinder reduction --> Field helps remove electrons
                   Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0)
-                elif self.in_cluster_with_electrode['bottom_layer'] or 'bottom_layer' in self.supp_by:
+                if self.in_cluster_with_electrode['bottom_layer'] or 'bottom_layer' in self.supp_by:
                   # Positive bias facilitate reduction --> Field helps add electrons
                   Act_E = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0)
-                else:
-                  Act_E = event[-1]
+                  
                   
               elif event[-2] == 'oxidation':
+                
+                Act_E = event[-1]
                 if self.in_cluster_with_electrode['top_layer'] or 'top_layer' in self.supp_by: 
                   Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
-                elif self.in_cluster_with_electrode['bottom_layer'] or 'bottom_layer' in self.supp_by:
+                  #print(f'Atom in position {self.position} have an effective oxidation energy of {Act_E}')
+                  #print(f'Electric field is {E_site_field}, Act energy at zero field is {event[-1]} and the CN contribution to redox is {self.CN_redox_energy}')
+                if self.in_cluster_with_electrode['bottom_layer'] or 'bottom_layer' in self.supp_by:
                   Act_E = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
-                else:
-                  Act_E = event[-1]
+                
+                  
                 
               
               else:
@@ -587,7 +593,192 @@ class Cluster:
         grid_crystal[site_id].in_cluster_with_electrode['bottom_layer'] = touches_bottom
         grid_crystal[site_id].in_cluster_with_electrode['top_layer'] = touches_top
         
+    def internal_atoms_BC(self,grid_crystal):
+      """
+      Return positions of fully coordinated atoms in the cluster
+      (i.e., all nearest neighbors are also in the cluster).
+      These are used as Dirichlet BCs for Poisson solver.
+      """
+      internal_atoms_positions = []
+      for site in self.atoms_id:
+        neighbors = grid_crystal[site].nearest_neighbors_idx
+        # Count how many neighbors are metal atoms in this cluster
+        in_cluster_neighbors = sum(1 for nb in neighbors if nb in self.atoms_id)
+        # Fully coordinated = all neighbors are in the cluster
+        if in_cluster_neighbors == len(neighbors):
+          internal_atoms_positions.append(grid_crystal[site].position)
+        
+      self.internal_atoms_positions = internal_atoms_positions
+        
+        
+class GrainBoundary:
+    def __init__(self,domain_size, gb_configurations: list[dict] = None):
+        
+      """
+      Grain boundaries for memristive filament formation. Supporing:
+      - Vertical planar boundaries (between 2 grains)
+      - Cylindrical boundaries (triple junctions - 3+ grains)
+          
+      Parameters:
+      -----------
+      domain_size : list [lx, ly, lz] - Domain dimensions in Angstroms
+      gb_configurations : list of dicts 
+        List of grain boundary configurations
+      """
+      
+      self.domain_size = np.array(domain_size)
+      self.gb_configurations = gb_configurations or self._create_default_configurations()
+      
+      # Pre-process configurations for fast lookup
+      self._process_configurations()
+      
+    def _create_default_configurations(self) -> list[dict]:
+      """
+      Create default grain boundary configurations
+      """
+      configs = []
+      
+      # Vertical planar boundaries (between 2 grains)
+      configs.extend([
+        {
+          'type':'vertical_planar',
+          'orientation':'yz', # YZ plane
+          'position':self.domain_size[0] * 0.2, # Position in x
+          'width':2.0, # GB width in Angstroms
+          'extra_Act_E_outside': 1 # Difference of Act Energy outside GB
+        },
+        {
+          'type':'vertical_planar',
+          'orientation':'xz',
+          'position':self.domain_size[1] * 0.8, # Position in y
+          'width':2.0,
+          'extra_Act_E_outside': 1
+        }
+      ])
+      
+      # Cylindrical boundaries (triple junctions)
+      configs.extend([
+        {
+          'type':'cylindrical',
+          'center': [self.domain_size[0] * 0.5, self.domain_size[1] * 0.5],
+          'radius': 2.0,
+          'extra_Act_E_outside': 1
+        }
+      ])
+      
+      return configs
+      
+    def _process_configurations(self):
+        """
+        Pre-process configurations
+        """
+        self.vertical_gbs = []
+        self.cylindrical_gbs = []
+        
+        for config in self.gb_configurations:
+          if config['type'] == 'vertical_planar':
+            self.vertical_gbs.append(config)
+          elif config['type'] == 'cylindrical':
+            self.cylindrical_gbs.append(config)
             
+    def _is_site_in_grain_boundary(self, site_position: tuple) -> bool:
+      """
+      Check if site is in any grain boundary
+      """
+      x, y, z = np.array(site_position)
+      
+      # Check vertical planar boundaries
+      for gb in self.vertical_gbs:
+        if gb['orientation'] == 'yz':
+          # Vertical YZ place at specific x-position
+          if abs(x - gb['position']) <= gb['width'] / 2: return True
+          
+        elif gb['orientation'] == 'xz':
+          # Vertical XZ place at specific y-position
+          if abs(y - gb['position']) <= gb['width'] / 2: return True
+          
+        elif gb['orientation'] == 'xy':
+          # Horizontal XY place at specific z-position
+          if abs(z - gb['position']) <= gb['width'] / 2: return True
+          
+      # Check cylindrical boundaries
+      for gb in self.cylindrical_gbs:
+        cx, cy = gb['center']
+        radius = gb['radius']
+        
+        # Distance from cylinder axis
+        distance_from_axis = np.sqrt((x - cx)**2 + (y - cy)**2)
+        
+        if distance_from_axis <= radius: return True
+        
+      return False
+      
+    def get_activation_energy_GB(self, site_position: tuple) -> float:
+      """
+      Get additional activation energy outside GB
+      
+      Parameters:
+      -----------
+      site_position : tuple (x, y, z)
+        Site coordinates in Angstroms
+            
+      Returns:
+      --------
+      float : Activation energy at site
+      """
+      x, y, z = np.array(site_position)
+      
+      # Check vertical planar boundaries
+      for gb in self.vertical_gbs:
+        if gb['orientation'] == 'yz':
+          if abs(x - gb['position']) <= gb['width'] / 2: return gb['Act_E_diff_GB']
+          
+        elif gb['orientation'] == 'xz':
+          if abs(y - gb['position']) <= gb['width'] / 2: return gb['Act_E_diff_GB']
+          
+        elif gb['orientation'] == 'xy':
+          if abs(z - gb['position']) <= gb['width'] / 2: return gb['Act_E_diff_GB']
+          
+      # Check cylindrical boundaries
+      for gb in self.cylindrical_gbs:
+        cx, cy = gb['center']
+        radius = gb['radius']
+        
+        distance_from_axis = np.sqrt((x - cx)**2 + (y - cy)**2)
+        
+        if distance_from_axis <= radius: return gb['Act_E_diff_GB']
+          
+      
+    
+    def modify_act_energy_GB(self,site,migration_pathways):
+      """
+      Modify the activation energy for the site if it is outside the GB
+      """
+      
+      site_pos = site.position
+      
+      if self._is_site_in_grain_boundary(site_pos):
+        site.Act_E_list["E_gen_defect"] -= self.get_activation_energy_GB(site_pos)
+        site.Act_E_list["E_mig_plane"] -= self.get_activation_energy_GB(site_pos)
+        site.Act_E_list["E_mig_upward"] -= self.get_activation_energy_GB(site_pos)
+        site.Act_E_list["E_mig_downward"] -= self.get_activation_energy_GB(site_pos)
+        
+      
+      Act_E_mig = {}
+            
+      for key,migration_vector in migration_pathways.items():
+        z_component = migration_vector[2]
+        # Migration in plane
+        if np.isclose(z_component, 0.0, atol=1e-9):
+          Act_E_mig[key] = site.Act_E_list['E_mig_plane'] 
+        # Migration upward
+        elif z_component > 0:
+          Act_E_mig[key] = site.Act_E_list['E_mig_upward']
+        # Migration downward
+        elif z_component < 0:
+          Act_E_mig[key] = site.Act_E_list['E_mig_downward']
+          
+      site.Act_E_list['E_mig'] = Act_E_mig
                                 
         
 class Island:

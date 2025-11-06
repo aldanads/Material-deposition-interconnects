@@ -170,7 +170,7 @@ def main():
             save_Poisson = System_state.poissonSolver_parameters['save_Poisson']
             
             events_tracking = {}
-            V_top = -1.0
+            V_top = 1.0
             System_state.save_electric_bias(V_top)
        
             # Dolfinx only works in Linux
@@ -230,21 +230,21 @@ def main():
                   if i%poisson_solve_frequency == 0:
                   
                         # Calculate clusters for include BC in the cluster --> Virtual electrode
-                        """
                         if rank == 0:
-                          System_state.metal_clusters_analysis()
                           clusters = System_state.clusters
+                          for cluster in clusters.values():
+                            cluster.internal_atoms_BC(System_state.grid_crystal)
                         else:
                           clusters = None
-                        """  
-                        clusters = []
-                        clusters = comm.bcast(clusters, root=0)
-                        if i == 6:
-                          poisson_solver.set_boundary_conditions(top_value=V_top, bottom_value=0.0, clusters = clusters)
+                          
+                           
+                        #clusters = comm.bcast(clusters, root=0)
+                        clusters = {}
+                        poisson_solver.set_boundary_conditions(V_top, 0.0, clusters)
+
                         run_start_time = MPI.Wtime()
 
                         uh = poisson_solver.solve(particle_locations,charges)
-                        #uh = poisson_solver.test_PointCharge_UniformField_analytical(particle_locations,charges)
                         
                         run_time = MPI.Wtime() - run_start_time
                         
@@ -264,15 +264,16 @@ def main():
 
                 # kMC steps after solving Poisson equation, calculating the electric field and the impact in the transition rates
                 if rank == 0:   
+                  
                   System_state,KMC_time_step, chosen_event = KMC(System_state,rng)  
                   events_tracking[chosen_event[2]] += 1
+                   
                   
                 # Synchronize before continuing
                 if comm is not None:
                   comm.Barrier()
                      
                 i+=1
-                if i%(snapshoots_steps*30) == 0: exit()
                 if i%snapshoots_steps== 0:
                 
                     j+=1

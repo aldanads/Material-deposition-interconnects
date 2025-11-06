@@ -772,7 +772,7 @@ class PoissonSolver():
         
         
         
-    def set_boundary_conditions(self,top_value=0.0, bottom_value=0.0,clusters = []):
+    def set_boundary_conditions(self,top_value=0.0, bottom_value=0.0,clusters = {}):
         """
         Set Dirichlet boundary conditions on the top and bottom layers.
         """   
@@ -818,11 +818,11 @@ class PoissonSolver():
         
 
         cluster_boundary_conditions = []
-        for cluster in clusters:
+        for cluster in clusters.values():
           if cluster.attached_layer['bottom_layer']:
-            cluster_boundary_conditions = self._create_cluster_boundary_conditions(cluster.atoms_positions, bottom_value)
+            cluster_boundary_conditions = self._create_cluster_boundary_conditions(cluster.internal_atoms_positions, bottom_value)
           elif cluster.attached_layer['top_layer']:
-            cluster_boundary_conditions = self._create_cluster_boundary_conditions(cluster.atoms_positions, top_value)
+            cluster_boundary_conditions = self._create_cluster_boundary_conditions(cluster.internal_atoms_positions, top_value)
           
           all_boundary_conditions.extend(cluster_boundary_conditions) # Use extend() to avoid nested lists, as cluster_boundary_conditions is a list
 

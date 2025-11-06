@@ -34,8 +34,8 @@ def initialization(n_sim):
     
     save_data = True
     lammps_file = True
-    snapshoots_steps = int(1e0)
-    total_steps = int(1e1)
+    snapshoots_steps = int(1e2)
+    total_steps = int(1e4)
     
     simulation_parameters = {
       'save_data':save_data, 'snapshoots_steps':snapshoots_steps,
@@ -366,6 +366,18 @@ def initialization(n_sim):
         mode = ['interstitial', 'vacancy']
 
         sites_generation_layer = ['bottom_layer','top_layer']
+        
+        # -----------------
+        # Grain boundaries
+        # -----------------
+        gb_configurations = [
+          {
+          'type':'cylindrical',
+          'center': [crystal_size[0] * 0.5, crystal_size[1] * 0.5],
+          'radius': 4.0,
+          'Act_E_diff_GB': 2.7
+          }
+        ]
 
 
         script_directory = Path(__file__).parent        # Get the config path from the environment variable or fallback to the current directory
@@ -395,7 +407,8 @@ def initialization(n_sim):
           'mode': mode[0],
           'radius_neighbors': radius_neighbors,
           'sites_generation_layer': sites_generation_layer[1],
-          'available_events': available_events
+          'available_events': available_events,
+          'gb_configurations': gb_configurations
         }
 
 
@@ -417,7 +430,7 @@ def initialization(n_sim):
         
         # Parameters for Poisson solver
         active_dipoles = 4
-        poisson_solve_frequency = int(1e0)  # Solve Poisson every N KMC steps
+        poisson_solve_frequency = int(1e2)  # Solve Poisson every N KMC steps
         solve_Poisson = True
         save_Poisson = False
         
@@ -515,7 +528,7 @@ def initialization(n_sim):
         # =============================================================================
         #P = 0.01
         #System_state.defect_gen(rng,P)
-        System_state.deposition_specie(0,rng,test = 1)
+        #System_state.deposition_specie(0,rng,test = 3)
         
         # This timestep_limits will depend on the V/s ratio
         System_state.timestep_limits = float('inf')

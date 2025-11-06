@@ -6,7 +6,7 @@ Created on Wed Jan 10 15:19:06 2024
 """
 # import lattpy as lp # https://lattpy.readthedocs.io/en/latest/tutorial/finite.html#position-and-neighbor-data
 import matplotlib.pyplot as plt
-from Site import Site,Island, Cluster
+from Site import Site,Island,Cluster,GrainBoundary
 from scipy import constants
 import numpy as np
 import math
@@ -54,6 +54,7 @@ class Crystal_Lattice():
         self.sites_generation_layer = crystal_features['sites_generation_layer']
         self.available_events = crystal_features['available_events']
         self.interstitial_specie = kwargs.get('interstitial_specie', None)
+        self.gb_configurations = crystal_features['gb_configurations']
         
         # Deposition
         self.sticking_coefficient = experimental_conditions['sticking_coeff']
@@ -104,13 +105,13 @@ class Crystal_Lattice():
         else:
             self.wulff_facets = None
             self.dir_edge_facets = None
-            self.Act_E_gen = self.activation_energies['E_gen_defect']
+            #self.Act_E_gen = self.activation_energies['E_gen_defect']
             self._initialize_cluster_tracking()
             
             kb = constants.physical_constants['Boltzmann constant in eV/K'][0]
             nu0=7E12;  # nu0 (s^-1) bond vibration frequency
             T = 300
-            self.TR_gen = nu0 * np.exp(-self.Act_E_gen / (kb * T))
+            #self.TR_gen = nu0 * np.exp(-self.Act_E_gen / (kb * T))
 
 
         
@@ -487,6 +488,8 @@ class Crystal_Lattice():
         self.event_labels = {}
         self.migration_pathways = {}
         i = 0
+        
+
         for site in self.structure:
             neighbors = self.structure.get_neighbors(site, radius_neighbors)
             for neighbor in neighbors:
@@ -524,6 +527,9 @@ class Crystal_Lattice():
                     
             self.activation_energies['E_mig'] = Act_E_mig
             
+    
+      
+            
     def crystal_grid(self,grid_crystal,radius_neighbors,mode,affected_site,use_parallel=None):
         
         self._initialize_migration_pathways(radius_neighbors)
@@ -539,7 +545,9 @@ class Crystal_Lattice():
             use_mpi = False
  
         if grid_crystal == None:
+            
             if rank == 0:
+
                 # Set default parallelization based on system size and cores
                 if use_parallel is None:
                     use_parallel = len(self.structure) > 1600
@@ -596,12 +604,23 @@ class Crystal_Lattice():
                 
         else:
             
+            import copy
+            
             self.grid_crystal = grid_crystal
             self.domain_height = self.crystal_size[2]
             
             for site in self.grid_crystal.values():
                 site.site_events = []
-                site.Act_E_list = self.activation_energies
+                site.Act_E_list = copy.deepcopy(self.activation_energies)
+        
+        
+        # If we include grain boundaries, we should modify the activation energies
+        if hasattr(self, 'gb_configurations'):
+          self.gb_model = GrainBoundary(self.crystal_size,self.gb_configurations)
+          for site in self.grid_crystal.values():
+            self.gb_model.modify_act_energy_GB(site,self.migration_pathways)
+            
+          
                 
     def _handle_missing_neighbors(self,radius_neighbors, affected_site):
         """
@@ -1043,7 +1062,7 @@ class Crystal_Lattice():
                 else:
                     if (self.sites_generation_layer in site.supp_by) and (site.chemical_specie == self.affected_site):
                         self.adsorption_sites.append(idx)
-                        site.ion_generation_interface(idx,self.Act_E_gen)
+                        site.ion_generation_interface(idx)
                         update_gen_sites.add(idx)
                         
           return update_gen_sites  
@@ -1176,23 +1195,38 @@ class Crystal_Lattice():
             self.update_sites(update_specie_events,update_supp_av)
                  
 
-        # Introduce two adjacent particles
+        # Full coordinated atom --> Cluster
         elif test == 3:
             
-            if self.latt_orientation == '001': idx = (3,2,-2)
-            elif self.latt_orientation == '111': idx = (1,11,-12)
+            # Compute geometric center of the domain
+            center = np.array(self.crystal_size) * [0.5,0.5,0.5]  # assumes crystal_size = [Lx, Ly, Lz]
+            min_dist = float('inf')
+            central_site = None
+            central_idx = None
             
+            for idx, site in self.grid_crystal.items():
+                pos = np.array(site.position)
+                dist = np.linalg.norm(pos - center)
+                #print(f'Dist {dist} and min. dist. {min_dist}')
+                if dist < min_dist:
+                    min_dist = dist
+                    central_site = site
+                    central_idx = idx   
+                    
+                     
             # Introduce specie in the site
-            update_specie_events,update_supp_av = self.introduce_specie_site(idx,update_specie_events,update_supp_av)
-            # Update sites availables, the support to each site and available migrations
+            update_specie_events,update_supp_av = self.introduce_specie_site(central_idx,update_specie_events,update_supp_av,0)
             self.update_sites(update_specie_events,update_supp_av)
+            self._add_metal_atom_to_clusters(central_idx)
             
-            neighbor = self.grid_crystal[idx].migration_paths['Plane'][0]
-            # Introduce specie in the neighbor site
-            update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av)
-            # Update sites availables, the support to each site and available migrations
-            self.update_sites(update_specie_events,update_supp_av)
-            
+            for migration_path in self.grid_crystal[central_idx].migration_paths.values():
+              
+              for neighbor in migration_path:
+                  update_specie_events,update_supp_av = self.introduce_specie_site(neighbor[0],update_specie_events,update_supp_av,0)
+                  self.update_sites(update_specie_events,update_supp_av)
+                  print(f'Neighbor: {neighbor}')
+                  self._add_metal_atom_to_clusters(neighbor[0])
+                  
 
         # Cluster - particles in plane, one on bottom
         elif test == 4:
@@ -1367,14 +1401,11 @@ class Crystal_Lattice():
             
             if np.isclose(self.grid_crystal[chosen_event[1]].position[2], self.crystal_size[2]) and self.V < 0 and self.grid_crystal[chosen_event[-1]].ion_charge != 0:
               # Remove particle
-              print('Remove particle')
-              print(f'Specie: {self.grid_crystal[chosen_event[-1]].chemical_specie}')
               update_specie_events,update_supp_av = self.remove_specie_site(chosen_event[-1],update_specie_events,update_supp_av)
               # We have to update every activation energy affected by the electric field            
               if self.poissonSolver_parameters['solve_Poisson']: update_specie_events = self.sites_occupied
               # Update sites availables, the support to each site and available migrations
               self.update_sites(update_specie_events,update_supp_av)
-              print(f'Specie: {self.grid_crystal[chosen_event[-1]].chemical_specie}')
               return
               
             # Introduce specie in the site
@@ -1469,6 +1500,7 @@ class Crystal_Lattice():
 
         if update_specie_events: 
             # Sites are not available because a particle has migrated there
+
             for idx in update_specie_events:
                 self.grid_crystal[idx].available_pathways(self.grid_crystal,idx,self.facets_type,self.available_events)
                 self.grid_crystal[idx].transition_rates()
