@@ -604,8 +604,7 @@ class Crystal_Lattice():
           for site in self.grid_crystal.values():
             self.gb_model.modify_act_energy_GB(site,self.migration_pathways)
             
-          
-                
+           
     def _handle_missing_neighbors(self,radius_neighbors, affected_site):
         """
         Identify and add missing neighbor sites to the grid_crystal.

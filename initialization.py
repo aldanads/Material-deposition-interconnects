@@ -34,8 +34,8 @@ def initialization(n_sim):
     
     save_data = True
     lammps_file = True
-    snapshoots_steps = int(4e2)
-    total_steps = int(snapshoots_steps * 15)
+    snapshoots_steps = int(4e1)
+    total_steps = int(snapshoots_steps * 30)
     
     simulation_parameters = {
       'save_data':save_data, 'snapshoots_steps':snapshoots_steps,
@@ -441,7 +441,7 @@ def initialization(n_sim):
         
         # Parameters for Poisson solver
         active_dipoles = 4
-        poisson_solve_frequency = int(4e2)  # Solve Poisson every N KMC steps
+        poisson_solve_frequency = int(snapshoots_steps)  # Solve Poisson every N KMC steps
         solve_Poisson = True
         save_Poisson = False
         

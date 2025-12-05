@@ -94,7 +94,8 @@ class Site():
                 elif (pos[2]-self.position[2]) < -tol:               
                     self.migration_paths['Down'].append([tuple(min_dist_idx),event_labels[tuple(idx - np.array(idx_origin))]])
               
-        self.mig_paths_plane = {num_event:site_idx for site_idx, num_event in self.migration_paths['Plane']}       
+        self.mig_paths_plane = {num_event:site_idx for site_idx, num_event in self.migration_paths['Plane']}  
+        self.NN_dist = min(np.sqrt(np.sum((np.array(self.nearest_neighbors_cart) - self.position)**2, axis=1)))     
 
 # =============================================================================
 #         Occupied sites supporting this node
@@ -580,6 +581,9 @@ class Site():
             elif len(event) == 4:
                 event[0] = tr_value
                 
+        #if any(event[-2] == 'reduction' for event in self.site_events):
+        #  print(f'Pos: {self.position}, NN: {len(self.supp_by)}')
+        #  print(f'Site events: {self.site_events}')
                 
 class Cluster:
     def __init__(self,cluster_atoms,atoms_positions,attached_layer,conductivity):
@@ -938,13 +942,15 @@ class GrainBoundary:
         #site.Act_E_list["E_mig_plane"] -= self.get_activation_energy_GB(site_pos)
         #site.Act_E_list["E_mig_upward"] -= self.get_activation_energy_GB(site_pos)
         #site.Act_E_list["E_mig_downward"] -= self.get_activation_energy_GB(site_pos)
-        
-      
+
       Act_E_mig = {}
+      
+      in_GB = False
+      out_GB = False
             
       for key,migration_vector in migration_pathways.items():
         # Calculate destination position
-        dest_pos = site_pos + migration_vector
+        dest_pos = site_pos + migration_vector * site.NN_dist
         z_component = migration_vector[2]
         
         # Migration in plane
@@ -959,16 +965,19 @@ class GrainBoundary:
           
         # Modify only if destination is in GB
         if self._is_site_in_grain_boundary(dest_pos):
+          in_GB = True
           # Lower barrier to enter GB (particles prefer GB)
           modified_energy = base_energy - self.get_activation_energy_GB(dest_pos)
         else:
           # No modification for bulk destinations (base case)
+          out_GB = True
           modified_energy = base_energy
           
         Act_E_mig[key] = modified_energy
+        
           
-      site.Act_E_list['E_mig'] = Act_E_mig
-                                
+      site.Act_E_list['E_mig'] = Act_E_mig   
+      
         
 class Island:
     def __init__(self,z_starting_position,z_starting_pos_cart,island_sites):
