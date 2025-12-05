@@ -19,7 +19,7 @@ class Site():
         self.position = position
         self.nearest_neighbors_idx = [] # Nearest neighbors indexes
         self.nearest_neighbors_cart = [] # Nearest neighbors cartesian coordinates
-        self.Act_E_list = copy.deepcopy(Act_E_list)
+        self.Act_E_list = copy.deepcopy(Act_E_list) # Its own copy 
         self.site_events = [] # Possible events corresponding to this node
         self.migration_paths = {'Plane':[],'Up':[],'Down':[]} # Possible migration sites with the corresponding label
 
@@ -487,29 +487,28 @@ class Site():
         E_site_field = kwargs.get("E_site_field", np.array([0.0, 0.0, 0.0]))
         migration_pathways =  kwargs.get("migration_pathways")
         
-        
         relevant_field = np.any(abs(E_site_field) > 1e6)
+        
+        # Ions in contact with the virtual electrode will have the reduction rate affected
+        clusters = kwargs.get("clusters")
+        atom_to_cluster = kwargs.get("atom_to_cluster", {})
+        self.in_cluster_with_electrode = {'bottom_layer': False, 'top_layer': False}
+              
+        if len(atom_to_cluster) > 0 and self.ion_charge > 0:        
+          for nb in self.supp_by:
+            if (not isinstance(nb, str) and nb in atom_to_cluster):    
+              cid = atom_to_cluster[nb]
+              cluster = clusters[cid]
+              if cluster.attached_layer['bottom_layer']:
+                self.in_cluster_with_electrode['bottom_layer'] = True
+              if cluster.attached_layer['top_layer']:
+                self.in_cluster_with_electrode['top_layer'] = True
+                
         
         # Iterate over site_events directly, no need to use range(len(...))
         for event in self.site_events:
           
             if relevant_field:
-              
-              # Ions in contact with the virtual electrode will have the reduction rate affected
-              clusters = kwargs.get("clusters")
-              atom_to_cluster = kwargs.get("atom_to_cluster")
-              
-              if len(atom_to_cluster) > 0 and self.ion_charge > 0:
-                self.in_cluster_with_electrode = {'bottom_layer': False, 'top_layer': False}
-                
-                for nb in self.supp_by:
-                  if (not isinstance(nb, str) and nb in atom_to_cluster):    
-                    cid = atom_to_cluster[nb]
-                    cluster = clusters[cid]
-                    if cluster.attached_layer['bottom_layer']:
-                      self.in_cluster_with_electrode['bottom_layer'] = True
-                    if cluster.attached_layer['top_layer']:
-                      self.in_cluster_with_electrode['top_layer'] = True
               
               if event[-2] == 'generation':
                 Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
@@ -517,24 +516,43 @@ class Site():
               elif event[-2] == 'reduction':
                 
                 Act_E = event[-1]
-                if self.in_cluster_with_electrode['top_layer'] or 'top_layer' in self.supp_by: 
-                  # Positive bias hinder reduction --> Field helps remove electrons
-                  Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0)
-                if self.in_cluster_with_electrode['bottom_layer'] or 'bottom_layer' in self.supp_by:
-                  # Positive bias facilitate reduction --> Field helps add electrons
-                  Act_E = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0)
+                
+                # Cluster bridging both electrodes
+                if self.in_cluster_with_electrode['top_layer'] and self.in_cluster_with_electrode['bottom_layer']:
+                  field_along_pathway = [round(np.dot(E_site_field,migration_pathways[event[2]]) * 1e-10,3) for event in self.site_events if not isinstance(event[2],str)]
+                  
+                  if field_along_pathway:
+                    Act_E_pathway = [event[-1] + 0.5 * field for field in field_along_pathway]
+                    Act_E = max(min(Act_E_pathway), 0.3)
+
+                else:
+                  if self.in_cluster_with_electrode['top_layer'] or 'top_layer' in self.supp_by: 
+                    # Positive bias hinder reduction --> Field helps remove electrons
+                    Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0.3)
+                  if self.in_cluster_with_electrode['bottom_layer'] or 'bottom_layer' in self.supp_by:
+                    # Positive bias facilitate reduction --> Field helps add electrons
+                    Act_E = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,1]) * 1e-10,3), 0.3)
+                    
+                
                   
                   
               elif event[-2] == 'oxidation':
                 
                 Act_E = event[-1]
-                if self.in_cluster_with_electrode['top_layer'] or 'top_layer' in self.supp_by: 
-                  Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
-                  #print(f'Atom in position {self.position} have an effective oxidation energy of {Act_E}')
-                  #print(f'Electric field is {E_site_field}, Act energy at zero field is {event[-1]} and the CN contribution to redox is {self.CN_redox_energy}')
-                if self.in_cluster_with_electrode['bottom_layer'] or 'bottom_layer' in self.supp_by:
-                  Act_E = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
                 
+                # Cluster bridging both electrodes
+                if self.in_cluster_with_electrode['top_layer'] and self.in_cluster_with_electrode['bottom_layer']:
+                  field_along_pathway = [round(np.dot(E_site_field,migration_pathways[event[2]]) * 1e-10,3) for event in self.site_events if not isinstance(event[2],str)]
+                  
+                  if field_along_pathway:
+                    Act_E_pathway = [event[-1] - 0.5 * field for field in field_along_pathway]
+                    Act_E = max(min(Act_E_pathway), self.Act_E_list['E_min_gen'])
+                else:
+                  if self.in_cluster_with_electrode['top_layer'] or 'top_layer' in self.supp_by: 
+                    Act_E = max(event[-1] - 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
+                  if self.in_cluster_with_electrode['bottom_layer'] or 'bottom_layer' in self.supp_by:
+                    Act_E = max(event[-1] + 0.5 * round(np.dot(E_site_field,[0,0,-1]) * 1e-10,3), self.Act_E_list['E_min_gen'])
+                  
                   
                 
               
@@ -563,13 +581,13 @@ class Site():
                 event[0] = tr_value
                 
                 
-                
 class Cluster:
-    def __init__(self,cluster_atoms,atoms_positions,attached_layer):
+    def __init__(self,cluster_atoms,atoms_positions,attached_layer,conductivity):
       self.atoms_id = set(cluster_atoms)
       self.atoms_positions = atoms_positions
       self.size = len(self.atoms_id)
       self.attached_layer = attached_layer
+      self.conductivity = conductivity
       
     def update_electrode_contact(self,grid_crystal):
       """Update whether this cluster touches top/bottom electrode layers."""
@@ -588,27 +606,173 @@ class Cluster:
         
       self.attached_layer = {'bottom_layer': touches_bottom, 'top_layer': touches_top}
       
+      
+      
       # Propagate to every atom in the cluster
       for site_id in self.atoms_id:
         grid_crystal[site_id].in_cluster_with_electrode['bottom_layer'] = touches_bottom
         grid_crystal[site_id].in_cluster_with_electrode['top_layer'] = touches_top
         
-    def internal_atoms_BC(self,grid_crystal):
+    def prepare_cluster_for_bcs(self,grid_crystal):
       """
-      Return positions of fully coordinated atoms in the cluster
-      (i.e., all nearest neighbors are also in the cluster).
-      These are used as Dirichlet BCs for Poisson solver.
+      1. Identifies and stores positions of fully coordinated atoms within the cluster.
+       These internal atoms are suitable for applying Dirichlet BCs in the Poisson solver.
+      2. If the cluster bridges both the top and bottom layers, it performs slicing
+       to prepare data for per-layer potential drop calculations.
       """
-      internal_atoms_positions = []
+      
+      # 1) For virtual electrodes
+      internal_atom_positions = []
+      internal_sites = set()
       for site in self.atoms_id:
         neighbors = grid_crystal[site].nearest_neighbors_idx
         # Count how many neighbors are metal atoms in this cluster
         in_cluster_neighbors = sum(1 for nb in neighbors if nb in self.atoms_id)
         # Fully coordinated = all neighbors are in the cluster
         if in_cluster_neighbors == len(neighbors):
-          internal_atoms_positions.append(grid_crystal[site].position)
+          internal_atom_positions.append(grid_crystal[site].position)
+          internal_sites.add(site)
         
-      self.internal_atoms_positions = internal_atoms_positions
+      self.internal_atom_positions = internal_atom_positions
+      self.internal_sites = internal_sites
+      
+      # 2) When filament is bridging the electrodes: calculate the voltage drops across the filament
+      if self.attached_layer['bottom_layer'] and self.attached_layer['top_layer']:
+        self._slice_cluster(grid_crystal)
+        self._cluster_resistance(grid_crystal)
+      
+      
+    def _slice_cluster(self,grid_crystal):
+      """
+      Slice the cluster in the z axis
+      """
+      #sites_occupied = System_state.sites_occupied
+      sites_occupied = self.atoms_id
+        
+      # Convert occupied sites to Cartesian coordinates and sort by z-coordinate in descending order
+      sites_occupied_cart = sorted(
+        ((grid_crystal[site].position, site) for site in sites_occupied), 
+          key=lambda coord: coord[0][2], 
+          reverse=True
+        )
+        
+      total_visited = set()
+      slice_list = []
+      slice_internal_positions = []
+      
+      for cart_coords, site in sites_occupied_cart:
+        if site not in total_visited:
+          slice_sites = self._build_slice(grid_crystal, {site},site)
+                
+          # Intersection between the new slice and the total_visited atoms. If some atoms are already in total_visited -> Overlap
+          # Skip that atom
+          if slice_sites & total_visited:
+            continue
+                
+          slice_list.append(list(slice_sites))
+          slice_internal_ids = slice_sites.intersection(self.internal_sites)
+          slice_internal_pos = [grid_crystal[s_id].position for s_id in slice_internal_ids]
+          
+          slice_internal_positions.append(slice_internal_pos)
+          
+          total_visited.update(slice_sites)
+
+      self.slice_list = slice_list
+      self.slice_internal_positions_per_slice = slice_internal_positions
+
+      
+    def _build_slice(self,grid_crystal,slice_sites,start_idx):
+      """
+      Helper function to build the slice
+      """
+      stack = [start_idx]
+        
+      while stack:
+        idx = stack.pop()
+        site = grid_crystal[idx]
+            
+        for element in site.migration_paths['Plane']:
+    
+          if element[0] not in slice_sites and element[0] in self.atoms_id:
+            slice_sites.add(element[0])
+            stack.append(element[0])
+                    
+      return slice_sites 
+      
+    def _cluster_resistance(self,grid_crystal):
+      """
+      Calculates the cluster resistance based on morphology (sliced layers).
+      Uses cached geometric data for efficiency.
+      """
+      
+      # Ensure geometric data is available (calculate once if needed)
+      self._ensure_geometry_data_cached(grid_crystal)
+      
+      if self._layer_thickness_z is None or self._area_per_site is None:
+        return None
+        
+      # --- Calculate Total Resistance ---
+      total_resistance = 0.0
+      layers_resistance = []
+      
+      for layer_slice in self.slice_list:
+        num_atoms_in_layer = len(layer_slice)
+        effective_area = num_atoms_in_layer * self._area_per_site
+        layer_resistance = self._layer_thickness_z / (effective_area * self.conductivity)
+        layers_resistance.append(layer_resistance)
+        total_resistance += layer_resistance
+        
+      self.total_resistance = total_resistance
+      self.layers_resistance = layers_resistance
+    
+    
+    def voltage_across_cluster(self,V_top, V_bottom):
+    
+      V_diff = V_top - V_bottom
+      I_current = V_diff / self.total_resistance # Current through the whole filament
+      voltage_drop_layer = np.array(self.layers_resistance) * I_current # V_drop for each layer
+      
+      potential_layer_BC = [(V_top - np.sum(voltage_drop_layer[:i])) for i in range(len(voltage_drop_layer)) ]
+      
+      return potential_layer_BC
+    
+      
+      
+    def _ensure_geometry_data_cached(self,grid_crystal):
+      """
+      Helper function to calculate and cache geometric data (layer thickness, area per site)
+      only if it hasn't been calculated yet
+      """
+      
+      # Check if we already have the data
+      if not hasattr(self, '_layer_thickness_z'):
+        # --- Calculate layer thickness ---
+        pos_1st_layer = grid_crystal[self.slice_list[0][0]].position
+        pos_2nd_layer = grid_crystal[self.slice_list[1][0]].position
+        self._layer_thickness_z = np.linalg.norm(np.array(pos_1st_layer[2]) - np.array(pos_2nd_layer[2])) * 1e-10
+      
+      
+        # --- Calculate area per site
+        sites_per_layer = len(grid_crystal) / len(self.slice_list)
+        
+        x_max = -float('inf')
+        x_min = float('inf')
+        
+        y_max = -float('inf')
+        y_min = float('inf')
+      
+        for site in grid_crystal.values():
+          x,y,z = site.position
+          if x > x_max: x_max = x
+          if x < x_min: x_min = x
+          if y > y_max: y_max = y
+          if y < y_min: y_min = y  
+                     
+        x_size = (x_max - x_min) * 1e-10
+        y_size = (y_max - y_min) * 1e-10
+        
+        self._area_per_site = (x_size * y_size) / sites_per_layer
+    
         
         
 class GrainBoundary:
@@ -645,24 +809,34 @@ class GrainBoundary:
           'orientation':'yz', # YZ plane
           'position':self.domain_size[0] * 0.2, # Position in x
           'width':2.0, # GB width in Angstroms
-          'extra_Act_E_outside': 1 # Difference of Act Energy outside GB
+          'Act_E_diff_GB': 1 # Difference of Act Energy outside GB
         },
         {
           'type':'vertical_planar',
           'orientation':'xz',
           'position':self.domain_size[1] * 0.8, # Position in y
           'width':2.0,
-          'extra_Act_E_outside': 1
+          'Act_E_diff_GB': 1
         }
       ])
       
-      # Cylindrical boundaries (triple junctions)
+      # Cylindrical boundaries
       configs.extend([
         {
           'type':'cylindrical',
           'center': [self.domain_size[0] * 0.5, self.domain_size[1] * 0.5],
           'radius': 2.0,
-          'extra_Act_E_outside': 1
+          'Act_E_diff_GB': 1
+        }
+      ])
+      
+      # Triple Junction Planes (3 planes intersecting, between 3 grains)
+      configs.extend([
+        {
+          'type': 'triple_junction_planes',
+          'center': [self.domain_size[0] * 0.5, self.domain_size[1] * 0.5],
+          'width' : 2.0, # Width of each planar GB region
+          'Act_E_diff_GB': 1 
         }
       ])
       
@@ -680,6 +854,8 @@ class GrainBoundary:
             self.vertical_gbs.append(config)
           elif config['type'] == 'cylindrical':
             self.cylindrical_gbs.append(config)
+          elif config['type'] == 'triple_junction_planes':
+            self.triple_junction_gbs.append(config)
             
     def _is_site_in_grain_boundary(self, site_position: tuple) -> bool:
       """
@@ -759,24 +935,37 @@ class GrainBoundary:
       
       if self._is_site_in_grain_boundary(site_pos):
         site.Act_E_list["E_gen_defect"] -= self.get_activation_energy_GB(site_pos)
-        site.Act_E_list["E_mig_plane"] -= self.get_activation_energy_GB(site_pos)
-        site.Act_E_list["E_mig_upward"] -= self.get_activation_energy_GB(site_pos)
-        site.Act_E_list["E_mig_downward"] -= self.get_activation_energy_GB(site_pos)
+        #site.Act_E_list["E_mig_plane"] -= self.get_activation_energy_GB(site_pos)
+        #site.Act_E_list["E_mig_upward"] -= self.get_activation_energy_GB(site_pos)
+        #site.Act_E_list["E_mig_downward"] -= self.get_activation_energy_GB(site_pos)
         
       
       Act_E_mig = {}
             
       for key,migration_vector in migration_pathways.items():
+        # Calculate destination position
+        dest_pos = site_pos + migration_vector
         z_component = migration_vector[2]
+        
         # Migration in plane
         if np.isclose(z_component, 0.0, atol=1e-9):
-          Act_E_mig[key] = site.Act_E_list['E_mig_plane'] 
+          base_energy = site.Act_E_list['E_mig_plane'] 
         # Migration upward
         elif z_component > 0:
-          Act_E_mig[key] = site.Act_E_list['E_mig_upward']
+          base_energy = site.Act_E_list['E_mig_upward']
         # Migration downward
         elif z_component < 0:
-          Act_E_mig[key] = site.Act_E_list['E_mig_downward']
+          base_energy = site.Act_E_list['E_mig_downward']
+          
+        # Modify only if destination is in GB
+        if self._is_site_in_grain_boundary(dest_pos):
+          # Lower barrier to enter GB (particles prefer GB)
+          modified_energy = base_energy - self.get_activation_energy_GB(dest_pos)
+        else:
+          # No modification for bulk destinations (base case)
+          modified_energy = base_energy
+          
+        Act_E_mig[key] = modified_energy
           
       site.Act_E_list['E_mig'] = Act_E_mig
                                 

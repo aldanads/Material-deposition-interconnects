@@ -224,23 +224,20 @@ def main():
                   
                   comm.Barrier()
                   
-                  #if i == 100:
-                  # poisson_solver.set_boundary_conditions(top_value=1.0, bottom_value=0.0)
-                  
                   if i%poisson_solve_frequency == 0:
                   
                         # Calculate clusters for include BC in the cluster --> Virtual electrode
                         if rank == 0:
                           clusters = System_state.clusters
                           for cluster in clusters.values():
-                            cluster.internal_atoms_BC(System_state.grid_crystal)
+                            cluster.prepare_cluster_for_bcs(System_state.grid_crystal)
+                  
                         else:
                           clusters = None
-                          
-                           
-                        #clusters = comm.bcast(clusters, root=0)
-                        clusters = {}
-                        poisson_solver.set_boundary_conditions(V_top, 0.0, clusters)
+                
+                        clusters = comm.bcast(clusters, root=0)
+                        poisson_solver.set_boundary_conditions(V_top, 0.0,clusters)
+                        
 
                         run_start_time = MPI.Wtime()
 
@@ -248,23 +245,23 @@ def main():
                         
                         run_time = MPI.Wtime() - run_start_time
                         
+                        
                         if rank == 0: print(f'Run time to solve Poisson: {run_time}')
-            
+
                         if save_Poisson:
                           poisson_solver.save_potential(uh,System_state.time,j+1)
                           
                         if rank == 0: print(f"Poisson solved at step {i}")
                         run_time = 0
                         
-                  E_field = poisson_solver.evaluate_electric_field_at_points(uh,E_field_points)      
-                  if rank == 0:
-                      System_state.update_transition_rates_with_electric_field(E_field)
-                      
-
+                  E_field = poisson_solver.evaluate_electric_field_at_points(uh,E_field_points)   
+                  
+                  if rank == 0:                       
+                        System_state.update_transition_rates_with_electric_field(E_field)
+                        
 
                 # kMC steps after solving Poisson equation, calculating the electric field and the impact in the transition rates
-                if rank == 0:   
-                  
+                if rank == 0:       
                   System_state,KMC_time_step, chosen_event = KMC(System_state,rng)  
                   events_tracking[chosen_event[2]] += 1
                    

@@ -34,8 +34,8 @@ def initialization(n_sim):
     
     save_data = True
     lammps_file = True
-    snapshoots_steps = int(1e2)
-    total_steps = int(1e4)
+    snapshoots_steps = int(4e2)
+    total_steps = int(snapshoots_steps * 15)
     
     simulation_parameters = {
       'save_data':save_data, 'snapshoots_steps':snapshoots_steps,
@@ -370,6 +370,7 @@ def initialization(n_sim):
         # -----------------
         # Grain boundaries
         # -----------------
+
         gb_configurations = [
           {
           'type':'cylindrical',
@@ -378,7 +379,17 @@ def initialization(n_sim):
           'Act_E_diff_GB': 2.7
           }
         ]
-
+        """
+        gb_configurations = [
+          {
+          'type':'vertical_planar',
+          'orientation':'xz',
+          'position':crystal_size[1] * 0.5, # Position in y
+          'width':8.0,
+          'Act_E_diff_GB': 2.7
+          }
+        ]
+        """
 
         script_directory = Path(__file__).parent        # Get the config path from the environment variable or fallback to the current directory
         config_path = script_directory / 'config.json'
@@ -430,12 +441,13 @@ def initialization(n_sim):
         
         # Parameters for Poisson solver
         active_dipoles = 4
-        poisson_solve_frequency = int(1e2)  # Solve Poisson every N KMC steps
+        poisson_solve_frequency = int(4e2)  # Solve Poisson every N KMC steps
         solve_Poisson = True
         save_Poisson = False
         
         screening_factor = 0.01
         ion_charge = 1
+        conductivity  = 6.3e7 * 0.1
         
 
         
@@ -468,7 +480,8 @@ def initialization(n_sim):
         poissonSolver_parameters = {'mesh_file':mesh_file,
                                     'epsilon_r':epsilon_r,'chem_env_symmetry':chem_env_symmetry,'metal_valence':metal_valence,'d_metal_O':d_metal_O,'active_dipoles':active_dipoles,
                                     'poisson_solve_frequency':poisson_solve_frequency,'solve_Poisson':solve_Poisson,'save_Poisson':save_Poisson, 'screening_factor':screening_factor,
-                                    'ion_charge':ion_charge
+                                    'ion_charge':ion_charge,
+                                    'conductivity':conductivity
         
         }
         
@@ -528,7 +541,7 @@ def initialization(n_sim):
         # =============================================================================
         #P = 0.01
         #System_state.defect_gen(rng,P)
-        #System_state.deposition_specie(0,rng,test = 3)
+        #System_state.deposition_specie(0,rng,test = 6)
         
         # This timestep_limits will depend on the V/s ratio
         System_state.timestep_limits = float('inf')

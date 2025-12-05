@@ -156,6 +156,9 @@ class PoissonSolver():
         self.u_trial = ufl.TrialFunction(self.V)
         self.v_test = ufl.TestFunction(self.V)
         
+        # Pre-create conductivity (sigma)
+        #self.sigma = fem.Function(self.W)
+        
         # Pre-create forms (bilinear form is constant)
         # Pymatgen works in angstrom
         
@@ -811,21 +814,43 @@ class PoissonSolver():
         
         # Apply Dirichlet boundary conditions
         bc_top = fem.dirichletbc(u_top, boundary_dofs_top)
-        all_boundary_conditions.append(bc_top)
         bc_bottom = fem.dirichletbc(u_bottom, boundary_dofs_bottom)
-        all_boundary_conditions.append(bc_bottom)
-        # Clusters boundary conditions
         
-
-        cluster_boundary_conditions = []
+        all_boundary_conditions.extend([bc_top, bc_bottom]) # Add electrode BCs first
+        
+        # ---- Helper function for cluster BCs -----
+        def apply_cluster_bc(atom_positions, potential_value):
+          """Helper to create and add BCs for a set of atom positions."""
+          cluster_bcs = self._create_cluster_boundary_conditions(atom_positions, potential_value)
+          all_boundary_conditions.extend(cluster_bcs)
+        
+        
+        # ---- Clusters boundary conditions ----
         for cluster in clusters.values():
-          if cluster.attached_layer['bottom_layer']:
-            cluster_boundary_conditions = self._create_cluster_boundary_conditions(cluster.internal_atoms_positions, bottom_value)
-          elif cluster.attached_layer['top_layer']:
-            cluster_boundary_conditions = self._create_cluster_boundary_conditions(cluster.internal_atoms_positions, top_value)
+          # Check if cluster touches electrodes
+          touches_bottom = cluster.attached_layer['bottom_layer']
+          touches_top = cluster.attached_layer['top_layer']
           
-          all_boundary_conditions.extend(cluster_boundary_conditions) # Use extend() to avoid nested lists, as cluster_boundary_conditions is a list
+          if touches_bottom and touches_top:
+            print('BC: Touches bottom and top')
+            # Bridging cluster: Apply per layer potential drop
+            V_across_cluster = cluster.voltage_across_cluster(top_value, bottom_value)
+            for cluster_slice, V_slice in zip(cluster.slice_internal_positions_per_slice, V_across_cluster):
+              apply_cluster_bc(cluster_slice, V_slice)
+              
+          elif touches_bottom:
+            print('BC: Touches bottom')
+            # Cluster connected only to bottom electrode
+            apply_cluster_bc(cluster.internal_atom_positions, bottom_value)
+            
+          elif touches_top:
+            print('BC: Touches top')
+            # Cluster connected only to top electrode
+            apply_cluster_bc(cluster.internal_atom_positions, top_value)
+            
 
+
+        
         self.bcs = all_boundary_conditions
         
         
@@ -1045,7 +1070,7 @@ class PoissonSolver():
       print("="*70 + "\n")
           
         
-    def charge_density(self, charge_locations, charges, tolerance = 2):
+    def charge_density(self, charge_locations, charges, tolerance = 3):
         """
         Create a DG0 Function representing charge density with Gaussian approximations
         of point charges at specified locations.
@@ -1113,9 +1138,40 @@ class PoissonSolver():
           
         return self.rho
         
+    def conductivity_in_system(self,metal_atoms):
+      """
+      Include the conductivity of the metal and the dielectric for solving Poisson
+      """
+      
+      sigma_metal = 1e6#e6          # S/m
+      sigma_dielectric = 1e-1   # S/m
+      # Initialize sigma to dielectric value everywhere
+      self.sigma.x.array[:] = sigma_dielectric
+      
+      if not metal_atoms:
+        return
+
+      points_array = np.asarray(metal_atoms, dtype=np.float64)
+      if points_array.ndim == 1:
+        points_array = points_array.reshape(1, -1)
+        
+      bb_tree = geometry.bb_tree(self.domain,self.domain.topology.dim)
+      cell_candidates = geometry.compute_collisions_points(bb_tree, points_array)
+      colliding_cells = geometry.compute_colliding_cells(self.domain, cell_candidates, points_array)
+          
+      for i in range(len(points_array)):
+        if len(colliding_cells.links(i)) > 0:
+          cell_id = colliding_cells.links(i)[0]
+          if cell_id < len(self.sigma.x.array):
+            self.sigma.x.array[cell_id] = sigma_metal
+            
+      
+      
+
+         
         
         
-    def solve(self, charge_locations, charges, charge_err_tol = 2):
+    def solve(self, charge_locations, charges, charge_err_tol = 3):
         """
         Solve the Poisson equation with the given charge locations and magnitudes.
         
@@ -1128,6 +1184,8 @@ class PoissonSolver():
           - Only creates L_form once per solve (not stored as it depends on rho) 
           
         """
+        # Need to update conductivity before assembling the matrix
+        #self.conductivity_in_system(metal_atoms)
         
         # Reassemble matrix only when BCs change
         if self._bcs_changed:
@@ -1405,6 +1463,9 @@ class PoissonSolver():
       Evaluate a dolfinx function at specific points
       """
       points_array = np.asarray(points,dtype=np.float64)
+      
+      if len(points_array) == 0:
+        return
       
       # Find cells containing points
       bb_tree = geometry.bb_tree(self.domain,self.domain.topology.dim)
